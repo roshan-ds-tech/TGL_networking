@@ -31,6 +31,53 @@
     *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
   }
 
+  /* ---- responsive ---- */
+  /* Sticky side columns are only safe while the grid has two columns. Once it
+     collapses to one, the sticky block travels down over the stacked content. */
+  @media (max-width: 900px) {
+    [data-sticky-col] { position: static !important; top: auto !important; }
+  }
+  /* Tighter gutters and vertical rhythm on small screens. */
+  @media (max-width: 640px) {
+    section { padding-left: 18px !important; padding-right: 18px !important; }
+    section[id], div[id] { scroll-margin-top: 76px; }
+  }
+  @media (max-width: 480px) {
+    section { padding-left: 14px !important; padding-right: 14px !important; }
+  }
+  /* Stat pill pair must be allowed to shrink instead of forcing a scrollbar. */
+  @media (max-width: 560px) {
+    [data-stat-pills] { flex-shrink: 1 !important; }
+    [data-stat-pills] > div { padding-left: 14px !important; padding-right: 14px !important; }
+  }
+  /* Oversized feature-card padding is too costly on narrow screens. */
+  @media (max-width: 560px) {
+    [data-wide-pad] { padding-left: 22px !important; padding-right: 22px !important; }
+  }
+  /* Pill CTAs stop fitting side by side; stack them full width. */
+  @media (max-width: 420px) {
+    [data-cta-row] > a { flex: 1 1 100%; justify-content: center; white-space: normal !important; text-align: center; }
+  }
+  /* Card tiles keep a 2-up layout on small screens instead of stacking 1-up. */
+  @media (max-width: 700px) {
+    [data-cards] {
+      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+      gap: 12px !important;
+    }
+    [data-cards-flex] { gap: 12px !important; }
+    [data-cards-flex] > * {
+      flex: 1 1 calc(50% - 6px) !important;
+      max-width: none !important;
+      min-width: 0 !important;
+    }
+    /* Narrow columns: trim card padding and prevent long words from overflowing. */
+    [data-cards] > *, [data-cards-flex] > * {
+      padding-left: clamp(14px, 4vw, 26px) !important;
+      padding-right: clamp(14px, 4vw, 26px) !important;
+      overflow-wrap: anywhere;
+    }
+  }
+
 
 /* generated hover/focus states */
 .hv-1:hover { color:#6B3E96; }

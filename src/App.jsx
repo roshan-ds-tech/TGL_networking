@@ -51,6 +51,8 @@ function validate(fd) {
   if (!fd.get('category')) errors.category = 'Select a category.';
   if (!fd.get('employees')) errors.employees = 'Select your team size.';
   if (!fd.get('age')) errors.age = 'Select how long you have been operating.';
+  const paymentProof = fd.get('paymentProof');
+  if (!paymentProof || !paymentProof.size) errors.paymentProof = 'Please upload a screenshot of your payment.';
   if (!fd.get('agree')) errors.agree = 'Please acknowledge the selection and refund terms.';
   return { errors, name };
 }
@@ -257,6 +259,7 @@ export default function App() {
         errCategory={errors.category || ''}
         errEmployees={errors.employees || ''}
         errAge={errors.age || ''}
+        errPaymentProof={errors.paymentProof || ''}
         errAgree={errors.agree || ''}
         resetForm={resetForm}
       />

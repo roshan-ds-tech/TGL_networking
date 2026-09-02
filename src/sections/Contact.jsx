@@ -3,7 +3,7 @@ export default function Contact() {
     <section id="contact" style={{ position: 'relative', overflow: 'hidden', padding: '104px 28px 100px', background: 'transparent' }}>
       <div aria-hidden="true" style={{ position: 'absolute', top: '0', right: '8%', width: '540px', height: '540px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(192,141,46,0.16), rgba(192,141,46,0) 68%)', pointerEvents: 'none', maskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 16%, rgba(0,0,0,1) 84%, rgba(0,0,0,0) 100%)', WebkitMaskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 16%, rgba(0,0,0,1) 84%, rgba(0,0,0,0) 100%)' }}></div>
       <div aria-hidden="true" style={{ position: 'absolute', bottom: '0', left: '-140px', width: '560px', height: '560px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(107,62,150,0.12), rgba(107,62,150,0) 70%)', pointerEvents: 'none', maskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 16%, rgba(0,0,0,1) 84%, rgba(0,0,0,0) 100%)', WebkitMaskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 16%, rgba(0,0,0,1) 84%, rgba(0,0,0,0) 100%)' }}></div>
-      <div style={{ position: 'relative', maxWidth: '1240px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(330px, 1fr))', gap: '52px', alignItems: 'center' }}>
+      <div style={{ position: 'relative', maxWidth: '1240px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(330px, 100%), 1fr))', gap: '52px', alignItems: 'center' }}>
         <div data-reveal="">
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '18px' }}>
             <span style={{ width: '38px', height: '1px', background: 'linear-gradient(90deg, rgba(192,141,46,0), #C08D2E)', flexShrink: '0' }}></span>
@@ -40,7 +40,7 @@ export default function Contact() {
           <span aria-hidden="true" style={{ position: 'absolute', top: '0', left: '10%', right: '10%', height: '1px', background: 'linear-gradient(90deg, rgba(224,181,88,0), rgba(192,141,46,0.85), rgba(224,181,88,0))' }}></span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '22px' }}>
             <h3 style={{ margin: '0', fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: '22px', fontWeight: '800', letterSpacing: '-0.015em', color: '#2B1740' }}>
-              Contact & Registration
+              Contact & Information
             </h3>
             <span aria-hidden="true" style={{ flex: '1', height: '1px', background: 'linear-gradient(90deg, rgba(192,141,46,0.6), rgba(192,141,46,0))' }}></span>
           </div>
@@ -56,27 +56,12 @@ export default function Contact() {
                   Website
                 </span>
               </span>
-              <span style={{ fontFamily: '\'IBM Plex Mono\', monospace', fontSize: '13px', color: 'rgba(43,23,64,0.55)', textAlign: 'right' }}>
-                To Be Announced
-              </span>
+              <a href="https://skykeen.in" target="_blank" rel="noopener noreferrer" style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '13.5px', fontWeight: '400', color: '#6B3E96', textAlign: 'right', textDecoration: 'underline', textUnderlineOffset: '3px' }}>
+                skykeen.in
+              </a>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '18px', padding: '18px 0', borderBottom: '1px solid rgba(192,141,46,0.28)' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: '0' }}>
-                <span style={{ flexShrink: '0', width: '38px', height: '38px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(150deg, #FFF6E2, #EBD9B4)', border: '1px solid rgba(192,141,46,0.45)', color: '#8A5F22' }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-                    <use href="#i-link"></use>
-                  </svg>
-                </span>
-                <span style={{ fontSize: '11.5px', letterSpacing: '.16em', textTransform: 'uppercase', fontWeight: '700', color: '#6B3E96' }}>
-                  Registration link
-                </span>
-              </span>
-              <span style={{ fontFamily: '\'IBM Plex Mono\', monospace', fontSize: '13px', color: 'rgba(43,23,64,0.55)', textAlign: 'right' }}>
-                To Be Announced
-              </span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '18px', padding: '18px 0', borderBottom: '1px solid rgba(192,141,46,0.28)' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: '0' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '18px', padding: '18px 0', borderBottom: '1px solid rgba(192,141,46,0.28)' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: '0', paddingTop: '4px' }}>
                 <span style={{ flexShrink: '0', width: '38px', height: '38px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(150deg, #FFF6E2, #EBD9B4)', border: '1px solid rgba(192,141,46,0.45)', color: '#8A5F22' }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
                     <use href="#i-mail"></use>
@@ -86,9 +71,14 @@ export default function Contact() {
                   Contact
                 </span>
               </span>
-              <span style={{ fontFamily: '\'IBM Plex Mono\', monospace', fontSize: '13px', color: 'rgba(43,23,64,0.55)', textAlign: 'right' }}>
-                To Be Announced
-              </span>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px', textAlign: 'right' }}>
+                <a href="mailto:Kavitha@skykeen.in" style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '13.5px', fontWeight: '400', color: '#6B3E96', textDecoration: 'none' }}>
+                  Kavitha@skykeen.in
+                </a>
+                <a href="tel:+917406238503" style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '13.5px', fontWeight: '400', color: '#2B1740', textDecoration: 'none' }}>
+                  +91 74062 38503
+                </a>
+              </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '18px', padding: '18px 0' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: '0' }}>
@@ -101,7 +91,7 @@ export default function Contact() {
                   Location
                 </span>
               </span>
-              <span style={{ fontSize: '14.5px', fontWeight: '700', color: '#2B1740', textAlign: 'right' }}>
+              <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '13.5px', fontWeight: '400', color: '#2B1740', textAlign: 'right' }}>
                 Bengaluru, India
               </span>
             </div>

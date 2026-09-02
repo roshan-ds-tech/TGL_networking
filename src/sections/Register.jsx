@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 export default function Register({
   formRef,
   onSubmit,
@@ -13,9 +15,12 @@ export default function Register({
   errCategory,
   errEmployees,
   errAge,
+  errPaymentProof,
   errAgree,
   resetForm,
 }) {
+  const [paymentProofName, setPaymentProofName] = useState('');
+
   return (
     <section id="register" style={{ position: 'relative', overflow: 'hidden', padding: '104px 28px 100px', background: 'linear-gradient(180deg, #35194E, #22103A)', color: '#F6EEDF' }}>
       <span aria-hidden="true" style={{ position: 'absolute', top: '0', left: '0', right: '0', height: '150px', pointerEvents: 'none', background: 'linear-gradient(180deg, rgba(246,238,223,0.1), rgba(246,238,223,0))' }}></span>
@@ -128,7 +133,7 @@ export default function Register({
                 <p style={{ margin: '0 0 30px', fontSize: '15px', lineHeight: '1.6', color: 'rgba(43,23,64,0.66)' }}>
                   Tell us about your business. Fields marked <span style={{ color: '#B8863B', fontWeight: '700' }}>*</span> are required. Registration does not guarantee selection.
                 </p>
-                <form ref={formRef} onSubmit={onSubmit} noValidate style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '22px' }}>
+                <form ref={formRef} onSubmit={onSubmit} noValidate style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(240px, 100%), 1fr))', gap: '22px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <label htmlFor="tgl-name" style={{ fontSize: '12.5px', letterSpacing: '.1em', textTransform: 'uppercase', fontWeight: '700', color: '#6B3E96' }}>
                       Full name<span style={{ color: '#B8863B' }}>*</span>
@@ -208,6 +213,29 @@ export default function Register({
                     </label>
                     <input id="tgl-city" name="city" type="text" placeholder="e.g. Indiranagar, Bengaluru" style={{ border: '1px solid rgba(53,26,78,0.24)', background: '#F6EEDF', padding: '15px 16px', fontSize: '15.5px', color: '#2B1740', borderRadius: '12px', minHeight: '52px' }} className="hv-73" />
                   </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', gridColumn: '1 / -1' }}>
+                    <label htmlFor="tgl-payment-proof" style={{ fontSize: '12.5px', letterSpacing: '.1em', textTransform: 'uppercase', fontWeight: '700', color: '#6B3E96' }}>
+                      Payment screenshot<span style={{ color: '#B8863B' }}>*</span>
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', border: '1px dashed rgba(53,26,78,0.35)', background: '#F6EEDF', padding: '15px 16px', fontSize: '14.5px', color: paymentProofName ? '#2B1740' : 'rgba(43,23,64,0.55)', borderRadius: '12px', minHeight: '52px' }}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style={{ flexShrink: '0', color: '#6B3E96' }}>
+                          <use href="#i-camera"></use>
+                        </svg>
+                        {paymentProofName || 'Upload a screenshot of your payment (JPG, PNG or PDF)'}
+                      </div>
+                      <input
+                        id="tgl-payment-proof"
+                        name="paymentProof"
+                        type="file"
+                        accept="image/*,.pdf"
+                        required
+                        onChange={(ev) => setPaymentProofName(ev.target.files[0] ? ev.target.files[0].name : '')}
+                        style={{ position: 'absolute', inset: '0', width: '100%', height: '100%', opacity: '0', cursor: 'pointer' }}
+                      />
+                    </div>
+                    {errPaymentProof && <span role="alert" style={{ fontSize: '13px', color: '#9A2B2B', fontWeight: '600' }}>{errPaymentProof}</span>}
+                  </div>
                   <label style={{ gridColumn: '1 / -1', display: 'flex', gap: '12px', alignItems: 'flex-start', fontSize: '14.5px', lineHeight: '1.6', color: 'rgba(43,23,64,0.72)', cursor: 'pointer' }}>
                     <input name="agree" type="checkbox" style={{ width: '20px', height: '20px', marginTop: '2px', accentColor: '#6B3E96', flexShrink: '0' }} />
                     <span>
@@ -270,17 +298,9 @@ export default function Register({
               <p style={{ margin: '0 0 22px', fontSize: '13.5px', color: 'rgba(43,23,64,0.6)' }}>
                 Point your camera at the code.
               </p>
-              <div style={{ width: '100%', maxWidth: '220px', aspectRatio: '1 / 1', margin: '0 auto 20px', border: '2px solid #35194E', borderRadius: '18px', background: 'repeating-linear-gradient(45deg, rgba(53,26,78,0.06) 0 8px, transparent 8px 16px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
-                <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '11px', lineHeight: '1.6', letterSpacing: '.04em', color: '#6B3E96', textAlign: 'center' }}>
-                  [REGISTRATION<br />QR URL<br />REQUIRED]
-                </span>
+              <div style={{ width: '100%', maxWidth: '240px', aspectRatio: '921 / 1280', margin: '0 auto 20px', border: '2px solid #35194E', borderRadius: '18px', overflow: 'hidden' }}>
+                <img src="/images/QR_code.jpeg" alt="Registration QR Code" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
               </div>
-              <p style={{ margin: '0 0 20px', fontFamily: "'IBM Plex Mono', monospace", fontSize: '11px', lineHeight: '1.6', color: 'rgba(43,23,64,0.5)' }}>
-                QR code to be added once the official registration link is confirmed.
-              </p>
-              <a href="#register" style={{ display: 'block', background: '#35194E', color: '#FFFBF3', fontWeight: '700', fontSize: '13px', letterSpacing: '.08em', textTransform: 'uppercase', padding: '16px', borderRadius: '999px' }} className="hv-76">
-                Register Online
-              </a>
             </div>
             <div style={{ border: '1px solid rgba(224,181,88,0.35)', padding: '28px 26px', borderRadius: '20px' }}>
               <p style={{ margin: '0 0 12px', fontSize: '11px', letterSpacing: '.22em', textTransform: 'uppercase', fontWeight: '700', color: '#E0B558' }}>

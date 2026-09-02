@@ -37,7 +37,7 @@ export default function Evaluation() {
             </div>
           </div>
         </div>
-        <div data-reveal="" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(258px, 1fr))', gap: '22px', alignItems: 'start' }}>
+        <div data-reveal="" data-cards="" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(258px, 100%), 1fr))', gap: '22px', alignItems: 'start' }}>
           <div style={{ position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', marginTop: '0', padding: '34px 28px 30px', border: '1px solid rgba(192,141,46,0.38)', borderRadius: '24px', background: 'linear-gradient(160deg, rgba(255,252,245,0.94) 0%, rgba(246,238,223,0.72) 100%)', boxShadow: '0 10px 26px rgba(53,26,78,0.06)', transition: 'transform .3s cubic-bezier(.2,.7,.3,1), box-shadow .3s ease, border-color .3s ease' }} className="hv-46">
             <span aria-hidden="true" style={{ position: 'absolute', top: '8px', right: '16px', fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: '86px', fontWeight: '800', lineHeight: '1', letterSpacing: '-0.05em', color: 'transparent', WebkitTextStroke: '1px rgba(168,118,47,0.24)', pointerEvents: 'none' }}>
               01

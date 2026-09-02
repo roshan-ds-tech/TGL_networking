@@ -34,7 +34,7 @@ export default function Eligibility() {
             </span>
           </div>
         </div>
-        <div data-reveal="" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+        <div data-reveal="" data-cards="" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))', gap: '20px' }}>
           <div style={{ position: 'relative', overflow: 'hidden', background: 'linear-gradient(155deg, rgba(255,252,245,0.96), rgba(246,238,223,0.6))', border: '1px solid rgba(53,26,78,0.1)', borderRadius: '24px', padding: '34px 32px 32px', boxShadow: '0 20px 48px -34px rgba(53,26,78,0.5)', transition: 'transform .3s cubic-bezier(.2,.7,.3,1), border-color .3s ease, box-shadow .3s ease' }} className="hv-33">
             <div style={{ position: 'absolute', top: '0', left: '32px', right: '32px', height: '1px', background: 'linear-gradient(90deg, rgba(224,181,88,0), #E0B558, rgba(224,181,88,0))' }}></div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '26px' }}>

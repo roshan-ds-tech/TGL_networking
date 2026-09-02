@@ -25,7 +25,7 @@ export default function Benefits() {
             </span>
           </div>
         </div>
-        <div data-reveal="" style={{ position: 'relative', overflow: 'hidden', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '34px 44px', marginBottom: '22px', padding: '40px 40px', borderRadius: '26px', background: 'linear-gradient(118deg, #2B1740 0%, #3A2059 48%, #4A2A6B 100%)', boxShadow: '0 22px 50px rgba(53,26,78,0.24)' }}>
+        <div data-reveal="" data-wide-pad="" style={{ position: 'relative', overflow: 'hidden', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '34px 44px', marginBottom: '22px', padding: '40px 40px', borderRadius: '26px', background: 'linear-gradient(118deg, #2B1740 0%, #3A2059 48%, #4A2A6B 100%)', boxShadow: '0 22px 50px rgba(53,26,78,0.24)' }}>
           <div aria-hidden="true" style={{ position: 'absolute', inset: '0', background: 'radial-gradient(circle at 78% 12%, rgba(224,181,88,0.2), rgba(224,181,88,0) 58%)', pointerEvents: 'none', maskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 16%, rgba(0,0,0,1) 84%, rgba(0,0,0,0) 100%)', WebkitMaskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 16%, rgba(0,0,0,1) 84%, rgba(0,0,0,0) 100%)' }}></div>
           <div aria-hidden="true" style={{ position: 'absolute', top: '0', left: '0', right: '0', height: '1px', background: 'linear-gradient(90deg, rgba(224,181,88,0), rgba(224,181,88,0.7), rgba(224,181,88,0))' }}></div>
           <div style={{ position: 'relative', flex: '1 1 430px', minWidth: '260px' }}>
@@ -68,8 +68,8 @@ export default function Benefits() {
             </div>
           </div>
         </div>
-        <div data-reveal="" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(292px, 1fr))', gap: '22px' }}>
-          <div style={{ position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: '30px 26px 28px', border: '1px solid rgba(192,141,46,0.34)', borderRadius: '22px', background: 'linear-gradient(158deg, rgba(246,238,223,0.85) 0%, rgba(255,252,245,0.6) 100%)', transition: 'transform .3s cubic-bezier(.2,.7,.3,1), box-shadow .3s ease, border-color .3s ease' }} className="hv-50">
+        <div data-reveal="" data-cards-flex="" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '22px' }}>
+          <div style={{ flex: '1 1 292px', maxWidth: '340px', position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: '30px 26px 28px', border: '1px solid rgba(192,141,46,0.34)', borderRadius: '22px', background: 'linear-gradient(158deg, rgba(246,238,223,0.85) 0%, rgba(255,252,245,0.6) 100%)', transition: 'transform .3s cubic-bezier(.2,.7,.3,1), box-shadow .3s ease, border-color .3s ease' }} className="hv-50">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', marginBottom: '22px' }}>
               <span style={{ flexShrink: '0', width: '54px', height: '54px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(150deg, #FFF6E2, #EBD9B4)', border: '1px solid rgba(192,141,46,0.5)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.75)', color: '#8A5F22' }}>
                 <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
@@ -88,7 +88,7 @@ export default function Benefits() {
               Promotional exposure through TGL’s digital ecosystem and event-related content.
             </p>
           </div>
-          <div style={{ position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: '30px 26px 28px', border: '1px solid rgba(192,141,46,0.34)', borderRadius: '22px', background: 'linear-gradient(158deg, rgba(246,238,223,0.85) 0%, rgba(255,252,245,0.6) 100%)', transition: 'transform .3s cubic-bezier(.2,.7,.3,1), box-shadow .3s ease, border-color .3s ease' }} className="hv-51">
+          <div style={{ flex: '1 1 292px', maxWidth: '340px', position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: '30px 26px 28px', border: '1px solid rgba(192,141,46,0.34)', borderRadius: '22px', background: 'linear-gradient(158deg, rgba(246,238,223,0.85) 0%, rgba(255,252,245,0.6) 100%)', transition: 'transform .3s cubic-bezier(.2,.7,.3,1), box-shadow .3s ease, border-color .3s ease' }} className="hv-51">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', marginBottom: '22px' }}>
               <span style={{ flexShrink: '0', width: '54px', height: '54px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(150deg, #FFF6E2, #EBD9B4)', border: '1px solid rgba(192,141,46,0.5)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.75)', color: '#8A5F22' }}>
                 <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
@@ -107,7 +107,7 @@ export default function Benefits() {
               A listing in the Season 1 Directory Magazine, reaching 500+ business owners.
             </p>
           </div>
-          <div style={{ position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: '30px 26px 28px', border: '1px solid rgba(192,141,46,0.34)', borderRadius: '22px', background: 'linear-gradient(158deg, rgba(246,238,223,0.85) 0%, rgba(255,252,245,0.6) 100%)', transition: 'transform .3s cubic-bezier(.2,.7,.3,1), box-shadow .3s ease, border-color .3s ease' }} className="hv-52">
+          <div style={{ flex: '1 1 292px', maxWidth: '340px', position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: '30px 26px 28px', border: '1px solid rgba(192,141,46,0.34)', borderRadius: '22px', background: 'linear-gradient(158deg, rgba(246,238,223,0.85) 0%, rgba(255,252,245,0.6) 100%)', transition: 'transform .3s cubic-bezier(.2,.7,.3,1), box-shadow .3s ease, border-color .3s ease' }} className="hv-52">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', marginBottom: '22px' }}>
               <span style={{ flexShrink: '0', width: '54px', height: '54px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(150deg, #FFF6E2, #EBD9B4)', border: '1px solid rgba(192,141,46,0.5)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.75)', color: '#8A5F22' }}>
                 <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
@@ -126,7 +126,7 @@ export default function Benefits() {
               Opportunity to connect with entrepreneurs, business owners, professionals, decision-makers and industry leaders.
             </p>
           </div>
-          <div style={{ position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: '30px 26px 28px', border: '1px solid rgba(192,141,46,0.34)', borderRadius: '22px', background: 'linear-gradient(158deg, rgba(246,238,223,0.85) 0%, rgba(255,252,245,0.6) 100%)', transition: 'transform .3s cubic-bezier(.2,.7,.3,1), box-shadow .3s ease, border-color .3s ease' }} className="hv-53">
+          <div style={{ flex: '1 1 292px', maxWidth: '340px', position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: '30px 26px 28px', border: '1px solid rgba(192,141,46,0.34)', borderRadius: '22px', background: 'linear-gradient(158deg, rgba(246,238,223,0.85) 0%, rgba(255,252,245,0.6) 100%)', transition: 'transform .3s cubic-bezier(.2,.7,.3,1), box-shadow .3s ease, border-color .3s ease' }} className="hv-53">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', marginBottom: '22px' }}>
               <span style={{ flexShrink: '0', width: '54px', height: '54px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(150deg, #FFF6E2, #EBD9B4)', border: '1px solid rgba(192,141,46,0.5)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.75)', color: '#8A5F22' }}>
                 <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
@@ -145,7 +145,7 @@ export default function Benefits() {
               Opportunity to build recognition, credibility, market positioning and digital credibility.
             </p>
           </div>
-          <div style={{ position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: '30px 26px 28px', border: '1px solid rgba(192,141,46,0.34)', borderRadius: '22px', background: 'linear-gradient(158deg, rgba(246,238,223,0.85) 0%, rgba(255,252,245,0.6) 100%)', transition: 'transform .3s cubic-bezier(.2,.7,.3,1), box-shadow .3s ease, border-color .3s ease' }} className="hv-54">
+          <div style={{ flex: '1 1 292px', maxWidth: '340px', position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: '30px 26px 28px', border: '1px solid rgba(192,141,46,0.34)', borderRadius: '22px', background: 'linear-gradient(158deg, rgba(246,238,223,0.85) 0%, rgba(255,252,245,0.6) 100%)', transition: 'transform .3s cubic-bezier(.2,.7,.3,1), box-shadow .3s ease, border-color .3s ease' }} className="hv-54">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', marginBottom: '22px' }}>
               <span style={{ flexShrink: '0', width: '54px', height: '54px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(150deg, #FFF6E2, #EBD9B4)', border: '1px solid rgba(192,141,46,0.5)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.75)', color: '#8A5F22' }}>
                 <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
@@ -164,7 +164,7 @@ export default function Benefits() {
               Finalists move into a public-engagement / voting stage as part of the Season 1 journey.
             </p>
           </div>
-          <div style={{ position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: '30px 26px 28px', border: '1px solid rgba(192,141,46,0.34)', borderRadius: '22px', background: 'linear-gradient(158deg, rgba(246,238,223,0.85) 0%, rgba(255,252,245,0.6) 100%)', transition: 'transform .3s cubic-bezier(.2,.7,.3,1), box-shadow .3s ease, border-color .3s ease' }} className="hv-55">
+          <div style={{ flex: '1 1 292px', maxWidth: '340px', position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: '30px 26px 28px', border: '1px solid rgba(192,141,46,0.34)', borderRadius: '22px', background: 'linear-gradient(158deg, rgba(246,238,223,0.85) 0%, rgba(255,252,245,0.6) 100%)', transition: 'transform .3s cubic-bezier(.2,.7,.3,1), box-shadow .3s ease, border-color .3s ease' }} className="hv-55">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', marginBottom: '22px' }}>
               <span style={{ flexShrink: '0', width: '54px', height: '54px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(150deg, #FFF6E2, #EBD9B4)', border: '1px solid rgba(192,141,46,0.5)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.75)', color: '#8A5F22' }}>
                 <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">

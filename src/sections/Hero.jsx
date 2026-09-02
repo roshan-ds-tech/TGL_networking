@@ -7,12 +7,12 @@ export default function Hero({ tickerRef, daysLeftLabel, cdD, cdH, cdM, cdS }) {
       <div style={{ position: 'absolute', inset: '-10% -30%', overflow: 'hidden', pointerEvents: 'none' }}>
         <div style={{ position: 'absolute', top: '0', bottom: '0', width: '320px', background: 'linear-gradient(100deg, rgba(255,251,243,0) 0%, rgba(255,248,224,0.85) 45%, rgba(255,251,243,0) 100%)', filter: 'blur(28px)', animation: 'tglSweep 14s ease-in-out infinite 2s' }}></div>
       </div>
-      <div style={{ position: 'relative', maxWidth: '1240px', margin: '0 auto', padding: '96px 28px 104px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '60px', alignItems: 'center' }}>
+      <div style={{ position: 'relative', maxWidth: '1240px', margin: '0 auto', padding: '96px 28px 104px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(340px, 100%), 1fr))', gap: '60px', alignItems: 'center' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '30px', animation: 'tglRise .7s cubic-bezier(.2,.7,.3,1) both' }}>
             <span style={{ width: '46px', height: '1px', background: 'linear-gradient(90deg, rgba(192,141,46,0), #C08D2E)', flexShrink: '0' }}></span>
             <span style={{ width: '6px', height: '6px', background: '#C08D2E', transform: 'rotate(45deg)', display: 'block', flexShrink: '0', animation: 'tglGlow 2.6s ease-in-out infinite' }}></span>
-            <span style={{ fontSize: '11.5px', letterSpacing: '.32em', textTransform: 'uppercase', fontWeight: '700', color: '#6B3E96', lineHeight: '1.5', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: '11.5px', letterSpacing: 'clamp(.12em, 1.4vw, .32em)', textTransform: 'uppercase', fontWeight: '700', color: '#6B3E96', lineHeight: '1.5', minWidth: '0' }}>
               Season 1 · Bengaluru
             </span>
           </div>
@@ -43,14 +43,14 @@ export default function Hero({ tickerRef, daysLeftLabel, cdD, cdH, cdM, cdS }) {
               Fashion, Apparel & Textile
             </span>
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', marginBottom: '38px', animation: 'tglRise .8s cubic-bezier(.2,.7,.3,1) both .44s' }}>
-            <a href="#register" style={{ background: 'linear-gradient(135deg, #E0B558, #C08D2E)', color: '#22103A', fontWeight: '700', fontSize: '14px', letterSpacing: '.08em', textTransform: 'uppercase', padding: '18px 36px', borderRadius: '999px', boxShadow: '0 10px 26px rgba(192,141,46,0.35)', transition: 'transform .2s ease, box-shadow .2s ease', display: 'inline-flex', alignItems: 'center', gap: '12px', whiteSpace: 'nowrap' }} className="hv-14">
+          <div data-cta-row="" style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', marginBottom: '38px', animation: 'tglRise .8s cubic-bezier(.2,.7,.3,1) both .44s' }}>
+            <a href="#register" style={{ background: 'linear-gradient(135deg, #E0B558, #C08D2E)', color: '#22103A', fontWeight: '700', fontSize: '14px', letterSpacing: '.08em', textTransform: 'uppercase', padding: '18px clamp(20px, 5vw, 36px)', borderRadius: '999px', boxShadow: '0 10px 26px rgba(192,141,46,0.35)', transition: 'transform .2s ease, box-shadow .2s ease', display: 'inline-flex', alignItems: 'center', gap: '12px', whiteSpace: 'nowrap' }} className="hv-14">
               Register for Season 1
               <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style={{ flexShrink: '0' }}>
                 <use href="#i-arrow"></use>
               </svg>
             </a>
-            <a href="#about" style={{ border: '1px solid rgba(53,26,78,0.3)', color: '#35194E', fontWeight: '600', fontSize: '14px', letterSpacing: '.08em', textTransform: 'uppercase', padding: '18px 36px', borderRadius: '999px', display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap', transition: 'background .2s ease, border-color .2s ease' }} className="hv-15">
+            <a href="#about" style={{ border: '1px solid rgba(53,26,78,0.3)', color: '#35194E', fontWeight: '600', fontSize: '14px', letterSpacing: '.08em', textTransform: 'uppercase', padding: '18px clamp(20px, 5vw, 36px)', borderRadius: '999px', display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap', transition: 'background .2s ease, border-color .2s ease' }} className="hv-15">
               Learn More
             </a>
           </div>
@@ -92,7 +92,7 @@ export default function Hero({ tickerRef, daysLeftLabel, cdD, cdH, cdM, cdS }) {
         </div>
         <div style={{ position: 'relative', animation: 'tglRise .9s cubic-bezier(.2,.7,.3,1) both .34s' }}>
           <div style={{ position: 'absolute', inset: '14px -14px -14px 14px', border: '1px solid rgba(192,141,46,0.6)', borderRadius: '20px' }}></div>
-          <div style={{ position: 'relative', background: 'linear-gradient(165deg, #35194E, #22103A)', borderRadius: '20px', padding: '40px 38px', boxShadow: '0 30px 60px rgba(34,16,58,0.28)' }}>
+          <div data-wide-pad="" style={{ position: 'relative', background: 'linear-gradient(165deg, #35194E, #22103A)', borderRadius: '20px', padding: '40px 38px', boxShadow: '0 30px 60px rgba(34,16,58,0.28)' }}>
             <div style={{ margin: '0 0 30px', paddingBottom: '28px', borderBottom: '1px solid rgba(224,181,88,0.24)' }}>
               <p style={{ margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '10.5px', letterSpacing: '.26em', textTransform: 'uppercase', color: 'rgba(246,238,223,0.6)', fontWeight: '600' }}>
                 <span style={{ color: '#E0B558', display: 'flex' }}>
@@ -142,7 +142,7 @@ export default function Hero({ tickerRef, daysLeftLabel, cdD, cdH, cdM, cdS }) {
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '18px', paddingBottom: '22px', borderBottom: '1px dashed rgba(224,181,88,0.35)' }}>
-                <span data-count="10" style={{ fontSize: '52px', fontWeight: '800', lineHeight: '1', color: '#EFCB77', minWidth: '108px', fontVariantNumeric: 'tabular-nums' }}>
+                <span data-count="10" style={{ fontSize: '52px', fontWeight: '800', lineHeight: '1', color: '#EFCB77', minWidth: 'clamp(62px, 17vw, 108px)', fontVariantNumeric: 'tabular-nums' }}>
                   10
                 </span>
                 <span style={{ fontSize: '13px', letterSpacing: '.16em', textTransform: 'uppercase', color: 'rgba(255,251,243,0.82)', fontWeight: '600' }}>
@@ -150,7 +150,7 @@ export default function Hero({ tickerRef, daysLeftLabel, cdD, cdH, cdM, cdS }) {
                 </span>
               </div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '18px', paddingBottom: '22px', borderBottom: '1px dashed rgba(224,181,88,0.35)' }}>
-                <span data-count="40" style={{ fontSize: '52px', fontWeight: '800', lineHeight: '1', color: '#EFCB77', minWidth: '108px', fontVariantNumeric: 'tabular-nums' }}>
+                <span data-count="40" style={{ fontSize: '52px', fontWeight: '800', lineHeight: '1', color: '#EFCB77', minWidth: 'clamp(62px, 17vw, 108px)', fontVariantNumeric: 'tabular-nums' }}>
                   40
                 </span>
                 <span style={{ fontSize: '13px', letterSpacing: '.16em', textTransform: 'uppercase', color: 'rgba(255,251,243,0.82)', fontWeight: '600' }}>
@@ -158,7 +158,7 @@ export default function Hero({ tickerRef, daysLeftLabel, cdD, cdH, cdM, cdS }) {
                 </span>
               </div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '18px' }}>
-                <span data-count="400" style={{ fontSize: '52px', fontWeight: '800', lineHeight: '1', color: '#EFCB77', minWidth: '108px', fontVariantNumeric: 'tabular-nums' }}>
+                <span data-count="400" style={{ fontSize: '52px', fontWeight: '800', lineHeight: '1', color: '#EFCB77', minWidth: 'clamp(62px, 17vw, 108px)', fontVariantNumeric: 'tabular-nums' }}>
                   400
                 </span>
                 <span style={{ fontSize: '13px', letterSpacing: '.16em', textTransform: 'uppercase', color: 'rgba(255,251,243,0.82)', fontWeight: '600' }}>

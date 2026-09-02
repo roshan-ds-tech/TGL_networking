@@ -1,5 +1,3 @@
-import logo from '../assets/logo.png';
-
 export default function Footer() {
   return (
     <footer style={{ position: 'relative', overflow: 'hidden', background: 'linear-gradient(180deg, #22103A 0%, #1A0B2E 100%)', color: '#F6EEDF', padding: '78px 28px 34px' }}>
@@ -9,18 +7,6 @@ export default function Footer() {
       <div style={{ position: 'relative', maxWidth: '1240px', margin: '0 auto' }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '48px', paddingBottom: '44px', borderBottom: '1px solid rgba(224,181,88,0.25)' }}>
           <div style={{ flex: '2 1 340px', minWidth: '0' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '22px' }}>
-              <img src={logo} alt="The Growth League logo" style={{ height: '52px', width: 'auto', display: 'block' }} />
-              <span aria-hidden="true" style={{ width: '1px', height: '38px', background: 'linear-gradient(180deg, rgba(224,181,88,0), rgba(224,181,88,0.5), rgba(224,181,88,0))' }}></span>
-              <div>
-                <p style={{ margin: '0 0 4px', fontFamily: '\'Cormorant Garamond\', Georgia, serif', fontSize: '30px', letterSpacing: '.14em', color: '#EFCB77', lineHeight: '1' }}>
-                  TGL
-                </p>
-                <p style={{ margin: '0', fontSize: '10.5px', letterSpacing: '.28em', textTransform: 'uppercase', color: 'rgba(246,238,223,0.72)' }}>
-                  The Growth League
-                </p>
-              </div>
-            </div>
             <p style={{ margin: '0 0 10px', fontFamily: '\'Bodoni Moda\', \'Cormorant Garamond\', Georgia, serif', fontStyle: 'italic', fontWeight: '500', fontSize: '27px', lineHeight: '1.2', letterSpacing: '-0.01em', color: '#E0B558' }}>
               A stage for recognition.
             </p>

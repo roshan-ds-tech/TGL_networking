@@ -1,5 +1,3 @@
-import logo from '../assets/logo.png';
-
 export default function About() {
   return (
     <section id="about" style={{ position: 'relative', overflow: 'hidden', padding: '104px 28px 108px', background: 'transparent' }}>
@@ -8,8 +6,8 @@ export default function About() {
       <div style={{ position: 'absolute', bottom: '0', right: '-160px', width: '660px', height: '660px', borderRadius: '50%', pointerEvents: 'none', background: 'radial-gradient(circle, rgba(107,62,150,0.15), rgba(107,62,150,0) 68%)', animation: 'tglGlow 13s ease-in-out infinite 2s', maskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 16%, rgba(0,0,0,1) 84%, rgba(0,0,0,0) 100%)', WebkitMaskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 16%, rgba(0,0,0,1) 84%, rgba(0,0,0,0) 100%)' }}></div>
       <div style={{ position: 'absolute', top: '42%', left: '46%', width: '420px', height: '420px', borderRadius: '50%', pointerEvents: 'none', background: 'radial-gradient(circle, rgba(255,243,206,0.6), rgba(255,243,206,0) 70%)', maskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 16%, rgba(0,0,0,1) 84%, rgba(0,0,0,0) 100%)', WebkitMaskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 16%, rgba(0,0,0,1) 84%, rgba(0,0,0,0) 100%)' }}></div>
       <div style={{ position: 'relative', maxWidth: '1240px', margin: '0 auto' }}>
-        <div data-reveal="" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '64px', alignItems: 'start' }}>
-          <div style={{ position: 'sticky', top: '108px' }}>
+        <div data-reveal="" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))', gap: '64px', alignItems: 'start' }}>
+          <div data-sticky-col="" style={{ position: 'sticky', top: '108px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '20px' }}>
               <span style={{ width: '38px', height: '1px', background: 'linear-gradient(90deg, rgba(192,141,46,0), #C08D2E)', flexShrink: '0' }}></span>
               <p style={{ margin: '0', fontSize: '11px', letterSpacing: '.28em', textTransform: 'uppercase', color: '#C08D2E', fontWeight: '700' }}>
@@ -73,7 +71,7 @@ export default function About() {
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '30px' }}>
-              <img src={logo} alt="TGL" style={{ width: '40px', height: '40px', objectFit: 'contain', flexShrink: '0', opacity: '.9' }} />
+              <img src="/images/skykeen_logo.png" alt="SkyKeen Events" style={{ width: '104px', height: 'auto', objectFit: 'contain', flexShrink: '0', opacity: '.9' }} />
               <p style={{ margin: '0', fontSize: '12px', lineHeight: '1.5', letterSpacing: '.12em', textTransform: 'uppercase', fontWeight: '600', color: 'rgba(43,23,64,0.5)' }}>
                 Powered by
                 <br />
@@ -117,7 +115,7 @@ export default function About() {
                 TGL Season 1 is designed for small businesses with ten or fewer employees, operating for at least six months, based in or around Bengaluru. It is built for founders seeking structured evaluation, professional content and exposure to a wider business community.
               </p>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '14px', marginTop: '8px' }}>
+            <div data-cards="" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(150px, 100%), 1fr))', gap: '14px', marginTop: '8px' }}>
               <div style={{ padding: '22px 22px 20px', border: '1px solid rgba(53,26,78,0.12)', borderRadius: '18px', background: 'rgba(255,252,245,0.6)' }}>
                 <p style={{ margin: '0 0 8px', fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: '30px', fontWeight: '800', letterSpacing: '-0.02em', color: '#2B1740', lineHeight: '1' }}>
                   ≤ 10

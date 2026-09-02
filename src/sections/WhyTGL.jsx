@@ -33,7 +33,7 @@ export default function WhyTGL() {
             </svg>
           </a>
         </div>
-        <div data-reveal="" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
+        <div data-reveal="" data-cards="" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(300px, 100%), 1fr))', gap: '20px' }}>
           <div style={{ position: 'relative', overflow: 'hidden', background: 'linear-gradient(155deg, rgba(255,251,243,0.1), rgba(255,251,243,0.025) 60%)', border: '1px solid rgba(224,181,88,0.22)', borderRadius: '22px', padding: '34px 32px 32px', boxShadow: '0 26px 54px -36px rgba(0,0,0,0.75)', transition: 'transform .3s cubic-bezier(.2,.7,.3,1), background .3s ease, border-color .3s ease, box-shadow .3s ease' }} className="hv-27">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '26px', color: '#E0B558' }}>
               <span style={{ flexShrink: '0', width: '54px', height: '54px', borderRadius: '999px', border: '1px solid rgba(224,181,88,0.38)', background: 'radial-gradient(circle at 34% 26%, rgba(239,203,119,0.3), rgba(224,181,88,0.06))', boxShadow: 'inset 0 1px 0 rgba(255,243,206,0.3)', color: '#EFCB77', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

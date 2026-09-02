@@ -19,7 +19,7 @@ export default function Categories() {
               Categories
             </p>
           </div>
-          <div style={{ flexShrink: '0', display: 'flex', alignItems: 'stretch', gap: '0', border: '1px solid rgba(192,141,46,0.42)', borderRadius: '18px', background: 'rgba(246,238,223,0.55)', overflow: 'hidden' }}>
+          <div data-stat-pills="" style={{ flexShrink: '0', maxWidth: '100%', display: 'flex', alignItems: 'stretch', gap: '0', border: '1px solid rgba(192,141,46,0.42)', borderRadius: '18px', background: 'rgba(246,238,223,0.55)', overflow: 'hidden' }}>
             <div style={{ padding: '18px 24px' }}>
               <p style={{ margin: '0 0 4px', fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: '30px', fontWeight: '800', lineHeight: '1', letterSpacing: '-0.03em', color: '#2B1740' }}>
                 40
@@ -39,7 +39,7 @@ export default function Categories() {
             </div>
           </div>
         </div>
-        <div data-reveal="" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', columnGap: '56px', rowGap: '0', borderBottom: '1px solid rgba(192,141,46,0.32)' }}>
+        <div data-reveal="" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(400px, 100%), 1fr))', columnGap: '56px', rowGap: '0', borderBottom: '1px solid rgba(192,141,46,0.32)' }}>
           <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '68px minmax(0,1fr) auto', alignItems: 'center', gap: '18px', padding: '24px 20px 24px 14px', borderTop: '1px solid rgba(192,141,46,0.32)', borderRadius: '4px 14px 14px 4px', transition: 'background .3s ease, box-shadow .3s ease, transform .3s cubic-bezier(.2,.7,.3,1)' }} className="hv-36">
             <span style={{ fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: '40px', fontWeight: '800', lineHeight: '1', letterSpacing: '-0.04em', color: 'transparent', WebkitTextStroke: '1.1px rgba(168,118,47,0.6)', fontVariantNumeric: 'tabular-nums' }}>
               01

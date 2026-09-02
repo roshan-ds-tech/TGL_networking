@@ -41,7 +41,7 @@ export default function Journey() {
             </div>
           </div>
         </div>
-        <div data-reveal="" style={{ position: 'relative', maxWidth: '860px', margin: '0 auto', paddingLeft: '96px' }}>
+        <div data-reveal="" style={{ position: 'relative', maxWidth: '860px', margin: '0 auto', paddingLeft: 'clamp(56px, 14vw, 96px)' }}>
           <span aria-hidden="true" style={{ position: 'absolute', left: '42px', top: '8px', bottom: '8px', width: '1px', background: 'linear-gradient(180deg, rgba(224,181,88,0) 0%, rgba(224,181,88,0.55) 8%, rgba(224,181,88,0.55) 92%, rgba(224,181,88,0) 100%)' }}></span>
           <div style={{ position: 'relative', padding: '26px 0 14px' }}>
             <span aria-hidden="true" style={{ position: 'absolute', left: '-60px', top: '32px', width: '12px', height: '12px', background: '#E0B558', transform: 'rotate(45deg)', boxShadow: '0 0 0 6px rgba(34,16,58,1), 0 0 18px rgba(224,181,88,0.6)' }}></span>
