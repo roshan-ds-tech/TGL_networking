@@ -17,7 +17,7 @@ const faqItems = [
   },
   {
     q: 'Who produces the business video?',
-    a: 'Participants provide raw footage per the shoot guide; SkyKeen’s in-house team produces a professionally edited 60-second video for Instagram and YouTube.',
+    a: 'Participants provide raw footage per the shoot guide; SkyKeen’s in-house team produces a professionally edited 30-second video for Instagram and YouTube. If you would prefer not to shoot it yourself, the TGL photography team can visit and capture the raw footage for you at an additional ₹1,500.',
   },
   {
     q: 'Where is the Grand Finale held?',

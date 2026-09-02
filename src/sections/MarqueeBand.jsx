@@ -15,7 +15,7 @@ export default function MarqueeBand() {
               Evaluation
             </span>
             <span style={{ width: '5px', height: '5px', background: '#C08D2E', transform: 'rotate(45deg)', alignSelf: 'center', flexShrink: '0' }}></span>
-            <span style={{ fontFamily: '\'Bodoni Moda\', \'Cormorant Garamond\', Georgia, serif', fontStyle: 'italic', fontWeight: '500', fontSize: '27px', letterSpacing: '-0.01em', color: '#E0B558' }}>
+            <span style={{ fontFamily: '\'Kaushan Script\', cursive', fontWeight: '500', fontSize: '27px', letterSpacing: '-0.01em', color: '#E0B558' }}>
               Quality over popularity
             </span>
             <span style={{ width: '5px', height: '5px', background: '#C08D2E', transform: 'rotate(45deg)', alignSelf: 'center', flexShrink: '0' }}></span>
@@ -41,7 +41,7 @@ export default function MarqueeBand() {
               Evaluation
             </span>
             <span style={{ width: '5px', height: '5px', background: '#C08D2E', transform: 'rotate(45deg)', alignSelf: 'center', flexShrink: '0' }}></span>
-            <span style={{ fontFamily: '\'Bodoni Moda\', \'Cormorant Garamond\', Georgia, serif', fontStyle: 'italic', fontWeight: '500', fontSize: '27px', letterSpacing: '-0.01em', color: '#E0B558' }}>
+            <span style={{ fontFamily: '\'Kaushan Script\', cursive', fontWeight: '500', fontSize: '27px', letterSpacing: '-0.01em', color: '#E0B558' }}>
               Quality over popularity
             </span>
             <span style={{ width: '5px', height: '5px', background: '#C08D2E', transform: 'rotate(45deg)', alignSelf: 'center', flexShrink: '0' }}></span>

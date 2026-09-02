@@ -1,7 +1,6 @@
 export default function About() {
   return (
     <section id="about" style={{ position: 'relative', overflow: 'hidden', padding: '104px 28px 108px', background: 'transparent' }}>
-      <div style={{ position: 'absolute', inset: '0', pointerEvents: 'none', backgroundImage: 'linear-gradient(rgba(53,26,78,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(53,26,78,0.04) 1px, transparent 1px)', backgroundSize: '76px 76px', WebkitMaskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 18%, rgba(0,0,0,1) 82%, rgba(0,0,0,0) 100%)', maskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 18%, rgba(0,0,0,1) 82%, rgba(0,0,0,0) 100%)' }}></div>
       <div style={{ position: 'absolute', top: '0', left: '-140px', width: '560px', height: '560px', borderRadius: '50%', pointerEvents: 'none', background: 'radial-gradient(circle, rgba(224,181,88,0.26), rgba(224,181,88,0) 66%)', animation: 'tglGlow 10s ease-in-out infinite', maskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 16%, rgba(0,0,0,1) 84%, rgba(0,0,0,0) 100%)', WebkitMaskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 16%, rgba(0,0,0,1) 84%, rgba(0,0,0,0) 100%)' }}></div>
       <div style={{ position: 'absolute', bottom: '0', right: '-160px', width: '660px', height: '660px', borderRadius: '50%', pointerEvents: 'none', background: 'radial-gradient(circle, rgba(107,62,150,0.15), rgba(107,62,150,0) 68%)', animation: 'tglGlow 13s ease-in-out infinite 2s', maskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 16%, rgba(0,0,0,1) 84%, rgba(0,0,0,0) 100%)', WebkitMaskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 16%, rgba(0,0,0,1) 84%, rgba(0,0,0,0) 100%)' }}></div>
       <div style={{ position: 'absolute', top: '42%', left: '46%', width: '420px', height: '420px', borderRadius: '50%', pointerEvents: 'none', background: 'radial-gradient(circle, rgba(255,243,206,0.6), rgba(255,243,206,0) 70%)', maskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 16%, rgba(0,0,0,1) 84%, rgba(0,0,0,0) 100%)', WebkitMaskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 16%, rgba(0,0,0,1) 84%, rgba(0,0,0,0) 100%)' }}></div>
@@ -17,7 +16,7 @@ export default function About() {
             <h2 style={{ fontSize: 'clamp(34px, 3.8vw, 52px)', lineHeight: '1.05', letterSpacing: '-0.02em', fontWeight: '800', margin: '0 0 18px', color: '#2B1740' }}>
               What Is TGL?
             </h2>
-            <p style={{ fontFamily: '\'Bodoni Moda\', \'Cormorant Garamond\', Georgia, serif', fontStyle: 'italic', fontSize: 'clamp(28px, 2.6vw, 38px)', lineHeight: '1.2', letterSpacing: '-0.015em', color: '#6B3E96', margin: '0 0 34px' }}>
+            <p style={{ fontFamily: '\'Kaushan Script\', cursive', fontSize: 'clamp(28px, 2.6vw, 38px)', lineHeight: '1.2', letterSpacing: '-0.015em', color: '#6B3E96', margin: '0 0 34px' }}>
               Quality over popularity.
             </p>
             <div style={{ height: '1px', marginBottom: '26px', background: 'linear-gradient(90deg, rgba(192,141,46,0.55), rgba(192,141,46,0))' }}></div>

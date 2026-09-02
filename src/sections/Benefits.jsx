@@ -14,7 +14,7 @@ export default function Benefits() {
             <h2 style={{ fontSize: 'clamp(30px, 3.4vw, 44px)', lineHeight: '1.06', letterSpacing: '-0.02em', fontWeight: '800', margin: '0 0 2px', color: '#2B1740', textTransform: 'uppercase' }}>
               Inside The
             </h2>
-            <p style={{ margin: '0', fontFamily: '\'Bodoni Moda\', \'Cormorant Garamond\', Georgia, serif', fontStyle: 'italic', fontWeight: '500', fontSize: 'clamp(46px, 6vw, 82px)', lineHeight: '1', letterSpacing: '-0.02em', background: 'linear-gradient(100deg, #A8762F 8%, #E0B558 26%, #FFF3CE 36%, #E0B558 46%, #A8762F 66%)', backgroundSize: '240% 100%', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', animation: 'tglShimmer 8s linear infinite' }}>
+            <p style={{ margin: '0', fontFamily: '\'Kaushan Script\', cursive', fontWeight: '500', fontSize: 'clamp(46px, 6vw, 82px)', lineHeight: '1', letterSpacing: '-0.02em', background: 'linear-gradient(100deg, #A8762F 8%, #E0B558 26%, #FFF3CE 36%, #E0B558 46%, #A8762F 66%)', backgroundSize: '240% 100%', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', animation: 'tglShimmer 8s linear infinite' }}>
               Season
             </p>
           </div>
@@ -43,13 +43,13 @@ export default function Benefits() {
               Professional Business Video
             </h3>
             <p style={{ margin: '0', fontSize: '16px', lineHeight: '1.72', maxWidth: '520px', color: 'rgba(246,238,223,0.76)', textWrap: 'pretty' }}>
-              Participants provide raw footage per the shoot guide; SkyKeen’s in-house team produces a professionally edited 60-second video for Instagram and YouTube.
+              Participants provide raw footage per the shoot guide; SkyKeen’s in-house team produces a professionally edited 30-second video for Instagram and YouTube.
             </p>
           </div>
           <div style={{ position: 'relative', flex: '0 1 250px', display: 'flex', gap: '30px', paddingLeft: '34px', borderLeft: '1px solid rgba(224,181,88,0.32)' }}>
             <div>
               <p style={{ margin: '0 0 6px', fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: '46px', fontWeight: '800', lineHeight: '1', letterSpacing: '-0.04em', color: '#E0B558' }}>
-                60
+                30
                 <span style={{ fontSize: '20px', letterSpacing: '0' }}>
                   s
                 </span>

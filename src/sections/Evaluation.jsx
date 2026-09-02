@@ -15,7 +15,7 @@ export default function Evaluation() {
             <h2 style={{ fontSize: 'clamp(30px, 3.4vw, 44px)', lineHeight: '1.06', letterSpacing: '-0.02em', fontWeight: '800', margin: '0 0 2px', color: '#2B1740', textTransform: 'uppercase' }}>
               How TGL
             </h2>
-            <p style={{ margin: '0 0 20px', fontFamily: '\'Bodoni Moda\', \'Cormorant Garamond\', Georgia, serif', fontStyle: 'italic', fontWeight: '500', fontSize: 'clamp(40px, 5vw, 68px)', lineHeight: '1', letterSpacing: '-0.02em', background: 'linear-gradient(100deg, #A8762F 8%, #E0B558 26%, #FFF3CE 36%, #E0B558 46%, #A8762F 66%)', backgroundSize: '240% 100%', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', animation: 'tglShimmer 8s linear infinite' }}>
+            <p style={{ margin: '0 0 20px', fontFamily: '\'Kaushan Script\', cursive', fontWeight: '500', fontSize: 'clamp(40px, 5vw, 68px)', lineHeight: '1', letterSpacing: '-0.02em', background: 'linear-gradient(100deg, #A8762F 8%, #E0B558 26%, #FFF3CE 36%, #E0B558 46%, #A8762F 66%)', backgroundSize: '240% 100%', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', animation: 'tglShimmer 8s linear infinite' }}>
               Evaluates Businesses
             </p>
             <p style={{ margin: '0', fontSize: '16.5px', lineHeight: '1.72', maxWidth: '540px', color: 'rgba(43,23,64,0.72)' }}>
@@ -29,7 +29,7 @@ export default function Evaluation() {
               <span style={{ fontFamily: '\'IBM Plex Mono\', monospace', fontSize: '9px', letterSpacing: '.2em', textTransform: 'uppercase', color: 'rgba(246,238,223,0.6)' }}>
                 Judged on
               </span>
-              <span style={{ fontFamily: '\'Bodoni Moda\', \'Cormorant Garamond\', Georgia, serif', fontStyle: 'italic', fontWeight: '500', fontSize: '25px', lineHeight: '1.05', color: '#E0B558' }}>
+              <span style={{ fontFamily: '\'Kaushan Script\', cursive', fontWeight: '500', fontSize: '25px', lineHeight: '1.05', color: '#E0B558' }}>
                 Quality
                 <br />
                 over hype

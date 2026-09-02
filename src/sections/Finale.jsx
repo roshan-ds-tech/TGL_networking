@@ -24,7 +24,7 @@ export default function Finale() {
           <span style={{ fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: 'clamp(56px, 9vw, 118px)', fontWeight: '800', lineHeight: '0.92', letterSpacing: '-0.04em', color: '#2B1740' }}>
             5
           </span>
-          <span style={{ fontFamily: '\'Bodoni Moda\', \'Cormorant Garamond\', Georgia, serif', fontStyle: 'italic', fontWeight: '500', fontSize: 'clamp(44px, 7vw, 92px)', lineHeight: '1', letterSpacing: '-0.02em', color: '#6B3E96' }}>
+          <span style={{ fontFamily: '\'Kaushan Script\', cursive', fontWeight: '500', fontSize: 'clamp(44px, 7vw, 92px)', lineHeight: '1', letterSpacing: '-0.02em', color: '#6B3E96' }}>
             Dec
           </span>
           <span style={{ fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: 'clamp(56px, 9vw, 118px)', fontWeight: '800', lineHeight: '0.92', letterSpacing: '-0.04em', background: 'linear-gradient(100deg, #A8762F 6%, #E0B558 26%, #FFF3CE 38%, #E0B558 50%, #A8762F 70%)', backgroundSize: '240% 100%', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', animation: 'tglShimmer 8s linear infinite' }}>

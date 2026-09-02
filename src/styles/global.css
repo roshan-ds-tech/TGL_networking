@@ -86,7 +86,8 @@
 .hv-4:hover { color:#6B3E96; }
 .hv-5:hover { color:#6B3E96; }
 .hv-6:hover { color:#6B3E96; }
-.hv-7:hover { transform:translateY(-2px); box-shadow:0 12px 28px -8px rgba(192,141,46,0.8), inset 0 1px 0 rgba(255,255,255,0.5); color:#22103A; }
+.hv-7:hover { transform:translateY(-3px) scale(1.06); box-shadow:0 16px 34px -6px rgba(192,141,46,0.9), 0 0 0 3px rgba(224,181,88,0.3), inset 0 1px 0 rgba(255,255,255,0.6) !important; filter:brightness(1.08) saturate(1.1); }
+.hv-7:active { transform:translateY(-1px) scale(0.98); }
 .hv-8:hover { color:#6B3E96; }
 .hv-9:hover { color:#6B3E96; }
 .hv-10:hover { color:#6B3E96; }

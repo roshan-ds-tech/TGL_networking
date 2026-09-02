@@ -1,7 +1,6 @@
 export default function Hero({ tickerRef, daysLeftLabel, cdD, cdH, cdM, cdS }) {
   return (
     <section id="top" style={{ position: 'relative', overflow: 'hidden', background: 'transparent' }}>
-      <div style={{ position: 'absolute', inset: '0', backgroundImage: 'linear-gradient(rgba(53,26,78,0.045) 1px, transparent 1px), linear-gradient(90deg, rgba(53,26,78,0.045) 1px, transparent 1px)', backgroundSize: '76px 76px', pointerEvents: 'none', WebkitMaskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 18%, rgba(0,0,0,1) 82%, rgba(0,0,0,0) 100%)', maskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 18%, rgba(0,0,0,1) 82%, rgba(0,0,0,0) 100%)' }}></div>
       <div style={{ position: 'absolute', top: '0', right: '-140px', width: '640px', height: '640px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(224,181,88,0.3), rgba(224,181,88,0) 65%)', animation: 'tglGlow 9s ease-in-out infinite', pointerEvents: 'none', maskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 16%, rgba(0,0,0,1) 84%, rgba(0,0,0,0) 100%)', WebkitMaskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 16%, rgba(0,0,0,1) 84%, rgba(0,0,0,0) 100%)' }}></div>
       <div style={{ position: 'absolute', bottom: '0', left: '-160px', width: '520px', height: '520px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(107,62,150,0.16), rgba(107,62,150,0) 68%)', animation: 'tglGlow 11s ease-in-out infinite 1.5s', pointerEvents: 'none', maskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 16%, rgba(0,0,0,1) 84%, rgba(0,0,0,0) 100%)', WebkitMaskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 16%, rgba(0,0,0,1) 84%, rgba(0,0,0,0) 100%)' }}></div>
       <div style={{ position: 'absolute', inset: '-10% -30%', overflow: 'hidden', pointerEvents: 'none' }}>
@@ -23,7 +22,7 @@ export default function Hero({ tickerRef, daysLeftLabel, cdD, cdH, cdM, cdS }) {
             <span style={{ display: 'block', fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: 'clamp(38px, 5vw, 70px)', lineHeight: '1', letterSpacing: '-0.035em', fontWeight: '800', textTransform: 'uppercase', color: '#2B1740' }}>
               Where Businesses
             </span>
-            <span style={{ display: 'block', marginTop: '4px', fontFamily: "'Bodoni Moda', 'Cormorant Garamond', Georgia, serif", fontStyle: 'italic', fontWeight: '500', fontSize: 'clamp(62px, 9vw, 128px)', lineHeight: '0.94', letterSpacing: '-0.015em', background: 'linear-gradient(100deg, #A8762F 6%, #E0B558 24%, #FFF3CE 33%, #E0B558 42%, #A8762F 62%)', backgroundSize: '240% 100%', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', animation: 'tglShimmer 7s linear infinite' }}>
+            <span style={{ display: 'block', marginTop: '4px', fontFamily: "'Kaushan Script', cursive", fontWeight: '500', fontSize: 'clamp(62px, 9vw, 128px)', lineHeight: '0.94', letterSpacing: '-0.015em', background: 'linear-gradient(100deg, #A8762F 6%, #E0B558 24%, #FFF3CE 33%, #E0B558 42%, #A8762F 62%)', backgroundSize: '240% 100%', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', animation: 'tglShimmer 7s linear infinite' }}>
               Rise.
             </span>
           </h1>

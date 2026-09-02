@@ -15,6 +15,7 @@ import Finale from './sections/Finale';
 import Register from './sections/Register';
 import Faq from './sections/Faq';
 import Contact from './sections/Contact';
+import Sponsors from './sections/Sponsors';
 import Footer from './sections/Footer';
 import { submitRegistration } from './services/registrationService';
 
@@ -54,6 +55,7 @@ function validate(fd) {
   const paymentProof = fd.get('paymentProof');
   if (!paymentProof || !paymentProof.size) errors.paymentProof = 'Please upload a screenshot of your payment.';
   if (!fd.get('agree')) errors.agree = 'Please acknowledge the selection and refund terms.';
+  if (!fd.get('mediaConsent')) errors.mediaConsent = 'Please grant permission to use your footage.';
   return { errors, name };
 }
 
@@ -261,9 +263,11 @@ export default function App() {
         errAge={errors.age || ''}
         errPaymentProof={errors.paymentProof || ''}
         errAgree={errors.agree || ''}
+        errMediaConsent={errors.mediaConsent || ''}
         resetForm={resetForm}
       />
       <Faq faq={faq} toggleFaq={toggleFaq} />
+      <Sponsors />
       <Contact />
       <Footer />
     </div>

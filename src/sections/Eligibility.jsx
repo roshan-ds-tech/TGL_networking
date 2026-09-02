@@ -1,7 +1,6 @@
 export default function Eligibility() {
   return (
     <section id="eligibility" style={{ position: 'relative', overflow: 'hidden', padding: '104px 28px 110px', background: 'transparent' }}>
-      <div style={{ position: 'absolute', inset: '0', pointerEvents: 'none', backgroundImage: 'linear-gradient(rgba(53,26,78,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(53,26,78,0.035) 1px, transparent 1px)', backgroundSize: '76px 76px', WebkitMaskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 18%, rgba(0,0,0,1) 82%, rgba(0,0,0,0) 100%)', maskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 18%, rgba(0,0,0,1) 82%, rgba(0,0,0,0) 100%)' }}></div>
       <div style={{ position: 'absolute', top: '0', right: '-130px', width: '580px', height: '580px', borderRadius: '50%', pointerEvents: 'none', background: 'radial-gradient(circle, rgba(224,181,88,0.26), rgba(224,181,88,0) 66%)', animation: 'tglGlow 11s ease-in-out infinite', maskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 16%, rgba(0,0,0,1) 84%, rgba(0,0,0,0) 100%)', WebkitMaskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 16%, rgba(0,0,0,1) 84%, rgba(0,0,0,0) 100%)' }}></div>
       <div style={{ position: 'absolute', bottom: '0', left: '-170px', width: '600px', height: '600px', borderRadius: '50%', pointerEvents: 'none', background: 'radial-gradient(circle, rgba(107,62,150,0.12), rgba(107,62,150,0) 68%)', animation: 'tglGlow 14s ease-in-out infinite 2s', maskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 16%, rgba(0,0,0,1) 84%, rgba(0,0,0,0) 100%)', WebkitMaskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 16%, rgba(0,0,0,1) 84%, rgba(0,0,0,0) 100%)' }}></div>
       <div style={{ position: 'relative', maxWidth: '1240px', margin: '0 auto' }}>
@@ -16,7 +15,7 @@ export default function Eligibility() {
             <h2 style={{ fontSize: 'clamp(32px, 3.6vw, 48px)', lineHeight: '1.06', letterSpacing: '-0.02em', fontWeight: '800', margin: '0 0 4px', color: '#2B1740' }}>
               Who Can
             </h2>
-            <p style={{ margin: '0 0 20px', fontFamily: '\'Bodoni Moda\', \'Cormorant Garamond\', Georgia, serif', fontStyle: 'italic', fontWeight: '500', fontSize: 'clamp(42px, 5.4vw, 72px)', lineHeight: '1', letterSpacing: '-0.02em', background: 'linear-gradient(100deg, #A8762F 8%, #E0B558 26%, #FFF3CE 36%, #E0B558 46%, #A8762F 66%)', backgroundSize: '240% 100%', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', animation: 'tglShimmer 8s linear infinite' }}>
+            <p style={{ margin: '0 0 20px', fontFamily: '\'Kaushan Script\', cursive', fontWeight: '500', fontSize: 'clamp(42px, 5.4vw, 72px)', lineHeight: '1', letterSpacing: '-0.02em', background: 'linear-gradient(100deg, #A8762F 8%, #E0B558 26%, #FFF3CE 36%, #E0B558 46%, #A8762F 66%)', backgroundSize: '240% 100%', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', animation: 'tglShimmer 8s linear infinite' }}>
               Join TGL?
             </p>
             <p style={{ margin: '0', fontSize: '17px', lineHeight: '1.72', maxWidth: '540px', color: 'rgba(43,23,64,0.72)' }}>

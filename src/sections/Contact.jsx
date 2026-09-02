@@ -14,7 +14,7 @@ export default function Contact() {
           <h2 style={{ fontSize: 'clamp(26px, 2.8vw, 36px)', lineHeight: '1.06', letterSpacing: '-0.018em', fontWeight: '800', margin: '0 0 2px', color: '#2B1740', textTransform: 'uppercase' }}>
             SkyKeen
           </h2>
-          <p style={{ margin: '0 0 22px', fontFamily: '\'Bodoni Moda\', \'Cormorant Garamond\', Georgia, serif', fontStyle: 'italic', fontWeight: '500', fontSize: 'clamp(46px, 5.6vw, 78px)', lineHeight: '1', letterSpacing: '-0.02em', background: 'linear-gradient(100deg, #A8762F 8%, #E0B558 26%, #FFF3CE 36%, #E0B558 46%, #A8762F 66%)', backgroundSize: '240% 100%', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', animation: 'tglShimmer 8s linear infinite' }}>
+          <p style={{ margin: '0 0 22px', fontFamily: '\'Kaushan Script\', cursive', fontWeight: '500', fontSize: 'clamp(46px, 5.6vw, 78px)', lineHeight: '1', letterSpacing: '-0.02em', background: 'linear-gradient(100deg, #A8762F 8%, #E0B558 26%, #FFF3CE 36%, #E0B558 46%, #A8762F 66%)', backgroundSize: '240% 100%', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', animation: 'tglShimmer 8s linear infinite' }}>
             Events
           </p>
           <p style={{ margin: '0 0 30px', fontSize: '17px', lineHeight: '1.74', color: 'rgba(43,23,64,0.72)', maxWidth: '480px', textWrap: 'pretty' }}>
@@ -74,9 +74,6 @@ export default function Contact() {
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px', textAlign: 'right' }}>
                 <a href="mailto:Kavitha@skykeen.in" style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '13.5px', fontWeight: '400', color: '#6B3E96', textDecoration: 'none' }}>
                   Kavitha@skykeen.in
-                </a>
-                <a href="tel:+917406238503" style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '13.5px', fontWeight: '400', color: '#2B1740', textDecoration: 'none' }}>
-                  +91 74062 38503
                 </a>
               </div>
             </div>

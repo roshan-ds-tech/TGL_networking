@@ -18,7 +18,7 @@ export default function Faq({ faq, toggleFaq }) {
           <h2 style={{ fontSize: 'clamp(26px, 2.8vw, 36px)', lineHeight: '1.08', letterSpacing: '-0.018em', fontWeight: '800', margin: '0 0 2px', color: '#2B1740', textTransform: 'uppercase' }}>
             Questions About
           </h2>
-          <p style={{ margin: '0 0 26px', fontFamily: "'Bodoni Moda', 'Cormorant Garamond', Georgia, serif", fontStyle: 'italic', fontWeight: '500', fontSize: 'clamp(44px, 5.4vw, 74px)', lineHeight: '1', letterSpacing: '-0.02em', background: 'linear-gradient(100deg, #A8762F 8%, #E0B558 26%, #FFF3CE 36%, #E0B558 46%, #A8762F 66%)', backgroundSize: '240% 100%', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', animation: 'tglShimmer 8s linear infinite' }}>
+          <p style={{ margin: '0 0 26px', fontFamily: "'Kaushan Script', cursive", fontWeight: '500', fontSize: 'clamp(44px, 5.4vw, 74px)', lineHeight: '1', letterSpacing: '-0.02em', background: 'linear-gradient(100deg, #A8762F 8%, #E0B558 26%, #FFF3CE 36%, #E0B558 46%, #A8762F 66%)', backgroundSize: '240% 100%', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', animation: 'tglShimmer 8s linear infinite' }}>
             Season 1
           </p>
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '18px 22px', border: '1px solid rgba(192,141,46,0.36)', borderRadius: '18px', background: 'rgba(246,238,223,0.6)', maxWidth: '340px' }}>

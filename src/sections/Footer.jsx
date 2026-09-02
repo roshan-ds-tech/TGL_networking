@@ -7,7 +7,7 @@ export default function Footer() {
       <div style={{ position: 'relative', maxWidth: '1240px', margin: '0 auto' }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '48px', paddingBottom: '44px', borderBottom: '1px solid rgba(224,181,88,0.25)' }}>
           <div style={{ flex: '2 1 340px', minWidth: '0' }}>
-            <p style={{ margin: '0 0 10px', fontFamily: '\'Bodoni Moda\', \'Cormorant Garamond\', Georgia, serif', fontStyle: 'italic', fontWeight: '500', fontSize: '27px', lineHeight: '1.2', letterSpacing: '-0.01em', color: '#E0B558' }}>
+            <p style={{ margin: '0 0 10px', fontFamily: '\'Kaushan Script\', cursive', fontWeight: '500', fontSize: '27px', lineHeight: '1.2', letterSpacing: '-0.01em', color: '#E0B558' }}>
               A stage for recognition.
             </p>
             <p style={{ margin: '0 0 26px', fontSize: '15px', lineHeight: '1.72', color: 'rgba(246,238,223,0.6)', maxWidth: '390px', textWrap: 'pretty' }}>

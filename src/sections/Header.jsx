@@ -37,7 +37,7 @@ export default function Header({ headerRef, progressRef, menuOpen, toggleMenu, c
             Contact
           </a>
         </nav>
-        <a data-nav-desktop="" href="#register" style={{ position: 'relative', overflow: 'hidden', flexShrink: '0', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '10px', background: 'linear-gradient(135deg, #EFCB77, #E0B558 45%, #C08D2E)', color: '#22103A', fontWeight: '700', fontSize: '12px', letterSpacing: '.14em', textTransform: 'uppercase', padding: '14px 24px', borderRadius: '999px', boxShadow: '0 8px 22px -8px rgba(192,141,46,0.7), inset 0 1px 0 rgba(255,255,255,0.45)', transition: 'transform .2s ease, box-shadow .2s ease' }} className="hv-7">
+        <a data-nav-desktop="" href="#register" style={{ position: 'relative', overflow: 'hidden', flexShrink: '0', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '10px', background: 'linear-gradient(135deg, #EFCB77, #E0B558 45%, #C08D2E)', color: '#22103A', fontWeight: '700', fontSize: '12px', letterSpacing: '.14em', textTransform: 'uppercase', padding: '14px 24px', borderRadius: '999px', boxShadow: '0 8px 22px -8px rgba(192,141,46,0.7), inset 0 1px 0 rgba(255,255,255,0.45)', transition: 'transform .35s cubic-bezier(.34,1.56,.64,1), box-shadow .3s ease, filter .3s ease' }} className="hv-7">
           Register Now
           <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true" style={{ flexShrink: '0' }}>
             <use href="#i-arrow"></use>

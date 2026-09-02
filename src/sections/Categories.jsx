@@ -15,7 +15,7 @@ export default function Categories() {
             <h2 style={{ fontSize: 'clamp(30px, 3.4vw, 44px)', lineHeight: '1.06', letterSpacing: '-0.02em', fontWeight: '800', margin: '0 0 2px', color: '#2B1740', textTransform: 'uppercase' }}>
               The 10
             </h2>
-            <p style={{ margin: '0', fontFamily: '\'Bodoni Moda\', \'Cormorant Garamond\', Georgia, serif', fontStyle: 'italic', fontWeight: '500', fontSize: 'clamp(44px, 5.6vw, 76px)', lineHeight: '1', letterSpacing: '-0.02em', background: 'linear-gradient(100deg, #A8762F 8%, #E0B558 26%, #FFF3CE 36%, #E0B558 46%, #A8762F 66%)', backgroundSize: '240% 100%', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', animation: 'tglShimmer 8s linear infinite' }}>
+            <p style={{ margin: '0', fontFamily: '\'Kaushan Script\', cursive', fontWeight: '500', fontSize: 'clamp(44px, 5.6vw, 76px)', lineHeight: '1', letterSpacing: '-0.02em', background: 'linear-gradient(100deg, #A8762F 8%, #E0B558 26%, #FFF3CE 36%, #E0B558 46%, #A8762F 66%)', backgroundSize: '240% 100%', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', animation: 'tglShimmer 8s linear infinite' }}>
               Categories
             </p>
           </div>
@@ -159,7 +159,7 @@ export default function Categories() {
               Every category. Equal spotlight.
             </span>
             <span style={{ width: '5px', height: '5px', background: '#E0B558', transform: 'rotate(45deg)', flexShrink: '0' }}></span>
-            <span style={{ fontFamily: '\'Bodoni Moda\', \'Cormorant Garamond\', Georgia, serif', fontStyle: 'italic', fontWeight: '500', fontSize: '25px', lineHeight: '1.1', letterSpacing: '-0.01em', color: '#E0B558' }}>
+            <span style={{ fontFamily: '\'Kaushan Script\', cursive', fontWeight: '500', fontSize: '25px', lineHeight: '1.1', letterSpacing: '-0.01em', color: '#E0B558' }}>
               Every business, a chance to rise.
             </span>
           </div>
