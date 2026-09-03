@@ -35,7 +35,7 @@ os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{PROJECT_DIR}/var/tgl.db"
 os.environ["SQLITE_WAL"] = "false"
 os.environ["UPLOAD_DIR"] = f"{PROJECT_DIR}/var/uploads"
 os.environ["ADMIN_DIST_DIR"] = f"{PROJECT_DIR}/static/admin"
-os.environ["PUBLIC_ORIGIN"] = "https://your-public-site.example.com"
+os.environ["PUBLIC_ORIGIN"] = "https://tglwebsite.vercel.app"
 os.environ["SESSION_HOURS"] = "12"
 
 # ---- 3. Create tables / upload dir ----

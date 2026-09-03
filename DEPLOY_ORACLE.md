@@ -89,7 +89,7 @@ nano backend/.env
 
 ```
 SECRET_KEY=<paste output of: python3 -c "import secrets; print(secrets.token_urlsafe(48))">
-PUBLIC_ORIGIN=https://your-public-site.example.com
+PUBLIC_ORIGIN=https://tglwebsite.vercel.app
 ```
 
 Then bring it up:
