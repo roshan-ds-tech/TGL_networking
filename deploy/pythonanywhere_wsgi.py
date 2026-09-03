@@ -47,7 +47,12 @@ from app.database import init_db_sync  # noqa: E402
 init_db_sync()
 
 # ---- 4. Wrap the ASGI app for PythonAnywhere's WSGI server ----
-from a2wsgi import ASGIMiddleware  # noqa: E402
+# ForkSafeASGIMiddleware, not a2wsgi's ASGIMiddleware directly: uWSGI loads
+# this file in the master process and then forks its workers. a2wsgi starts
+# its event loop in a background thread at construction time, and threads do
+# not survive fork() -- the worker would inherit a loop nobody is running, and
+# every request would hang silently forever. See app/wsgi.py.
 from app.main import app as _fastapi_app  # noqa: E402
+from app.wsgi import ForkSafeASGIMiddleware  # noqa: E402
 
-application = ASGIMiddleware(_fastapi_app)
+application = ForkSafeASGIMiddleware(_fastapi_app)

@@ -21,8 +21,9 @@ os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{TMP}/test.db".replace("\\", 
 os.environ["UPLOAD_DIR"] = f"{TMP}/uploads"
 os.environ["ADMIN_DIST_DIR"] = f"{TMP}/nonexistent"
 
-from a2wsgi import ASGIMiddleware  # noqa: E402
 from werkzeug.test import Client  # noqa: E402
+
+from app.wsgi import ForkSafeASGIMiddleware  # noqa: E402
 
 from app.database import Base, SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
@@ -84,9 +85,9 @@ os.environ.update(
 # This mirrors deploy/pythonanywhere_wsgi.py exactly.
 from app.database import init_db_sync
 init_db_sync()
-from a2wsgi import ASGIMiddleware
 from app.main import app
-application = ASGIMiddleware(app)
+from app.wsgi import ForkSafeASGIMiddleware
+application = ForkSafeASGIMiddleware(app)
 
 from werkzeug.test import Client
 c = Client(application)
@@ -116,12 +117,58 @@ print("STATUS2", r2.status_code)
         shutil.rmtree(fresh, ignore_errors=True)
 
 
+def check_fork_safety() -> None:
+    """The bug that took the live PythonAnywhere deploy down.
+
+    a2wsgi starts its event loop in a background thread at construction time.
+    uWSGI imports the WSGI module in the master process and then fork()s its
+    workers -- threads don't survive fork(), so the worker inherited a loop
+    nobody was running and every request hung silently forever.
+
+    Windows has no fork(), so this asserts the mechanism rather than the
+    syscall: the adapter must be built lazily (not at construction), and must
+    be rebuilt when the PID changes.
+    """
+    wrapper = ForkSafeASGIMiddleware(app)
+    check(
+        "adapter is NOT built at construction (would be pre-fork)",
+        wrapper._adapter is None,
+    )
+
+    client = Client(wrapper)
+    client.get("/api/health")
+    first = wrapper._adapter
+    check("adapter built lazily on first request", first is not None)
+
+    client.get("/api/health")
+    check("adapter reused within the same process", wrapper._adapter is first)
+
+    # Simulate the post-fork state: same object, different PID.
+    real_getpid = os.getpid
+    try:
+        os.getpid = lambda: real_getpid() + 1  # type: ignore[assignment]
+        Client(wrapper).get("/api/health")
+        rebuilt = wrapper._adapter
+    finally:
+        os.getpid = real_getpid  # type: ignore[assignment]
+
+    check("adapter rebuilt after PID change (post-fork)", rebuilt is not first)
+
+    # And the wrapper still serves correctly after that rebuild.
+    r = Client(wrapper).get("/api/health")
+    check(
+        "requests still work after a simulated fork",
+        r.status_code == 200 and r.get_json() == {"status": "ok"},
+        str(r.status_code),
+    )
+
+
 def main() -> int:
     asyncio.run(seed())
 
     # This is the same object PythonAnywhere's WSGI file would expose as
     # `application` — a plain WSGI callable, not an ASGI app.
-    wsgi_app = ASGIMiddleware(app)
+    wsgi_app = ForkSafeASGIMiddleware(app)
     client = Client(wsgi_app)
 
     fields = {
@@ -167,6 +214,7 @@ def main() -> int:
     check("plain GET works through the WSGI bridge", r.status_code == 200 and r.get_json() == {"status": "ok"})
 
     check_cold_start()
+    check_fork_safety()
 
     passed = sum(1 for ok, _ in results if ok)
     total = len(results)
