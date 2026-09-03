@@ -1,0 +1,31 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+#
+# Deploy: push this repo to GitHub, then in Render:
+#   New -> Blueprint -> select the repo -> Render finds this file automatically.
+#
+# Before the first deploy, edit PUBLIC_ORIGIN below to your public marketing
+# site's real deployed URL (e.g. https://tgl-season1.vercel.app). Until the
+# site is deployed there too, you can leave it pointing at localhost — the
+# admin dashboard itself does not need it; only the public registration form's
+# cross-origin POST does.
+services:
+  - type: web
+    name: tgl-admin-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: starter # cheapest plan with a persistent disk; free tier has no disk
+    healthCheckPath: /api/health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: SECRET_KEY
+        generateValue: true # Render generates and stores a random 44-char value
+      - key: PUBLIC_ORIGIN
+        value: https://CHANGE-ME.example.com
+      - key: SESSION_HOURS
+        value: "12"
+    disk:
+      name: tgl-data
+      mountPath: /app/var
+      sizeGB: 1

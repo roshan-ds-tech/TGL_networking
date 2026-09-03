@@ -1,0 +1,12 @@
+{$DOMAIN} {
+	reverse_proxy api:8000
+
+	encode gzip
+
+	# Belt-and-suspenders: the backend already sets most of these, but Caddy
+	# is the outermost layer so it's worth pinning here too.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+	}
+}

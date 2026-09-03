@@ -1,0 +1,12 @@
+# Keep the build context small and never ship local secrets/state into the image.
+**/node_modules
+**/.venv
+**/__pycache__
+**/*.pyc
+backend/var
+backend/.env
+backend/static
+backend/static-admin.zip
+data
+.git
+dist

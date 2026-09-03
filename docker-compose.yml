@@ -1,0 +1,39 @@
+# Run on the VM with: docker compose up -d
+#
+# Two containers:
+#   api   - the FastAPI backend (built from ./Dockerfile), data on a bind
+#           mount so it survives container recreation and image rebuilds.
+#   caddy - reverse proxy that automatically provisions and renews a
+#           Let's Encrypt TLS certificate for DOMAIN. Caddy needs a real
+#           hostname to do this (see DEPLOY_ORACLE.md for a free one via
+#           DuckDNS) — it cannot issue a certificate for a bare IP address.
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: backend/.env
+    volumes:
+      - ./data:/app/var
+    expose:
+      - "8000"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - DOMAIN=${DOMAIN:?set DOMAIN in .env at the repo root, e.g. tgl-admin.duckdns.org}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+
+volumes:
+  caddy_data:
+  caddy_config:
