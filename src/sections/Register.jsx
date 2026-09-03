@@ -18,6 +18,7 @@ export default function Register({
   errPaymentProof,
   errAgree,
   errMediaConsent,
+  errForm,
   resetForm,
 }) {
   const [paymentProofName, setPaymentProofName] = useState('');
@@ -271,6 +272,11 @@ export default function Register({
                     </span>
                   </label>
                   {errMediaConsent && <span role="alert" style={{ gridColumn: '1 / -1', fontSize: '13px', color: '#9A2B2B', fontWeight: '600', marginTop: '-10px' }}>{errMediaConsent}</span>}
+                  {errForm && (
+                    <p role="alert" style={{ gridColumn: '1 / -1', margin: '0', padding: '14px 16px', borderRadius: '12px', background: 'rgba(154,43,43,0.08)', border: '1px solid rgba(154,43,43,0.3)', fontSize: '14px', fontWeight: '600', color: '#9A2B2B' }}>
+                      {errForm}
+                    </p>
+                  )}
                   <div style={{ gridColumn: '1 / -1', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '18px', marginTop: '4px' }}>
                     <button type="submit" disabled={submitting} style={{ display: 'inline-flex', alignItems: 'center', gap: '12px', background: 'linear-gradient(135deg, #E0B558, #C08D2E)', border: 'none', color: '#22103A', fontWeight: '700', fontSize: '14px', letterSpacing: '.08em', textTransform: 'uppercase', padding: '18px 40px', borderRadius: '999px', cursor: 'pointer', minHeight: '56px', boxShadow: '0 10px 26px rgba(192,141,46,0.3)', transition: 'transform .2s ease, box-shadow .2s ease' }} className="hv-74">
                       {submitting && <span style={{ width: '16px', height: '16px', border: '2px solid rgba(34,16,58,0.28)', borderTopColor: '#22103A', borderRadius: '50%', display: 'inline-block', animation: 'tglSpin .7s linear infinite' }}></span>}

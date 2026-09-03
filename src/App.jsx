@@ -222,10 +222,21 @@ export default function App() {
     }
     setErrors({});
     setSubmitting(true);
-    await submitRegistration(Object.fromEntries(fd.entries()));
-    setSubmitting(false);
-    setSubmitted(true);
-    setSubmittedName(name);
+    try {
+      // Post the FormData itself so the payment screenshot is included.
+      await submitRegistration(fd);
+      setSubmitted(true);
+      setSubmittedName(name);
+    } catch (err) {
+      // Never show the success screen when the server rejected the submission.
+      setErrors(
+        Object.keys(err.fieldErrors || {}).length
+          ? err.fieldErrors
+          : { form: err.message || 'Something went wrong. Please try again.' },
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const days = daysLeft();
@@ -264,6 +275,7 @@ export default function App() {
         errPaymentProof={errors.paymentProof || ''}
         errAgree={errors.agree || ''}
         errMediaConsent={errors.mediaConsent || ''}
+        errForm={errors.form || ''}
         resetForm={resetForm}
       />
       <Faq faq={faq} toggleFaq={toggleFaq} />
