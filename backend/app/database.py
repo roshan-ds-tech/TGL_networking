@@ -1,7 +1,9 @@
 """Async SQLAlchemy engine/session wiring.
 
-SQLite is put into WAL mode so reads never block the writer — that keeps the
-dashboard responsive while registrations are coming in.
+SQLite is put into WAL mode (settings.sqlite_wal) so reads never block the
+writer — that keeps the dashboard responsive while registrations are coming
+in. WAL is skipped when settings.sqlite_wal is false, for hosts whose disk
+doesn't support the shared-memory locking WAL depends on (see config.py).
 """
 from __future__ import annotations
 
@@ -37,8 +39,15 @@ if is_sqlite:
     @event.listens_for(engine.sync_engine, "connect")
     def _sqlite_pragmas(dbapi_conn, _record):  # pragma: no cover - driver hook
         cur = dbapi_conn.cursor()
-        cur.execute("PRAGMA journal_mode=WAL")
-        cur.execute("PRAGMA synchronous=NORMAL")
+        if settings.sqlite_wal:
+            cur.execute("PRAGMA journal_mode=WAL")
+            cur.execute("PRAGMA synchronous=NORMAL")
+        else:
+            # Default rollback journal: slower under concurrent access, but
+            # doesn't depend on the mmap/shared-memory locking that hangs on
+            # network filesystems. synchronous=FULL is the safe pairing for it.
+            cur.execute("PRAGMA journal_mode=DELETE")
+            cur.execute("PRAGMA synchronous=FULL")
         cur.execute("PRAGMA foreign_keys=ON")
         cur.execute("PRAGMA busy_timeout=5000")
         cur.close()

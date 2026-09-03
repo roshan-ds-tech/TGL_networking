@@ -25,6 +25,13 @@ class Settings(BaseSettings):
     # sqlite+aiosqlite:///./tgl.db  |  postgresql+asyncpg://user:pass@host/db
     database_url: str = "sqlite+aiosqlite:///./var/tgl.db"
 
+    # WAL mode needs proper shared-memory file locking, which network
+    # filesystems (notably PythonAnywhere's free-tier home directory, which is
+    # NFS-backed) do not support reliably — it silently hangs rather than
+    # erroring. Set SQLITE_WAL=false on hosts where the database lives on such
+    # storage; safe to leave on (the default) anywhere with a normal local disk.
+    sqlite_wal: bool = True
+
     # Screenshots live here, deliberately OUTSIDE any statically served directory.
     upload_dir: str = "./var/uploads"
 

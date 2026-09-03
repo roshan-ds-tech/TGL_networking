@@ -29,6 +29,10 @@ os.environ["ENVIRONMENT"] = "production"
 # with a key that's published in this repo.
 os.environ["SECRET_KEY"] = "CHANGE-ME"
 os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{PROJECT_DIR}/var/tgl.db"
+# PythonAnywhere's free-tier home directory is network-mounted (NFS); SQLite's
+# WAL mode needs shared-memory locking that NFS doesn't support reliably, and
+# hangs (not errors) as a result. Must stay off on this host.
+os.environ["SQLITE_WAL"] = "false"
 os.environ["UPLOAD_DIR"] = f"{PROJECT_DIR}/var/uploads"
 os.environ["ADMIN_DIST_DIR"] = f"{PROJECT_DIR}/static/admin"
 os.environ["PUBLIC_ORIGIN"] = "https://your-public-site.example.com"

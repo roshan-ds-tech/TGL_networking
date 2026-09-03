@@ -24,6 +24,15 @@ see and I'll adjust.
 > request returns a 500 with `no such table: admins`. This was a real bug
 > caught while testing; the call is idempotent and safe on every reload.
 
+> Why the WSGI file sets `SQLITE_WAL=false`: SQLite's WAL journal mode needs
+> shared-memory file locking that PythonAnywhere's NFS-backed home directory
+> doesn't support reliably — it hangs rather than erroring, with nothing in
+> the error log, until PythonAnywhere's 5-minute watchdog kills the worker.
+> This was found live on a real deployment (first request worked, every one
+> after it hung), not caught by local testing since it's specific to
+> network-filesystem storage. `SQLITE_WAL=false` uses SQLite's plain rollback
+> journal instead, which doesn't have this dependency.
+
 ## 0. Prerequisite: push your latest commits
 
 This repo (`github.com/roshan-ds-tech/TGL`) already exists and is where
