@@ -3,8 +3,8 @@
    height to read at a comparable size. */
 const SPONSORS = [
   { name: 'Shami Equibooks', file: '/images/sponsor_shamiequibooks.png', maxHeight: '54px' },
-  { name: 'RK Doshi & Co LLP', file: '/images/sponsor_rkdoshi.png', maxHeight: '50px' },
-  { name: 'Saffron Technologies', file: '/images/sponsor_saffrontechnologies.png', maxHeight: '104px' },
+  { name: 'Creme Bliss', file: '/images/sponsor_creme_bliss.jpeg', maxHeight: '120px' },
+  { name: 'Saffron Technologies', file: '/images/sponsor_saffrontechnologies.png', maxHeight: '120px' },
 ];
 
 const HOVER_CLASSES = ['hv-46', 'hv-47', 'hv-48'];
