@@ -35,6 +35,9 @@ os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{PROJECT_DIR}/var/tgl.db"
 os.environ["SQLITE_WAL"] = "false"
 os.environ["UPLOAD_DIR"] = f"{PROJECT_DIR}/var/uploads"
 os.environ["ADMIN_DIST_DIR"] = f"{PROJECT_DIR}/static/admin"
+# Comma-separate to allow more than one origin. Add "http://localhost:5173" here
+# if you want to run the site locally against this deployed backend — without it
+# the browser blocks every API call from localhost as a CORS error.
 os.environ["PUBLIC_ORIGIN"] = "https://tglwebsite.vercel.app"
 os.environ["SESSION_HOURS"] = "12"
 

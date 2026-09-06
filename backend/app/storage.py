@@ -96,3 +96,19 @@ def resolve_proof(filename: str) -> Path:
     if not candidate.is_file() or root not in candidate.parents:
         raise HTTPException(status_code=404, detail="Payment proof not found")
     return candidate
+
+
+def delete_proof(filename: str) -> bool:
+    """Delete a stored proof file. Returns True if a file was removed.
+
+    Path-checked the same way as reads, so a malformed stored name can never
+    unlink something outside the upload root. Missing files are not an error:
+    the caller is deleting the registration either way, and a proof that is
+    already gone should not block that.
+    """
+    root = upload_root()
+    candidate = (root / filename).resolve()
+    if root not in candidate.parents or not candidate.is_file():
+        return False
+    candidate.unlink(missing_ok=True)
+    return True

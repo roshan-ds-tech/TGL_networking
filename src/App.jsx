@@ -19,6 +19,7 @@ import Contact from './sections/Contact';
 import Sponsors from './sections/Sponsors';
 import Footer from './sections/Footer';
 import { submitRegistration } from './services/registrationService';
+import useAvailability from './hooks/useAvailability';
 
 const REGISTRATION_CLOSE = new Date('2026-11-20T23:59:59');
 const CATEGORY_TICKER_ITEMS = [
@@ -67,6 +68,9 @@ export default function App() {
   const [submittedName, setSubmittedName] = useState('');
   const [errors, setErrors] = useState({});
   const [faq, setFaq] = useState({ 1: true, 2: false, 3: false, 4: false, 5: false, 6: false });
+
+  // One request per page load, shared by the Categories grid and the popup.
+  const availability = useAvailability();
 
   const formRef = useRef(null);
   const progressRef = useRef(null);
@@ -244,7 +248,7 @@ export default function App() {
   const daysLeftLabel = days > 0 ? days + ' days remaining' : 'Registration closed';
 
   return (
-    <div style={{ minHeight: '100vh', background: 'linear-gradient(180deg, #F6EEDF 0%, #FBF5E9 12%, #F7F0E2 34%, #FBF5E9 58%, #F6EEDF 78%, #F4EBDC 100%)', overflowX: 'hidden' }}>
+    <div className="tgl-shell" style={{ minHeight: '100vh', background: 'linear-gradient(180deg, #F6EEDF 0%, #FBF5E9 12%, #F7F0E2 34%, #FBF5E9 58%, #F6EEDF 78%, #F4EBDC 100%)' }}>
       <IconSprite />
       <Header headerRef={headerRef} progressRef={progressRef} menuOpen={menuOpen} toggleMenu={toggleMenu} closeMenu={closeMenu} />
       <Hero tickerRef={tickerRef} daysLeftLabel={daysLeftLabel} cdD={cdD} cdH={cdH} cdM={cdM} cdS={cdS} />
@@ -253,7 +257,7 @@ export default function App() {
       <Positioning />
       <WhyTGL />
       <Eligibility />
-      <Categories />
+      <Categories availability={availability} />
       <Evaluation />
       <Benefits />
       <Journey />
@@ -283,7 +287,7 @@ export default function App() {
       <Sponsors />
       <Contact />
       <Footer />
-      <UrgencyPopup />
+      <UrgencyPopup availability={availability} deadline={REGISTRATION_CLOSE} />
     </div>
   );
 }

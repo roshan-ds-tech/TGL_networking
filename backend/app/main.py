@@ -43,13 +43,14 @@ app = FastAPI(
 
 app.add_middleware(GZipMiddleware, minimum_size=500)
 
-# Only the public marketing site needs cross-origin access, and only to POST a
-# registration. The admin SPA is served same-origin, so it needs no CORS grant.
+# Only the public marketing site needs cross-origin access: POST to submit a
+# registration, GET to read the public slot-availability counters. The admin SPA
+# is served same-origin, so it needs no CORS grant.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.public_origin],
+    allow_origins=settings.public_origins,
     allow_credentials=False,
-    allow_methods=["POST", "OPTIONS"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
     max_age=600,
 )

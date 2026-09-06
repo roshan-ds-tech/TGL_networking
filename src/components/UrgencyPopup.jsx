@@ -1,126 +1,131 @@
 import { useEffect, useState } from 'react';
 
-const DISMISS_KEY = 'tgl-urgency-dismissed';
-const SHOW_DELAY_MS = 6000;
+const SHOW_DELAY_MS = 3500;
 
-export default function UrgencyPopup() {
+/* Shows on every page load by design — dismissing it only hides it for the
+ * current view, it is not persisted. */
+export default function UrgencyPopup({ availability, deadline }) {
   const [visible, setVisible] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [remaining, setRemaining] = useState(() => splitRemaining(deadline));
 
   useEffect(() => {
-    if (sessionStorage.getItem(DISMISS_KEY)) return;
     const timer = setTimeout(() => setVisible(true), SHOW_DELAY_MS);
     return () => clearTimeout(timer);
   }, []);
 
+  useEffect(() => {
+    if (!visible) return undefined;
+    const id = setInterval(() => setRemaining(splitRemaining(deadline)), 1000);
+    return () => clearInterval(id);
+  }, [visible, deadline]);
+
+  // Let the exit animation finish before unmounting.
   const dismiss = () => {
-    setVisible(false);
-    sessionStorage.setItem(DISMISS_KEY, '1');
+    setClosing(true);
+    setTimeout(() => setVisible(false), 260);
   };
 
   if (!visible) return null;
 
+  const filled = availability?.total_filled ?? null;
+  const capacity = availability?.total_capacity ?? null;
+  const left = filled !== null ? Math.max(0, capacity - filled) : null;
+  const pct = filled !== null && capacity ? Math.min(100, (filled / capacity) * 100) : 0;
+
   return (
-    <div
-      role="dialog"
-      aria-label="Registration urgency notice"
-      style={{
-        position: 'fixed',
-        right: '16px',
-        bottom: '16px',
-        zIndex: 200,
-        width: 'min(360px, calc(100vw - 32px))',
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: '14px',
-        padding: '20px 20px 20px 18px',
-        borderRadius: '18px',
-        background: 'linear-gradient(155deg, #2B1740, #22103A)',
-        border: '1px solid rgba(224,181,88,0.4)',
-        boxShadow: '0 24px 54px rgba(0,0,0,0.4)',
-        color: '#F6EEDF',
-        animation: 'tglRise .5s cubic-bezier(.2,.7,.3,1) both',
-      }}
+    <aside
+      role="complementary"
+      aria-label="Registration availability"
+      className="urgency"
+      data-closing={closing ? '' : undefined}
     >
-      <span
-        aria-hidden="true"
-        style={{
-          flexShrink: 0,
-          width: '40px',
-          height: '40px',
-          borderRadius: '50%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'linear-gradient(150deg, #E0B558, #A8762F)',
-          color: '#22103A',
-          animation: 'tglGlow 2.4s ease-in-out infinite',
-        }}
-      >
-        <svg width="19" height="19" viewBox="0 0 24 24" aria-hidden="true">
-          <use href="#i-clock"></use>
-        </svg>
-      </span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <p
-          style={{
-            margin: '0 0 5px',
-            fontSize: '10.5px',
-            letterSpacing: '.16em',
-            textTransform: 'uppercase',
-            fontWeight: '700',
-            color: '#EFCB77',
-          }}
-        >
-          Slots are filling fast
-        </p>
-        <p style={{ margin: '0 0 14px', fontSize: '14.5px', lineHeight: '1.55', color: 'rgba(246,238,223,0.85)' }}>
-          Early-bird pricing won&rsquo;t last — hurry up and register now before your category fills up.
-        </p>
-        <a
-          href="#register"
-          onClick={dismiss}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            background: 'linear-gradient(135deg, #E0B558, #C08D2E)',
-            color: '#22103A',
-            fontWeight: '700',
-            fontSize: '12px',
-            letterSpacing: '.06em',
-            textTransform: 'uppercase',
-            padding: '10px 18px',
-            borderRadius: '999px',
-            textDecoration: 'none',
-            transition: 'transform .2s ease, box-shadow .2s ease',
-          }}
-          className="urgency-cta"
-        >
-          Register Now
-        </a>
+      <span aria-hidden="true" className="urgency__hairline" />
+
+      <div className="urgency__head">
+        <span className="urgency__eyebrow">
+          <span aria-hidden="true" className="urgency__dot" />
+          Season 1 · Registrations open
+        </span>
+        <button type="button" onClick={dismiss} aria-label="Dismiss" className="urgency__close">
+          <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true">
+            <path
+              d="M1 1l10 10M11 1L1 11"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+            />
+          </svg>
+        </button>
       </div>
-      <button
-        type="button"
-        onClick={dismiss}
-        aria-label="Dismiss"
-        style={{
-          flexShrink: 0,
-          width: '26px',
-          height: '26px',
-          borderRadius: '50%',
-          border: '1px solid rgba(224,181,88,0.35)',
-          background: 'rgba(255,255,255,0.06)',
-          color: 'rgba(246,238,223,0.75)',
-          fontSize: '15px',
-          lineHeight: '1',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        &times;
-      </button>
-    </div>
+
+      {left !== null ? (
+        <>
+          <p className="urgency__title">
+            <strong>{left}</strong> {left === 1 ? 'slot' : 'slots'} still open
+          </p>
+          <p className="urgency__sub">
+            Across all 10 categories. Early-bird pricing closes as each category fills.
+          </p>
+          <div className="urgency__meter" aria-hidden="true">
+            <span className="urgency__meter-fill" style={{ width: `${pct}%` }} />
+          </div>
+          <p className="urgency__count">
+            <span>{filled} claimed</span>
+            <span>{capacity} total</span>
+          </p>
+        </>
+      ) : (
+        <>
+          <p className="urgency__title">Slots are filling up</p>
+          <p className="urgency__sub">
+            40 slots per category, 10 categories. Secure yours before your category closes.
+          </p>
+        </>
+      )}
+
+      {remaining && (
+        <div className="urgency__deadline">
+          <svg width="13" height="13" viewBox="0 0 24 24" aria-hidden="true">
+            <use href="#i-clock" />
+          </svg>
+          <span>
+            Closes in
+            <strong>
+              {' '}
+              {remaining.days}d {pad(remaining.hours)}h {pad(remaining.minutes)}m
+            </strong>
+          </span>
+        </div>
+      )}
+
+      <div className="urgency__actions">
+        <a href="#register" onClick={dismiss} className="urgency__cta">
+          Register now
+          <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <use href="#i-arrow" />
+          </svg>
+        </a>
+        <button type="button" onClick={dismiss} className="urgency__later">
+          Not now
+        </button>
+      </div>
+    </aside>
   );
+}
+
+function pad(n) {
+  return n < 10 ? `0${n}` : String(n);
+}
+
+function splitRemaining(deadline) {
+  if (!deadline) return null;
+  const ms = deadline - new Date();
+  if (ms <= 0) return null;
+  const total = Math.floor(ms / 1000);
+  return {
+    days: Math.floor(total / 86400),
+    hours: Math.floor(total / 3600) % 24,
+    minutes: Math.floor(total / 60) % 60,
+  };
 }

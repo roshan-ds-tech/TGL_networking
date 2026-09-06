@@ -1,6 +1,7 @@
 """Authenticated admin data endpoints."""
 from __future__ import annotations
 
+import logging
 import math
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
@@ -18,9 +19,12 @@ from ..schemas import (
     VerifyRequest,
 )
 from ..security import get_current_admin, require_csrf
-from ..storage import resolve_proof
+from ..storage import delete_proof, resolve_proof
+from .public import invalidate_availability_cache
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+logger = logging.getLogger("tgl")
 
 
 def _to_out(reg: Registration) -> RegistrationOut:
@@ -138,6 +142,46 @@ async def set_verified(
     await db.commit()
     await db.refresh(reg)
     return _to_out(reg)
+
+
+@router.delete("/registrations/{registration_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_registration(
+    registration_id: str,
+    admin: Admin = Depends(get_current_admin),
+    __: None = Depends(require_csrf),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Permanently remove a registration and its payment screenshot.
+
+    Irreversible by design (there is no soft-delete column, and no migration
+    tooling to add one). The proof file goes with the row so the upload
+    directory does not accumulate unreachable files.
+    """
+    reg = await db.get(Registration, registration_id)
+    if reg is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Registration not found")
+
+    proof_filename = reg.proof_filename
+    business = reg.business_name
+
+    await db.delete(reg)
+    await db.commit()
+
+    # Only after the row is durably gone — if the commit fails we must not have
+    # destroyed the evidence for a registration that still exists.
+    removed = delete_proof(proof_filename)
+
+    logger.warning(
+        "Registration deleted: id=%s business=%r by=%s proof_removed=%s",
+        registration_id,
+        business,
+        admin.email,
+        removed,
+    )
+    # The public slot counters are now stale.
+    invalidate_availability_cache()
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/registrations/{registration_id}/proof")

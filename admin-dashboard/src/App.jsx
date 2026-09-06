@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AGES, api, ApiError, CATEGORIES, EMPLOYEES } from './api';
+import DeleteModal from './DeleteModal';
 import Login from './Login';
 import ProofModal from './ProofModal';
 
@@ -46,6 +47,7 @@ export default function App() {
   const [error, setError] = useState('');
   const [pendingId, setPendingId] = useState(null);
   const [proof, setProof] = useState(null);
+  const [toDelete, setToDelete] = useState(null);
 
   const abortRef = useRef(null);
 
@@ -120,6 +122,15 @@ export default function App() {
     } finally {
       setPendingId(null);
     }
+  }
+
+  async function handleDelete(row) {
+    await api.remove(row.id);
+    setToDelete(null);
+    // Reload rather than splicing the row out: the current page is now short by
+    // one, so the counts, page total and any row pulled up from the next page
+    // all need to come from the server.
+    await load();
   }
 
   async function handleLogout() {
@@ -261,12 +272,13 @@ export default function App() {
                 <th>Submitted</th>
                 <th>Payment proof</th>
                 <th>Status</th>
+                <th><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={9} className="empty">
+                  <td colSpan={10} className="empty">
                     No registrations match these filters.
                   </td>
                 </tr>
@@ -315,6 +327,26 @@ export default function App() {
                       {pendingId === r.id ? '…' : r.verified ? '✓ Verified' : 'Verify'}
                     </button>
                   </td>
+                  <td>
+                    <button
+                      type="button"
+                      className="btn btn--icon"
+                      onClick={() => setToDelete(r)}
+                      title={`Delete ${r.business_name}`}
+                      aria-label={`Delete registration for ${r.business_name}`}
+                    >
+                      <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true">
+                        <path
+                          d="M4 7h16M10 4h4M9 7v12m6-12v12M6 7l1 13h10l1-13"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.7"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -346,6 +378,13 @@ export default function App() {
       </main>
 
       {proof && <ProofModal registration={proof} onClose={() => setProof(null)} />}
+      {toDelete && (
+        <DeleteModal
+          registration={toDelete}
+          onConfirm={() => handleDelete(toDelete)}
+          onClose={() => setToDelete(null)}
+        />
+      )}
     </div>
   );
 }

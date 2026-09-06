@@ -35,7 +35,11 @@ class Settings(BaseSettings):
     # Screenshots live here, deliberately OUTSIDE any statically served directory.
     upload_dir: str = "./var/uploads"
 
-    # Origin of the public marketing site (needed for CORS on the register endpoint).
+    # Origin(s) of the public marketing site, for CORS on the register and
+    # availability endpoints. Accepts a comma-separated list so the deployed site
+    # and a local dev server can both be allowed, e.g.
+    #   PUBLIC_ORIGIN="https://tglwebsite.vercel.app,http://localhost:5173"
+    # Always an explicit allowlist — "*" is deliberately not supported.
     public_origin: str = "http://localhost:5173"
 
     # Built admin SPA; served same-origin by this app so cookies stay SameSite=Strict.
@@ -43,6 +47,10 @@ class Settings(BaseSettings):
 
     session_hours: int = 12
     max_upload_bytes: int = 8 * 1024 * 1024  # 8 MB
+
+    # Season capacity. Drives the public "x of 40 slots filled" counters and the
+    # admin dashboard's early-bird thresholds.
+    slots_per_category: int = 40
 
     # Brute-force controls
     login_max_attempts: int = 5
@@ -52,6 +60,12 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.environment.lower() in {"production", "prod"}
+
+    @property
+    def public_origins(self) -> list[str]:
+        """`public_origin` split into the list CORSMiddleware expects."""
+        origins = [o.strip().rstrip("/") for o in self.public_origin.split(",")]
+        return [o for o in origins if o and o != "*"]
 
     @property
     def cookie_secure(self) -> bool:

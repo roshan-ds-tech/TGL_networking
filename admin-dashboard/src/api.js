@@ -69,6 +69,8 @@ export const api = {
       method: 'PATCH',
       body: { verified },
     }),
+  remove: (id) =>
+    request(`/api/admin/registrations/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   proofUrl: (id) => `/api/admin/registrations/${encodeURIComponent(id)}/proof`,
 };
 

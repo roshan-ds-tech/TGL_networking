@@ -81,8 +81,23 @@ through the `a2wsgi` adapter instead of served natively as ASGI.
 | `SECRET_KEY` | **Required in production**, ≥32 chars. Rotating it logs everyone out |
 | `DATABASE_URL` | `sqlite+aiosqlite:///./var/tgl.db` or `postgresql+asyncpg://…` |
 | `UPLOAD_DIR` | Screenshot storage. Keep outside any static/web root |
-| `PUBLIC_ORIGIN` | Public site origin, for CORS on the register endpoint |
+| `PUBLIC_ORIGIN` | Public site origin(s), for CORS on the register + availability endpoints. Comma-separate to allow more than one, e.g. `https://tglwebsite.vercel.app,http://localhost:5173`. Explicit allowlist only — `*` is ignored |
 | `SESSION_HOURS` | Admin session lifetime (default 12) |
+| `SLOTS_PER_CATEGORY` | Capacity per category shown by the public slot counters (default 40) |
+
+## Public endpoints
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /api/registrations` | Registration intake (multipart, includes payment proof) |
+| `GET /api/categories/availability` | Aggregate "x of 40 filled" counters for the marketing site |
+
+`GET /api/categories/availability` is unauthenticated on purpose — the public
+site renders a live slot counter per category. It returns **counts only**, never
+registrant data, and is cached in-process for 30s so page traffic does not turn
+into database load. The count is *all* registrations, matching the admin
+dashboard's slot-fill logic (a submitted registration holds the slot while its
+payment is being verified).
 
 ## Production notes
 

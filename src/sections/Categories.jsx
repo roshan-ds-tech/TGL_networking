@@ -1,4 +1,103 @@
-export default function Categories() {
+const CATEGORIES = [
+  { code: '01', name: 'Fashion, Apparel & Textile Businesses' },
+  { code: '02', name: 'Food, Bakery & Beverage Businesses' },
+  { code: '03', name: 'Handmade, Craft & Artisan Businesses' },
+  { code: '04', name: 'Jewellery & Accessories Businesses' },
+  { code: '05', name: 'Home Decor, Lifestyle & Interior Businesses' },
+  { code: '06', name: 'Kids Products, Toys & Parenting Brands' },
+  { code: '07', name: 'Beauty, Personal Care & Wellness Businesses' },
+  { code: '08', name: 'Fitness, Sports & Health Businesses' },
+  { code: '09', name: 'Business, Professional & Digital Services' },
+  { code: '10', name: 'Emerging, Innovative & Unique Businesses' },
+];
+
+const DEFAULT_CAPACITY = 40;
+
+/* Slot counter shown at the end of each category row.
+ *
+ * Until the counts arrive (or if the request failed) this falls back to the
+ * static "40 slots" label, so the section never renders a placeholder or a
+ * misleading "0 filled". */
+function SlotMeter({ filled, capacity }) {
+  if (filled === null) {
+    return (
+      <span
+        style={{
+          fontFamily: "'IBM Plex Mono', monospace",
+          fontSize: '10.5px',
+          letterSpacing: '.14em',
+          textTransform: 'uppercase',
+          color: 'rgba(43,23,64,0.4)',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {capacity} slots
+      </span>
+    );
+  }
+
+  const pct = Math.min(100, (filled / capacity) * 100);
+  const isFull = filled >= capacity;
+  const isTight = !isFull && pct >= 75;
+  const accent = isFull ? '#8E3B3B' : isTight ? '#A8762F' : '#C08D2E';
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-end',
+        gap: '7px',
+        minWidth: '96px',
+      }}
+      aria-label={`${filled} of ${capacity} slots filled`}
+    >
+      <span
+        style={{
+          fontFamily: "'IBM Plex Mono', monospace",
+          fontSize: '11px',
+          letterSpacing: '.1em',
+          textTransform: 'uppercase',
+          whiteSpace: 'nowrap',
+          color: 'rgba(43,23,64,0.42)',
+        }}
+      >
+        <strong style={{ fontSize: '13.5px', fontWeight: 700, color: accent }}>
+          {isFull ? 'Full' : filled}
+        </strong>
+        {!isFull && <span> / {capacity} filled</span>}
+      </span>
+      <span
+        aria-hidden="true"
+        style={{
+          width: '96px',
+          height: '3px',
+          borderRadius: '999px',
+          background: 'rgba(43,23,64,0.1)',
+          overflow: 'hidden',
+        }}
+      >
+        <span
+          style={{
+            display: 'block',
+            height: '100%',
+            width: `${pct}%`,
+            borderRadius: '999px',
+            background: isFull
+              ? 'linear-gradient(90deg, #A85252, #8E3B3B)'
+              : 'linear-gradient(90deg, #E0B558, #C08D2E)',
+            transition: 'width .8s cubic-bezier(.2,.7,.3,1)',
+          }}
+        />
+      </span>
+    </div>
+  );
+}
+
+export default function Categories({ availability }) {
+  const capacity = availability?.capacity_per_category ?? DEFAULT_CAPACITY;
+  const byCode = new Map((availability?.categories ?? []).map((c) => [c.category, c]));
+
   return (
     <section id="categories" style={{ position: 'relative', overflow: 'hidden', padding: '104px 28px 96px', background: 'transparent' }}>
       <div aria-hidden="true" style={{ position: 'absolute', top: '0', right: '-120px', width: '520px', height: '520px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(192,141,46,0.14), rgba(192,141,46,0) 68%)', pointerEvents: 'none', maskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 16%, rgba(0,0,0,1) 84%, rgba(0,0,0,0) 100%)', WebkitMaskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 16%, rgba(0,0,0,1) 84%, rgba(0,0,0,0) 100%)' }}></div>
@@ -22,7 +121,7 @@ export default function Categories() {
           <div data-stat-pills="" style={{ flexShrink: '0', maxWidth: '100%', display: 'flex', alignItems: 'stretch', gap: '0', border: '1px solid rgba(192,141,46,0.42)', borderRadius: '18px', background: 'rgba(246,238,223,0.55)', overflow: 'hidden' }}>
             <div style={{ padding: '18px 24px' }}>
               <p style={{ margin: '0 0 4px', fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: '30px', fontWeight: '800', lineHeight: '1', letterSpacing: '-0.03em', color: '#2B1740' }}>
-                40
+                {capacity}
               </p>
               <p style={{ margin: '0', fontFamily: '\'IBM Plex Mono\', monospace', fontSize: '10px', letterSpacing: '.16em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.55)' }}>
                 Slots / category
@@ -31,125 +130,42 @@ export default function Categories() {
             <div style={{ width: '1px', background: 'rgba(192,141,46,0.4)' }}></div>
             <div style={{ padding: '18px 24px' }}>
               <p style={{ margin: '0 0 4px', fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: '30px', fontWeight: '800', lineHeight: '1', letterSpacing: '-0.03em', color: '#6B3E96' }}>
-                400
+                {availability?.total_capacity ?? capacity * CATEGORIES.length}
               </p>
               <p style={{ margin: '0', fontFamily: '\'IBM Plex Mono\', monospace', fontSize: '10px', letterSpacing: '.16em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.55)' }}>
                 Businesses total
               </p>
             </div>
+            {availability && (
+              <>
+                <div style={{ width: '1px', background: 'rgba(192,141,46,0.4)' }}></div>
+                <div style={{ padding: '18px 24px', background: 'rgba(224,181,88,0.14)' }}>
+                  <p style={{ margin: '0 0 4px', fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: '30px', fontWeight: '800', lineHeight: '1', letterSpacing: '-0.03em', color: '#C08D2E' }}>
+                    {availability.total_filled}
+                  </p>
+                  <p style={{ margin: '0', fontFamily: '\'IBM Plex Mono\', monospace', fontSize: '10px', letterSpacing: '.16em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.55)' }}>
+                    Slots filled
+                  </p>
+                </div>
+              </>
+            )}
           </div>
         </div>
         <div data-reveal="" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(400px, 100%), 1fr))', columnGap: '56px', rowGap: '0', borderBottom: '1px solid rgba(192,141,46,0.32)' }}>
-          <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '68px minmax(0,1fr) auto', alignItems: 'center', gap: '18px', padding: '24px 20px 24px 14px', borderTop: '1px solid rgba(192,141,46,0.32)', borderRadius: '4px 14px 14px 4px', transition: 'background .3s ease, box-shadow .3s ease, transform .3s cubic-bezier(.2,.7,.3,1)' }} className="hv-36">
-            <span style={{ fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: '40px', fontWeight: '800', lineHeight: '1', letterSpacing: '-0.04em', color: 'transparent', WebkitTextStroke: '1.1px rgba(168,118,47,0.6)', fontVariantNumeric: 'tabular-nums' }}>
-              01
-            </span>
-            <p style={{ margin: '0', fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: '17.5px', fontWeight: '600', lineHeight: '1.4', letterSpacing: '-0.005em', color: '#2B1740', textWrap: 'pretty' }}>
-              Fashion, Apparel & Textile Businesses
-            </p>
-            <span style={{ flexShrink: '0', fontFamily: '\'IBM Plex Mono\', monospace', fontSize: '10.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.4)', whiteSpace: 'nowrap' }}>
-              40 slots
-            </span>
-          </div>
-          <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '68px minmax(0,1fr) auto', alignItems: 'center', gap: '18px', padding: '24px 20px 24px 14px', borderTop: '1px solid rgba(192,141,46,0.32)', borderRadius: '4px 14px 14px 4px', transition: 'background .3s ease, box-shadow .3s ease, transform .3s cubic-bezier(.2,.7,.3,1)' }} className="hv-37">
-            <span style={{ fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: '40px', fontWeight: '800', lineHeight: '1', letterSpacing: '-0.04em', color: 'transparent', WebkitTextStroke: '1.1px rgba(168,118,47,0.6)', fontVariantNumeric: 'tabular-nums' }}>
-              02
-            </span>
-            <p style={{ margin: '0', fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: '17.5px', fontWeight: '600', lineHeight: '1.4', letterSpacing: '-0.005em', color: '#2B1740', textWrap: 'pretty' }}>
-              Food, Bakery & Beverage Businesses
-            </p>
-            <span style={{ flexShrink: '0', fontFamily: '\'IBM Plex Mono\', monospace', fontSize: '10.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.4)', whiteSpace: 'nowrap' }}>
-              40 slots
-            </span>
-          </div>
-          <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '68px minmax(0,1fr) auto', alignItems: 'center', gap: '18px', padding: '24px 20px 24px 14px', borderTop: '1px solid rgba(192,141,46,0.32)', borderRadius: '4px 14px 14px 4px', transition: 'background .3s ease, box-shadow .3s ease, transform .3s cubic-bezier(.2,.7,.3,1)' }} className="hv-38">
-            <span style={{ fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: '40px', fontWeight: '800', lineHeight: '1', letterSpacing: '-0.04em', color: 'transparent', WebkitTextStroke: '1.1px rgba(168,118,47,0.6)', fontVariantNumeric: 'tabular-nums' }}>
-              03
-            </span>
-            <p style={{ margin: '0', fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: '17.5px', fontWeight: '600', lineHeight: '1.4', letterSpacing: '-0.005em', color: '#2B1740', textWrap: 'pretty' }}>
-              Handmade, Craft & Artisan Businesses
-            </p>
-            <span style={{ flexShrink: '0', fontFamily: '\'IBM Plex Mono\', monospace', fontSize: '10.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.4)', whiteSpace: 'nowrap' }}>
-              40 slots
-            </span>
-          </div>
-          <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '68px minmax(0,1fr) auto', alignItems: 'center', gap: '18px', padding: '24px 20px 24px 14px', borderTop: '1px solid rgba(192,141,46,0.32)', borderRadius: '4px 14px 14px 4px', transition: 'background .3s ease, box-shadow .3s ease, transform .3s cubic-bezier(.2,.7,.3,1)' }} className="hv-39">
-            <span style={{ fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: '40px', fontWeight: '800', lineHeight: '1', letterSpacing: '-0.04em', color: 'transparent', WebkitTextStroke: '1.1px rgba(168,118,47,0.6)', fontVariantNumeric: 'tabular-nums' }}>
-              04
-            </span>
-            <p style={{ margin: '0', fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: '17.5px', fontWeight: '600', lineHeight: '1.4', letterSpacing: '-0.005em', color: '#2B1740', textWrap: 'pretty' }}>
-              Jewellery & Accessories Businesses
-            </p>
-            <span style={{ flexShrink: '0', fontFamily: '\'IBM Plex Mono\', monospace', fontSize: '10.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.4)', whiteSpace: 'nowrap' }}>
-              40 slots
-            </span>
-          </div>
-          <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '68px minmax(0,1fr) auto', alignItems: 'center', gap: '18px', padding: '24px 20px 24px 14px', borderTop: '1px solid rgba(192,141,46,0.32)', borderRadius: '4px 14px 14px 4px', transition: 'background .3s ease, box-shadow .3s ease, transform .3s cubic-bezier(.2,.7,.3,1)' }} className="hv-40">
-            <span style={{ fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: '40px', fontWeight: '800', lineHeight: '1', letterSpacing: '-0.04em', color: 'transparent', WebkitTextStroke: '1.1px rgba(168,118,47,0.6)', fontVariantNumeric: 'tabular-nums' }}>
-              05
-            </span>
-            <p style={{ margin: '0', fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: '17.5px', fontWeight: '600', lineHeight: '1.4', letterSpacing: '-0.005em', color: '#2B1740', textWrap: 'pretty' }}>
-              Home Decor, Lifestyle & Interior Businesses
-            </p>
-            <span style={{ flexShrink: '0', fontFamily: '\'IBM Plex Mono\', monospace', fontSize: '10.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.4)', whiteSpace: 'nowrap' }}>
-              40 slots
-            </span>
-          </div>
-          <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '68px minmax(0,1fr) auto', alignItems: 'center', gap: '18px', padding: '24px 20px 24px 14px', borderTop: '1px solid rgba(192,141,46,0.32)', borderRadius: '4px 14px 14px 4px', transition: 'background .3s ease, box-shadow .3s ease, transform .3s cubic-bezier(.2,.7,.3,1)' }} className="hv-41">
-            <span style={{ fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: '40px', fontWeight: '800', lineHeight: '1', letterSpacing: '-0.04em', color: 'transparent', WebkitTextStroke: '1.1px rgba(168,118,47,0.6)', fontVariantNumeric: 'tabular-nums' }}>
-              06
-            </span>
-            <p style={{ margin: '0', fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: '17.5px', fontWeight: '600', lineHeight: '1.4', letterSpacing: '-0.005em', color: '#2B1740', textWrap: 'pretty' }}>
-              Kids Products, Toys & Parenting Brands
-            </p>
-            <span style={{ flexShrink: '0', fontFamily: '\'IBM Plex Mono\', monospace', fontSize: '10.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.4)', whiteSpace: 'nowrap' }}>
-              40 slots
-            </span>
-          </div>
-          <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '68px minmax(0,1fr) auto', alignItems: 'center', gap: '18px', padding: '24px 20px 24px 14px', borderTop: '1px solid rgba(192,141,46,0.32)', borderRadius: '4px 14px 14px 4px', transition: 'background .3s ease, box-shadow .3s ease, transform .3s cubic-bezier(.2,.7,.3,1)' }} className="hv-42">
-            <span style={{ fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: '40px', fontWeight: '800', lineHeight: '1', letterSpacing: '-0.04em', color: 'transparent', WebkitTextStroke: '1.1px rgba(168,118,47,0.6)', fontVariantNumeric: 'tabular-nums' }}>
-              07
-            </span>
-            <p style={{ margin: '0', fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: '17.5px', fontWeight: '600', lineHeight: '1.4', letterSpacing: '-0.005em', color: '#2B1740', textWrap: 'pretty' }}>
-              Beauty, Personal Care & Wellness Businesses
-            </p>
-            <span style={{ flexShrink: '0', fontFamily: '\'IBM Plex Mono\', monospace', fontSize: '10.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.4)', whiteSpace: 'nowrap' }}>
-              40 slots
-            </span>
-          </div>
-          <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '68px minmax(0,1fr) auto', alignItems: 'center', gap: '18px', padding: '24px 20px 24px 14px', borderTop: '1px solid rgba(192,141,46,0.32)', borderRadius: '4px 14px 14px 4px', transition: 'background .3s ease, box-shadow .3s ease, transform .3s cubic-bezier(.2,.7,.3,1)' }} className="hv-43">
-            <span style={{ fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: '40px', fontWeight: '800', lineHeight: '1', letterSpacing: '-0.04em', color: 'transparent', WebkitTextStroke: '1.1px rgba(168,118,47,0.6)', fontVariantNumeric: 'tabular-nums' }}>
-              08
-            </span>
-            <p style={{ margin: '0', fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: '17.5px', fontWeight: '600', lineHeight: '1.4', letterSpacing: '-0.005em', color: '#2B1740', textWrap: 'pretty' }}>
-              Fitness, Sports & Health Businesses
-            </p>
-            <span style={{ flexShrink: '0', fontFamily: '\'IBM Plex Mono\', monospace', fontSize: '10.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.4)', whiteSpace: 'nowrap' }}>
-              40 slots
-            </span>
-          </div>
-          <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '68px minmax(0,1fr) auto', alignItems: 'center', gap: '18px', padding: '24px 20px 24px 14px', borderTop: '1px solid rgba(192,141,46,0.32)', borderRadius: '4px 14px 14px 4px', transition: 'background .3s ease, box-shadow .3s ease, transform .3s cubic-bezier(.2,.7,.3,1)' }} className="hv-44">
-            <span style={{ fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: '40px', fontWeight: '800', lineHeight: '1', letterSpacing: '-0.04em', color: 'transparent', WebkitTextStroke: '1.1px rgba(168,118,47,0.6)', fontVariantNumeric: 'tabular-nums' }}>
-              09
-            </span>
-            <p style={{ margin: '0', fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: '17.5px', fontWeight: '600', lineHeight: '1.4', letterSpacing: '-0.005em', color: '#2B1740', textWrap: 'pretty' }}>
-              Business, Professional & Digital Services
-            </p>
-            <span style={{ flexShrink: '0', fontFamily: '\'IBM Plex Mono\', monospace', fontSize: '10.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.4)', whiteSpace: 'nowrap' }}>
-              40 slots
-            </span>
-          </div>
-          <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '68px minmax(0,1fr) auto', alignItems: 'center', gap: '18px', padding: '24px 20px 24px 14px', borderTop: '1px solid rgba(192,141,46,0.32)', borderRadius: '4px 14px 14px 4px', transition: 'background .3s ease, box-shadow .3s ease, transform .3s cubic-bezier(.2,.7,.3,1)' }} className="hv-45">
-            <span style={{ fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: '40px', fontWeight: '800', lineHeight: '1', letterSpacing: '-0.04em', color: 'transparent', WebkitTextStroke: '1.1px rgba(168,118,47,0.6)', fontVariantNumeric: 'tabular-nums' }}>
-              10
-            </span>
-            <p style={{ margin: '0', fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: '17.5px', fontWeight: '600', lineHeight: '1.4', letterSpacing: '-0.005em', color: '#2B1740', textWrap: 'pretty' }}>
-              Emerging, Innovative & Unique Businesses
-            </p>
-            <span style={{ flexShrink: '0', fontFamily: '\'IBM Plex Mono\', monospace', fontSize: '10.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.4)', whiteSpace: 'nowrap' }}>
-              40 slots
-            </span>
-          </div>
+          {CATEGORIES.map(({ code, name }, i) => (
+            <div key={code} style={{ position: 'relative', display: 'grid', gridTemplateColumns: '68px minmax(0,1fr) auto', alignItems: 'center', gap: '18px', padding: '24px 20px 24px 14px', borderTop: '1px solid rgba(192,141,46,0.32)', borderRadius: '4px 14px 14px 4px', transition: 'background .3s ease, box-shadow .3s ease, transform .3s cubic-bezier(.2,.7,.3,1)' }} className={`hv-${36 + i}`}>
+              <span style={{ fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: '40px', fontWeight: '800', lineHeight: '1', letterSpacing: '-0.04em', color: 'transparent', WebkitTextStroke: '1.1px rgba(168,118,47,0.6)', fontVariantNumeric: 'tabular-nums' }}>
+                {code}
+              </span>
+              <p style={{ margin: '0', fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: '17.5px', fontWeight: '600', lineHeight: '1.4', letterSpacing: '-0.005em', color: '#2B1740', textWrap: 'pretty' }}>
+                {name}
+              </p>
+              <SlotMeter
+                filled={byCode.has(code) ? byCode.get(code).filled : null}
+                capacity={byCode.get(code)?.capacity ?? capacity}
+              />
+            </div>
+          ))}
         </div>
         <div data-reveal="" style={{ marginTop: '44px', position: 'relative', overflow: 'hidden', borderRadius: '22px', background: 'linear-gradient(115deg, #2B1740 0%, #3A2059 52%, #4A2A6B 100%)', padding: '30px 32px', textAlign: 'center' }}>
           <div aria-hidden="true" style={{ position: 'absolute', inset: '0', background: 'radial-gradient(circle at 50% 0%, rgba(224,181,88,0.18), rgba(224,181,88,0) 62%)', pointerEvents: 'none', maskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 16%, rgba(0,0,0,1) 84%, rgba(0,0,0,0) 100%)', WebkitMaskImage: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 16%, rgba(0,0,0,1) 84%, rgba(0,0,0,0) 100%)' }}></div>

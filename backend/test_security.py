@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import io
 import os
+import pathlib
 import shutil
 import sys
 import tempfile
@@ -197,6 +198,63 @@ def main() -> int:
         rr = c.get("/api/admin/registrations")
         check("table intact after SQLi probes", rr.status_code == 200 and rr.json()["total"] >= 1)
 
+        # ---------- delete a registration ----------
+        # Create a throwaway row so the checks below don't consume the seeded one.
+        r = c.post(
+            "/api/registrations",
+            data=form(email="deleteme@example.com", business="Delete Me Ltd"),
+            files={"paymentProof": ("proof.png", io.BytesIO(PNG), "image/png")},
+        )
+        check("registration created for delete test", r.status_code == 201, r.text[:200])
+
+        rows = c.get("/api/admin/registrations", params={"search": "delete me"}).json()
+        del_id = rows["items"][0]["id"] if rows.get("items") else None
+        check("delete-test row is findable", del_id is not None)
+
+        # The proof file must exist on disk before we assert it gets removed.
+        uploads = pathlib.Path(TMP) / "uploads"
+        before = {p.name for p in uploads.iterdir()} if uploads.is_dir() else set()
+
+        # Auth and CSRF are both required, exactly like the verify mutation.
+        bare = TestClient(app)
+        r = bare.delete(f"/api/admin/registrations/{del_id}")
+        check("delete rejected without auth", r.status_code == 401, str(r.status_code))
+
+        r = c.delete(f"/api/admin/registrations/{del_id}", headers={"X-CSRF-Token": "wrong"})
+        check("delete rejected with forged CSRF", r.status_code == 403, str(r.status_code))
+
+        r = c.delete(
+            f"/api/admin/registrations/{del_id}",
+            headers={"X-CSRF-Token": c.cookies.get("tgl_csrf", "")},
+        )
+        check("delete succeeds with valid CSRF", r.status_code == 204, str(r.status_code))
+
+        rows = c.get("/api/admin/registrations", params={"search": "delete me"}).json()
+        check("deleted row is gone from the list", rows.get("total") == 0, str(rows.get("total")))
+
+        r = c.get(f"/api/admin/registrations/{del_id}/proof")
+        check("deleted row's proof 404s", r.status_code == 404, str(r.status_code))
+
+        after = {p.name for p in uploads.iterdir()} if uploads.is_dir() else set()
+        check(
+            "deleting a row removes its proof file from disk",
+            len(after) == len(before) - 1,
+            f"before={len(before)} after={len(after)}",
+        )
+
+        r = c.delete(
+            f"/api/admin/registrations/{del_id}",
+            headers={"X-CSRF-Token": c.cookies.get("tgl_csrf", "")},
+        )
+        check("deleting an already-deleted row 404s", r.status_code == 404, str(r.status_code))
+
+        # A traversal-shaped id must not reach the filesystem.
+        r = c.delete(
+            "/api/admin/registrations/..%2f..%2fetc%2fpasswd",
+            headers={"X-CSRF-Token": c.cookies.get("tgl_csrf", "")},
+        )
+        check("delete with traversal-shaped id is refused", r.status_code == 404, str(r.status_code))
+
         # ---------- session invalidation ----------
         r = c.post("/api/auth/logout", headers={"X-CSRF-Token": csrf})
         check("logout succeeds", r.status_code == 204, str(r.status_code))
@@ -215,6 +273,39 @@ def main() -> int:
             for i in range(8)
         ]
         check("login rate limiting kicks in", 429 in codes, str(codes))
+
+        # ---------- public slot availability ----------
+        # Aggregate counts are intentionally public; registrant data must not be.
+        r = c.get("/api/categories/availability")
+        check("availability is readable without auth", r.status_code == 200, r.text[:200])
+
+        body = r.json() if r.status_code == 200 else {}
+        cats = body.get("categories", [])
+        check("availability lists all 10 categories", len(cats) == 10, str(len(cats)))
+        check(
+            "availability covers every category code",
+            {c_["category"] for c_ in cats} == {f"{i:02d}" for i in range(1, 11)},
+        )
+        check(
+            "availability counts the seeded registration",
+            any(c_["category"] == "01" and c_["filled"] >= 1 for c_ in cats),
+            str(cats[:1]),
+        )
+        check(
+            "availability totals are consistent",
+            body.get("total_filled") == sum(c_["filled"] for c_ in cats)
+            and body.get("total_capacity") == sum(c_["capacity"] for c_ in cats),
+        )
+        check(
+            "availability never exceeds capacity",
+            all(c_["filled"] <= c_["capacity"] for c_ in cats),
+        )
+        # The whole point of a public aggregate endpoint is that it leaks nothing else.
+        raw = r.text.lower()
+        check(
+            "availability leaks no registrant data",
+            not any(t in raw for t in ("founder@example.com", "test biz", "9876543210", "proof")),
+        )
 
     passed = sum(1 for ok, _ in results if ok)
     total = len(results)

@@ -140,3 +140,24 @@ class StatsOut(BaseModel):
     verified: int
     pending: int
     by_category: list[CategoryCount]
+
+
+class CategoryAvailability(BaseModel):
+    """One category's public slot counter."""
+
+    category: str
+    filled: int
+    capacity: int
+
+
+class AvailabilityOut(BaseModel):
+    """Public, aggregate-only view of how full the season is.
+
+    Deliberately contains no per-registration data — only counts — so it is safe
+    to serve unauthenticated to the marketing site.
+    """
+
+    capacity_per_category: int
+    total_capacity: int
+    total_filled: int
+    categories: list[CategoryAvailability]
