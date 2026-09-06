@@ -136,15 +136,23 @@ export default function Register({
               Early-bird pricing is limited
             </p>
             <p style={{ margin: '0', fontSize: '16px', lineHeight: '1.68', color: 'rgba(246,238,223,0.88)', textWrap: 'pretty' }}>
-              Each category has <strong style={{ color: '#FFF3CE', fontWeight: '700' }}>40 slots</strong>. Once the first <strong style={{ color: '#FFF3CE', fontWeight: '700' }}>20 slots</strong> in a category are filled, the registration price for that category increases. Register early to lock in the launch price of ₹2,499.
+              Each category has <strong style={{ color: '#FFF3CE', fontWeight: '700' }}>40 slots</strong>. The first <strong style={{ color: '#FFF3CE', fontWeight: '700' }}>20 slots</strong> are priced at the early / launch rate of <strong style={{ color: '#FFF3CE', fontWeight: '700' }}>₹2,499</strong>. Once those fill, the price for that category rises to <strong style={{ color: '#FFCB5C', fontWeight: '700' }}>₹3,499</strong> — and for the <strong style={{ color: '#FFB5B5', fontWeight: '700' }}>final 3 slots</strong>, it rises again to an even higher rate. Register early to lock in the lowest price.
             </p>
           </div>
-          <span style={{ flexShrink: '0', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 18px', border: '1px solid rgba(224,181,88,0.45)', borderRadius: '999px', background: 'rgba(34,16,58,0.35)', fontFamily: "'IBM Plex Mono', monospace", fontSize: '10.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: '#EFCB77' }}>
-            First 20 / 40 · ₹2,499
-          </span>
+          <div style={{ flexShrink: '0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', padding: '8px 16px', border: '1px solid rgba(224,181,88,0.45)', borderRadius: '999px', background: 'rgba(34,16,58,0.35)', fontFamily: "'IBM Plex Mono', monospace", fontSize: '10.5px', letterSpacing: '.1em', textTransform: 'uppercase', color: '#EFCB77' }}>
+              Slots 1–20 <strong>₹2,499</strong>
+            </span>
+            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', padding: '8px 16px', border: '1px solid rgba(255,203,92,0.5)', borderRadius: '999px', background: 'rgba(34,16,58,0.35)', fontFamily: "'IBM Plex Mono', monospace", fontSize: '10.5px', letterSpacing: '.1em', textTransform: 'uppercase', color: '#FFCB5C' }}>
+              Slots 21–37 <strong>₹3,499</strong>
+            </span>
+            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', padding: '8px 16px', border: '1px solid rgba(255,181,181,0.55)', borderRadius: '999px', background: 'rgba(74,20,20,0.35)', fontFamily: "'IBM Plex Mono', monospace", fontSize: '10.5px', letterSpacing: '.1em', textTransform: 'uppercase', color: '#FFB5B5' }}>
+              Final 3 slots <strong>Higher</strong>
+            </span>
+          </div>
         </div>
         <div data-reveal="" style={{ display: 'flex', flexWrap: 'wrap', gap: '28px', alignItems: 'flex-start' }}>
-          <div style={{ flex: '1 1 540px', minWidth: '0', background: '#FFFBF3', color: '#2B1740', padding: '44px 42px', borderRadius: '20px', boxShadow: '0 30px 70px rgba(0,0,0,0.28)' }}>
+          <div data-register-panel="form" style={{ flex: '1 1 540px', minWidth: '0', background: '#FFFBF3', color: '#2B1740', padding: '44px 42px', borderRadius: '20px', boxShadow: '0 30px 70px rgba(0,0,0,0.28)' }}>
             {showForm && (
               <div>
                 <h3 style={{ margin: '0 0 8px', fontSize: '25px', fontWeight: '800', color: '#2B1740' }}>
@@ -323,7 +331,7 @@ export default function Register({
               </div>
             )}
           </div>
-          <div style={{ flex: '1 1 280px', minWidth: '0', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div data-register-panel="qr" style={{ flex: '1 1 280px', minWidth: '0', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={{ background: '#FFFBF3', color: '#2B1740', padding: '34px 30px', borderRadius: '20px', textAlign: 'center' }}>
               <p style={{ margin: '0 0 6px', fontSize: '11px', letterSpacing: '.24em', textTransform: 'uppercase', fontWeight: '700', color: '#6B3E96' }}>
                 Scan to register

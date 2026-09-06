@@ -75,7 +75,7 @@ export default function Journey() {
             </div>
           </div>
         </div>
-        <div data-reveal="" style={{ position: 'relative', maxWidth: '860px', margin: '0 auto', paddingLeft: 'clamp(56px, 14vw, 96px)' }}>
+        <div data-reveal="" style={{ position: 'relative', maxWidth: '860px', margin: '0 auto', paddingLeft: 'clamp(72px, 16vw, 96px)' }}>
           <span aria-hidden="true" style={{ position: 'absolute', left: '42px', top: '8px', bottom: '8px', width: '1px', background: 'linear-gradient(180deg, rgba(224,181,88,0) 0%, rgba(224,181,88,0.55) 8%, rgba(224,181,88,0.55) 92%, rgba(224,181,88,0) 100%)' }}></span>
           {PHASES.map((phase) => (
             <div key={phase.label}>

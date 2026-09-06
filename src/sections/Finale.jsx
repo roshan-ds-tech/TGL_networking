@@ -68,20 +68,6 @@ export default function Finale() {
             </div>
           </div>
         </div>
-        <div data-reveal="" style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', justifyContent: 'center' }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', border: '1px dashed rgba(168,118,47,0.55)', borderRadius: '999px', padding: '12px 22px', background: 'rgba(255,252,245,0.55)', fontFamily: '\'IBM Plex Mono\', monospace', fontSize: '11.5px', letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.6)' }}>
-            <span aria-hidden="true" style={{ width: '5px', height: '5px', background: '#C08D2E', transform: 'rotate(45deg)', flexShrink: '0' }}></span>
-            [VENUE TO BE CONFIRMED]
-          </span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', border: '1px dashed rgba(168,118,47,0.55)', borderRadius: '999px', padding: '12px 22px', background: 'rgba(255,252,245,0.55)', fontFamily: '\'IBM Plex Mono\', monospace', fontSize: '11.5px', letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.6)' }}>
-            <span aria-hidden="true" style={{ width: '5px', height: '5px', background: '#C08D2E', transform: 'rotate(45deg)', flexShrink: '0' }}></span>
-            [PROGRAM SCHEDULE TO BE ANNOUNCED]
-          </span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', border: '1px dashed rgba(168,118,47,0.55)', borderRadius: '999px', padding: '12px 22px', background: 'rgba(255,252,245,0.55)', fontFamily: '\'IBM Plex Mono\', monospace', fontSize: '11.5px', letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.6)' }}>
-            <span aria-hidden="true" style={{ width: '5px', height: '5px', background: '#C08D2E', transform: 'rotate(45deg)', flexShrink: '0' }}></span>
-            [SPEAKERS & GUESTS TO BE ANNOUNCED]
-          </span>
-        </div>
       </div>
     </section>
   );

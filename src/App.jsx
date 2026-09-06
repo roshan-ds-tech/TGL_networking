@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import IconSprite from './components/IconSprite';
+import UrgencyPopup from './components/UrgencyPopup';
 import Header from './sections/Header';
 import Hero from './sections/Hero';
 import MarqueeBand from './sections/MarqueeBand';
@@ -282,6 +283,7 @@ export default function App() {
       <Sponsors />
       <Contact />
       <Footer />
+      <UrgencyPopup />
     </div>
   );
 }

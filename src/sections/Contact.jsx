@@ -20,21 +20,6 @@ export default function Contact() {
           <p style={{ margin: '0 0 30px', fontSize: '17px', lineHeight: '1.74', color: 'rgba(43,23,64,0.72)', maxWidth: '480px', textWrap: 'pretty' }}>
             The Growth League is powered by SkyKeen Events, the organization responsible for producing and running Season 1.
           </p>
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '18px', border: '1px dashed rgba(168,118,47,0.5)', borderRadius: '20px', padding: '24px 26px', maxWidth: '480px', background: 'rgba(255,252,245,0.55)' }}>
-            <span style={{ flexShrink: '0', width: '46px', height: '46px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(150deg, #FFF6E2, #EBD9B4)', border: '1px solid rgba(192,141,46,0.5)', color: '#8A5F22' }}>
-              <svg width="21" height="21" viewBox="0 0 24 24" aria-hidden="true">
-                <use href="#i-briefcase"></use>
-              </svg>
-            </span>
-            <div style={{ minWidth: '0' }}>
-              <p style={{ margin: '0 0 6px', fontSize: '11px', letterSpacing: '.22em', textTransform: 'uppercase', fontWeight: '700', color: '#6B3E96' }}>
-                Official sponsors
-              </p>
-              <p style={{ margin: '0', fontFamily: '\'IBM Plex Mono\', monospace', fontSize: '13.5px', lineHeight: '1.6', color: 'rgba(43,23,64,0.6)' }}>
-                Coming soon — sponsor details will be announced shortly.
-              </p>
-            </div>
-          </div>
         </div>
         <div data-reveal="" style={{ position: 'relative', overflow: 'hidden', background: 'linear-gradient(158deg, rgba(255,252,245,0.96), rgba(246,238,223,0.8))', border: '1px solid rgba(192,141,46,0.4)', borderRadius: '26px', padding: '40px 36px', boxShadow: '0 20px 46px rgba(53,26,78,0.1)' }}>
           <span aria-hidden="true" style={{ position: 'absolute', top: '0', left: '10%', right: '10%', height: '1px', background: 'linear-gradient(90deg, rgba(224,181,88,0), rgba(192,141,46,0.85), rgba(224,181,88,0))' }}></span>
@@ -60,8 +45,8 @@ export default function Contact() {
                 skykeen.in
               </a>
             </div>
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '18px', padding: '18px 0', borderBottom: '1px solid rgba(192,141,46,0.28)' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: '0', paddingTop: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '18px', padding: '18px 0', borderBottom: '1px solid rgba(192,141,46,0.28)' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: '0' }}>
                 <span style={{ flexShrink: '0', width: '38px', height: '38px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(150deg, #FFF6E2, #EBD9B4)', border: '1px solid rgba(192,141,46,0.45)', color: '#8A5F22' }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
                     <use href="#i-mail"></use>
@@ -71,11 +56,9 @@ export default function Contact() {
                   Contact
                 </span>
               </span>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px', textAlign: 'right' }}>
-                <a href="mailto:Kavitha@skykeen.in" style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '13.5px', fontWeight: '400', color: '#6B3E96', textDecoration: 'none' }}>
-                  Kavitha@skykeen.in
-                </a>
-              </div>
+              <a href="mailto:Kavitha@skykeen.in" style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '13.5px', fontWeight: '400', color: '#6B3E96', textAlign: 'right', textDecoration: 'none' }}>
+                Kavitha@skykeen.in
+              </a>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '18px', padding: '18px 0' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: '0' }}>

@@ -37,6 +37,13 @@
   @media (max-width: 900px) {
     [data-sticky-col] { position: static !important; top: auto !important; }
   }
+  /* On mobile the register form and the QR/payment panel stack vertically.
+     Show the QR code first so users can see how/where to pay before they
+     fill in the (long) form above it — otherwise it's hidden below the
+     submit button until they scroll past everything. */
+  @media (max-width: 900px) {
+    [data-register-panel="qr"] { order: -1; }
+  }
   /* Tighter gutters and vertical rhythm on small screens. */
   @media (max-width: 640px) {
     section { padding-left: 18px !important; padding-right: 18px !important; }
@@ -172,3 +179,4 @@
 .hv-89:hover { color:#EFCB77; transform:translateX(4px); }
 .hv-90:hover { color:#EFCB77; transform:translateX(4px); }
 .hv-91:hover { color:#EFCB77; transform:translateX(4px); }
+.urgency-cta:hover { transform:translateY(-2px) scale(1.03); box-shadow:0 10px 22px -6px rgba(192,141,46,0.7); }
