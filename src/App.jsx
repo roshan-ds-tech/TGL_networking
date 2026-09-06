@@ -45,14 +45,25 @@ function validate(fd) {
   const business = (fd.get('business') || '').trim();
   const email = (fd.get('email') || '').trim();
   const phone = (fd.get('phone') || '').trim();
+  // Length floors mirror the server's, so a one-character entry is caught here
+  // instead of coming back as a 422 after the upload has already been sent.
   if (!name) errors.name = 'Please enter your full name.';
+  else if (name.length < 2) errors.name = 'Please enter your full name.';
   if (!business) errors.business = 'Please enter your business name.';
+  else if (business.length < 2) errors.business = 'Please enter your business name.';
   if (!email) errors.email = 'Please enter an email address.';
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) errors.email = 'Enter a valid email address.';
   if (!phone) errors.phone = 'Please enter a phone number.';
   else if (phone.replace(/\D/g, '').length < 10) errors.phone = 'Enter a valid 10-digit number.';
   if (!fd.get('category')) errors.category = 'Select a category.';
-  if (!fd.get('employees')) errors.employees = 'Select your team size.';
+  const employees = fd.get('employees');
+  if (!employees) errors.employees = 'Select your team size.';
+  // Season 1 eligibility caps team size at 10. Say so here rather than letting
+  // the server reject it, and don't quietly drop the option — a business with
+  // 12 staff should learn it isn't eligible, not be nudged into picking "7-10".
+  else if (employees === '10+') {
+    errors.employees = 'TGL Season 1 is open to businesses with 10 or fewer employees.';
+  }
   if (!fd.get('age')) errors.age = 'Select how long you have been operating.';
   const paymentProof = fd.get('paymentProof');
   if (!paymentProof || !paymentProof.size) errors.paymentProof = 'Please upload a screenshot of your payment.';

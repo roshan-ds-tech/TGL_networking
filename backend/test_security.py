@@ -13,6 +13,7 @@ import pathlib
 import shutil
 import sys
 import tempfile
+from datetime import datetime, timezone
 
 TMP = tempfile.mkdtemp(prefix="tgl-test-")
 os.environ["ENVIRONMENT"] = "development"
@@ -107,6 +108,19 @@ def main() -> int:
         )
         check("blocks spoofed content-type upload", r.status_code == 415, str(r.status_code))
 
+        # The form offers "10+", but Season 1 caps eligibility at 10 employees.
+        r = c.post(
+            "/api/registrations",
+            data=form(employees="10+"),
+            files={"paymentProof": ("p.png", io.BytesIO(PNG), "image/png")},
+        )
+        check("rejects over-10 team size", r.status_code == 422, str(r.status_code))
+        check(
+            "over-10 rejection explains eligibility",
+            "10 or fewer employees" in r.text,
+            r.text[:160],
+        )
+
         # ---------- auth ----------
         r = c.get("/api/admin/registrations")
         check("admin list requires auth", r.status_code == 401, str(r.status_code))
@@ -146,6 +160,22 @@ def main() -> int:
         body = r.json()
         check("list returns the seeded registration", body["total"] >= 1, str(body.get("total")))
         reg_id = body["items"][0]["id"]
+
+        # SQLite drops tzinfo on read. If the API serialised a naive timestamp,
+        # the browser would parse it as local time and display the wrong hour.
+        created_raw = body["items"][0]["created_at"]
+        check(
+            "created_at carries an explicit UTC offset",
+            created_raw.endswith("Z") or "+00:00" in created_raw,
+            created_raw,
+        )
+        parsed = datetime.fromisoformat(created_raw.replace("Z", "+00:00"))
+        check("created_at is timezone-aware", parsed.tzinfo is not None, created_raw)
+        check(
+            "created_at is close to now (not offset by a timezone)",
+            abs((datetime.now(timezone.utc) - parsed).total_seconds()) < 300,
+            f"{created_raw} vs now {datetime.now(timezone.utc).isoformat()}",
+        )
 
         r = c.get("/api/admin/stats")
         check("stats works", r.status_code == 200 and "by_category" in r.text)

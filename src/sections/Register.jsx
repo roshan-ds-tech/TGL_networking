@@ -166,21 +166,21 @@ export default function Register({
                     <label htmlFor="tgl-name" style={{ fontSize: '12.5px', letterSpacing: '.1em', textTransform: 'uppercase', fontWeight: '700', color: '#6B3E96' }}>
                       Full name<span style={{ color: '#B8863B' }}>*</span>
                     </label>
-                    <input id="tgl-name" name="name" type="text" autoComplete="name" placeholder="Your full name" style={{ border: '1px solid rgba(53,26,78,0.24)', background: '#F6EEDF', padding: '15px 16px', fontSize: '15.5px', color: '#2B1740', borderRadius: '12px', minHeight: '52px' }} className="hv-66" />
+                    <input id="tgl-name" name="name" maxLength={120} type="text" autoComplete="name" placeholder="Your full name" style={{ border: '1px solid rgba(53,26,78,0.24)', background: '#F6EEDF', padding: '15px 16px', fontSize: '15.5px', color: '#2B1740', borderRadius: '12px', minHeight: '52px' }} className="hv-66" />
                     {errName && <span role="alert" style={{ fontSize: '13px', color: '#9A2B2B', fontWeight: '600' }}>{errName}</span>}
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <label htmlFor="tgl-business" style={{ fontSize: '12.5px', letterSpacing: '.1em', textTransform: 'uppercase', fontWeight: '700', color: '#6B3E96' }}>
                       Business name<span style={{ color: '#B8863B' }}>*</span>
                     </label>
-                    <input id="tgl-business" name="business" type="text" autoComplete="organization" placeholder="Registered or trade name" style={{ border: '1px solid rgba(53,26,78,0.24)', background: '#F6EEDF', padding: '15px 16px', fontSize: '15.5px', color: '#2B1740', borderRadius: '12px', minHeight: '52px' }} className="hv-67" />
+                    <input id="tgl-business" name="business" maxLength={160} type="text" autoComplete="organization" placeholder="Registered or trade name" style={{ border: '1px solid rgba(53,26,78,0.24)', background: '#F6EEDF', padding: '15px 16px', fontSize: '15.5px', color: '#2B1740', borderRadius: '12px', minHeight: '52px' }} className="hv-67" />
                     {errBusiness && <span role="alert" style={{ fontSize: '13px', color: '#9A2B2B', fontWeight: '600' }}>{errBusiness}</span>}
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <label htmlFor="tgl-email" style={{ fontSize: '12.5px', letterSpacing: '.1em', textTransform: 'uppercase', fontWeight: '700', color: '#6B3E96' }}>
                       Email<span style={{ color: '#B8863B' }}>*</span>
                     </label>
-                    <input id="tgl-email" name="email" type="email" autoComplete="email" placeholder="you@business.com" style={{ border: '1px solid rgba(53,26,78,0.24)', background: '#F6EEDF', padding: '15px 16px', fontSize: '15.5px', color: '#2B1740', borderRadius: '12px', minHeight: '52px' }} className="hv-68" />
+                    <input id="tgl-email" name="email" maxLength={255} type="email" autoComplete="email" placeholder="you@business.com" style={{ border: '1px solid rgba(53,26,78,0.24)', background: '#F6EEDF', padding: '15px 16px', fontSize: '15.5px', color: '#2B1740', borderRadius: '12px', minHeight: '52px' }} className="hv-68" />
                     {errEmail && <span role="alert" style={{ fontSize: '13px', color: '#9A2B2B', fontWeight: '600' }}>{errEmail}</span>}
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -239,7 +239,7 @@ export default function Register({
                     <label htmlFor="tgl-city" style={{ fontSize: '12.5px', letterSpacing: '.1em', textTransform: 'uppercase', fontWeight: '700', color: '#6B3E96' }}>
                       City / area <span style={{ fontWeight: '500', textTransform: 'none', letterSpacing: '0', color: 'rgba(43,23,64,0.5)' }}>(optional)</span>
                     </label>
-                    <input id="tgl-city" name="city" type="text" placeholder="e.g. Indiranagar, Bengaluru" style={{ border: '1px solid rgba(53,26,78,0.24)', background: '#F6EEDF', padding: '15px 16px', fontSize: '15.5px', color: '#2B1740', borderRadius: '12px', minHeight: '52px' }} className="hv-73" />
+                    <input id="tgl-city" name="city" maxLength={120} type="text" placeholder="e.g. Indiranagar, Bengaluru" style={{ border: '1px solid rgba(53,26,78,0.24)', background: '#F6EEDF', padding: '15px 16px', fontSize: '15.5px', color: '#2B1740', borderRadius: '12px', minHeight: '52px' }} className="hv-73" />
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', gridColumn: '1 / -1' }}>
                     <label htmlFor="tgl-payment-proof" style={{ fontSize: '12.5px', letterSpacing: '.1em', textTransform: 'uppercase', fontWeight: '700', color: '#6B3E96' }}>

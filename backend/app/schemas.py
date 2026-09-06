@@ -6,9 +6,30 @@ as UX and never trusted.
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import datetime, timezone
+from typing import Annotated
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import AfterValidator, BaseModel, EmailStr, Field, field_validator
+
+
+def _ensure_utc(v: datetime | None) -> datetime | None:
+    """Tag naive timestamps as UTC.
+
+    Everything is written with `datetime.now(timezone.utc)`, but SQLite has no
+    native timestamp type and hands values back with `tzinfo` stripped. Without
+    this, the API would serialise "2026-09-03T18:10:08" with no offset, and the
+    browser would read that as *local* time — showing an IST admin 18:10 for a
+    registration actually submitted at 23:40. Postgres returns aware values and
+    is left untouched.
+    """
+    if v is not None and v.tzinfo is None:
+        return v.replace(tzinfo=timezone.utc)
+    return v
+
+
+# Serialises with an explicit "Z"/offset, so `new Date(...)` in the browser
+# converts to the viewer's local zone instead of guessing.
+UtcDatetime = Annotated[datetime, AfterValidator(_ensure_utc)]
 
 # Mirrors the ten Season 1 categories offered by the public form.
 VALID_CATEGORIES = {f"{i:02d}" for i in range(1, 11)}
@@ -34,7 +55,7 @@ class LoginRequest(BaseModel):
 class AdminOut(BaseModel):
     id: str
     email: EmailStr
-    last_login_at: datetime | None = None
+    last_login_at: UtcDatetime | None = None
 
     model_config = {"from_attributes": True}
 
@@ -76,6 +97,12 @@ class RegistrationCreate(BaseModel):
     @field_validator("employees")
     @classmethod
     def _employees(cls, v: str) -> str:
+        # "10+" is a real option on the form, but Season 1 eligibility is capped
+        # at 10 employees — so say why rather than "invalid selection".
+        if v == "10+":
+            raise ValueError(
+                "Season 1 is open to businesses with 10 or fewer employees."
+            )
         if v not in VALID_EMPLOYEES:
             raise ValueError("Select a valid team size.")
         return v
@@ -110,9 +137,9 @@ class RegistrationOut(BaseModel):
     agreed_terms: bool
     media_consent: bool
     verified: bool
-    verified_at: datetime | None
+    verified_at: UtcDatetime | None
     verified_by_email: str | None = None
-    created_at: datetime
+    created_at: UtcDatetime
 
     model_config = {"from_attributes": True}
 
