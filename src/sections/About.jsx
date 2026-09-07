@@ -69,8 +69,16 @@ export default function About() {
                 </span>
               </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '30px' }}>
-              <img src="/images/skykeen_sponsor.jpeg" alt="SkyKeen Events" style={{ width: '104px', height: 'auto', objectFit: 'contain', flexShrink: '0', opacity: '.9', borderRadius: '8px' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '30px' }}>
+              {/* skykeen1.png is a 2000x2000 canvas with the mark filling only
+                  the middle ~29% of the width — roughly 36% blank canvas on
+                  each side. At this render width that is ~65px of invisible
+                  padding on the left (which indents the mark from the column
+                  edge) and ~63px on the right (which pushes the caption away).
+                  These negative margins cancel that dead space so the visible
+                  mark lines up with the column and sits a normal gap from the
+                  text. Re-measure them if the logo file is swapped. */}
+              <img src="/images/skykeen1.png" alt="SkyKeen Events" style={{ width: '180px', height: 'auto', objectFit: 'contain', flexShrink: '0', opacity: '.9', marginLeft: '-65px', marginRight: '-63px' }} />
               <p style={{ margin: '0', fontSize: '12px', lineHeight: '1.5', letterSpacing: '.12em', textTransform: 'uppercase', fontWeight: '600', color: 'rgba(43,23,64,0.5)' }}>
                 Powered by
                 <br />

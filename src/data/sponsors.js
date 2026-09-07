@@ -18,8 +18,8 @@
 // four render with roughly 30px of actual logo regardless of their padding.
 export const SPONSORS = [
   { name: 'Shami Equibooks', file: '/images/sponsor_shamiequibooks.png', maxHeight: '54px', marqueeHeight: '34px' },
-  { name: 'Creme Bliss', file: '/images/sponsor_creme_bliss.jpeg', maxHeight: '120px', marqueeHeight: '50px' },
-  { name: 'Saffron Technologies', file: '/images/sponsor_saffrontechnologies.png', maxHeight: '120px', marqueeHeight: '73px' },
+  { name: 'Creme Bliss', file: '/images/sponsor_creme_bliss.jpeg', maxHeight: '120px', marqueeHeight: '80px' },
+  { name: 'Saffron Technologies', file: '/images/sponsor_saffrontechnologies.png', maxHeight: '120px', marqueeHeight: '90px' },
 ];
 
 // SkyKeen runs the event rather than sponsoring it, so it belongs in the
@@ -28,5 +28,5 @@ export const SPONSORS = [
 // canvas of the four — hence the tallest value.
 export const MARQUEE_LOGOS = [
   ...SPONSORS,
-  { name: 'SkyKeen Events', file: '/images/skykeen_sponsor.jpeg', marqueeHeight: '79px' },
+  { name: 'SkyKeen Events', file: '/images/skykeen2.png', marqueeHeight: '100px' },
 ];
