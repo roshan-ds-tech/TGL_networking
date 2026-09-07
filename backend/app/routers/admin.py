@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy import Integer, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..config import settings
 from ..database import get_db
 from ..models import Admin, Registration, utcnow
 from ..schemas import (
@@ -120,7 +121,11 @@ async def stats(
     ]
 
     return StatsOut(
-        total=total, verified=verified, pending=total - verified, by_category=by_category
+        total=total,
+        verified=verified,
+        pending=total - verified,
+        by_category=by_category,
+        capacity_per_category=settings.slots_per_category,
     )
 
 

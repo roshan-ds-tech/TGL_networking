@@ -58,6 +58,16 @@ export async function submitRegistration(formData) {
     );
   }
 
+  // The category filled up between the page loading and this submission —
+  // highlight the category field specifically rather than a generic banner.
+  if (res.status === 409) {
+    const message =
+      typeof detail === 'string'
+        ? detail
+        : 'This category just filled up. Please choose another category.';
+    throw new SubmissionError(message, { category: message });
+  }
+
   throw new SubmissionError(
     typeof detail === 'string' ? detail : 'Something went wrong. Please try again.',
   );

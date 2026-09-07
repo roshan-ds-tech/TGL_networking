@@ -5,7 +5,11 @@ import Login from './Login';
 import ProofModal from './ProofModal';
 
 const PAGE_SIZE = 25;
-const SLOTS_PER_CATEGORY = 40;
+// Fallback only, for the brief window before `stats` loads. Once loaded, the
+// real capacity always comes from stats.capacity_per_category (backend's
+// SLOTS_PER_CATEGORY setting) so this can never drift from what the server
+// actually enforces at registration time.
+const DEFAULT_SLOTS_PER_CATEGORY = 40;
 const EARLY_BIRD_SLOTS = 20;
 
 function formatDate(iso) {
@@ -179,13 +183,19 @@ export default function App() {
               Slots filled by category
               <span className="slots__hint">
                 Early-bird price applies for the first {EARLY_BIRD_SLOTS} of{' '}
-                {SLOTS_PER_CATEGORY}
+                {stats.capacity_per_category}
               </span>
             </h2>
             <div className="slots__grid">
               {stats.by_category.map((c) => {
-                const pct = Math.min(100, (c.total / SLOTS_PER_CATEGORY) * 100);
+                const capacity = stats.capacity_per_category ?? DEFAULT_SLOTS_PER_CATEGORY;
+                const pct = Math.min(100, (c.total / capacity) * 100);
                 const earlyBirdGone = c.total >= EARLY_BIRD_SLOTS;
+                // The backend refuses new registrations once a category hits
+                // this same capacity (see backend/app/routers/public.py) —
+                // this mirrors that threshold so the dashboard shows it as
+                // closed, not just "early-bird over".
+                const categoryClosed = c.total >= capacity;
                 return (
                   <div key={c.category} className="slot">
                     <div className="slot__head">
@@ -193,18 +203,22 @@ export default function App() {
                         {c.category} · {CATEGORIES[c.category] || 'Unknown'}
                       </span>
                       <span className="slot__count">
-                        {c.total}/{SLOTS_PER_CATEGORY}
+                        {c.total}/{capacity}
                       </span>
                     </div>
                     <div className="slot__bar">
                       <div
-                        className={`slot__fill${earlyBirdGone ? ' slot__fill--full' : ''}`}
+                        className={`slot__fill${earlyBirdGone ? ' slot__fill--full' : ''}${categoryClosed ? ' slot__fill--closed' : ''}`}
                         style={{ width: `${pct}%` }}
                       />
                       <span className="slot__marker" style={{ left: '50%' }} />
                     </div>
-                    {earlyBirdGone && (
-                      <span className="slot__flag">Early-bird closed · standard price</span>
+                    {categoryClosed ? (
+                      <span className="slot__flag slot__flag--closed">Full · registration closed</span>
+                    ) : (
+                      earlyBirdGone && (
+                        <span className="slot__flag">Early-bird closed · standard price</span>
+                      )
                     )}
                   </div>
                 );

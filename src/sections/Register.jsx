@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { CATEGORIES } from '../data/categories';
 
 export default function Register({
   formRef,
@@ -8,6 +9,7 @@ export default function Register({
   submittedName,
   submitting,
   submitLabel,
+  availability,
   errName,
   errBusiness,
   errEmail,
@@ -22,6 +24,7 @@ export default function Register({
   resetForm,
 }) {
   const [paymentProofName, setPaymentProofName] = useState('');
+  const byCode = new Map((availability?.categories ?? []).map((c) => [c.category, c]));
 
   return (
     <section id="register" style={{ position: 'relative', overflow: 'hidden', padding: '104px 28px 100px', background: 'linear-gradient(180deg, #35194E, #22103A)', color: '#F6EEDF' }}>
@@ -196,16 +199,15 @@ export default function Register({
                     </label>
                     <select id="tgl-category" name="category" style={{ border: '1px solid rgba(53,26,78,0.24)', background: '#F6EEDF', padding: '15px 16px', fontSize: '15.5px', color: '#2B1740', borderRadius: '12px', minHeight: '52px' }} className="hv-70">
                       <option value="">Select one of the 10 categories</option>
-                      <option value="01">01 · Fashion, Apparel & Textile Businesses</option>
-                      <option value="02">02 · Food, Bakery & Beverage Businesses</option>
-                      <option value="03">03 · Handmade, Craft & Artisan Businesses</option>
-                      <option value="04">04 · Jewellery & Accessories Businesses</option>
-                      <option value="05">05 · Home Decor, Lifestyle & Interior Businesses</option>
-                      <option value="06">06 · Kids Products, Toys & Parenting Brands</option>
-                      <option value="07">07 · Beauty, Personal Care & Wellness Businesses</option>
-                      <option value="08">08 · Fitness, Sports & Health Businesses</option>
-                      <option value="09">09 · Business, Professional & Digital Services</option>
-                      <option value="10">10 · Emerging, Innovative & Unique Businesses</option>
+                      {CATEGORIES.map(({ code, name }) => {
+                        const stat = byCode.get(code);
+                        const full = stat ? stat.filled >= stat.capacity : false;
+                        return (
+                          <option key={code} value={code} disabled={full}>
+                            {code} · {name}{full ? ' — Full, registration closed' : ''}
+                          </option>
+                        );
+                      })}
                     </select>
                     {errCategory && <span role="alert" style={{ fontSize: '13px', color: '#9A2B2B', fontWeight: '600' }}>{errCategory}</span>}
                   </div>

@@ -148,8 +148,10 @@ body {
 .slot__bar { position: relative; height: 7px; border-radius: 99px; background: rgba(53, 26, 78, 0.1); overflow: hidden; }
 .slot__fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--gold-light), var(--gold)); }
 .slot__fill--full { background: linear-gradient(90deg, #d08c3a, #9a2b2b); }
+.slot__fill--closed { background: var(--danger); }
 .slot__marker { position: absolute; top: -2px; width: 1px; height: 11px; background: rgba(43, 23, 64, 0.45); }
 .slot__flag { display: inline-block; margin-top: 5px; font-size: 10.5px; letter-spacing: 0.04em; color: var(--danger); font-weight: 600; }
+.slot__flag--closed { text-transform: uppercase; letter-spacing: 0.08em; }
 
 /* ---------- toolbar ---------- */
 .toolbar { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 18px; }

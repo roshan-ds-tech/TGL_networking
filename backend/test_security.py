@@ -15,6 +15,8 @@ import sys
 import tempfile
 from datetime import datetime, timezone
 
+import httpx
+
 TMP = tempfile.mkdtemp(prefix="tgl-test-")
 os.environ["ENVIRONMENT"] = "development"
 os.environ["SECRET_KEY"] = "test-secret-key-that-is-definitely-long-enough-123456"
@@ -24,6 +26,7 @@ os.environ["ADMIN_DIST_DIR"] = f"{TMP}/nonexistent"
 
 from fastapi.testclient import TestClient  # noqa: E402
 
+from app.config import settings as app_settings  # noqa: E402
 from app.database import Base, SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import Admin  # noqa: E402
@@ -34,6 +37,13 @@ EMAIL = "admin@tglseason.com"
 
 PNG = bytes.fromhex("89504e470d0a1a0a") + b"\x00" * 64
 results: list[tuple[bool, str]] = []
+
+# This file legitimately makes far more than 10 registration POSTs across all
+# its scenarios (capacity racing alone needs a dozen). Register rate limiting
+# has no dedicated check here — it is a simple sliding window, and the login
+# limiter next to it is already covered — so raising the ceiling for the test
+# run costs no coverage and keeps unrelated checks from tripping it.
+app_settings.register_max_per_hour = 1000
 
 
 def check(name: str, condition: bool, detail: str = "") -> None:
@@ -121,6 +131,97 @@ def main() -> int:
             r.text[:160],
         )
 
+        # ---------- category capacity enforcement ----------
+        CAP_CATEGORY = "08"  # unused by any other check in this file
+        original_capacity = app_settings.slots_per_category
+        app_settings.slots_per_category = 3  # small, so the boundary is reachable fast
+        try:
+            for i in range(app_settings.slots_per_category - 1):
+                rr = c.post(
+                    "/api/registrations",
+                    data=form(category=CAP_CATEGORY, email=f"cap{i}@example.com"),
+                    files={"paymentProof": ("p.png", io.BytesIO(PNG), "image/png")},
+                )
+                check(f"capacity setup #{i} accepted", rr.status_code == 201, rr.text[:160])
+
+            avail = c.get("/api/categories/availability").json()
+            cat_row = next(x for x in avail["categories"] if x["category"] == CAP_CATEGORY)
+            check(
+                "capacity setup: category one slot from full",
+                cat_row["filled"] == app_settings.slots_per_category - 1,
+                str(cat_row),
+            )
+
+            # Fire several concurrent requests at the single remaining slot. Proven
+            # safe to mix with the sync TestClient used everywhere else in this
+            # file (see git history / commit message for the isolated experiment
+            # that validated this pattern doesn't hit aiosqlite's per-loop
+            # connection binding): each request opens its own DB session, and the
+            # separate event loop here is fully torn down before the next `c.*`
+            # call resumes below.
+            async def race() -> list[int]:
+                transport = httpx.ASGITransport(app=app)
+                async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
+                    async def attempt(i: int) -> int:
+                        resp = await ac.post(
+                            "/api/registrations",
+                            data=form(category=CAP_CATEGORY, email=f"race{i}@example.com"),
+                            files={"paymentProof": ("p.png", io.BytesIO(PNG), "image/png")},
+                        )
+                        return resp.status_code
+
+                    return await asyncio.gather(*(attempt(i) for i in range(6)))
+
+            codes = asyncio.run(race())
+            check(
+                "exactly one concurrent racer wins the last slot",
+                codes.count(201) == 1,
+                str(codes),
+            )
+            check(
+                "every other racer is rejected as full",
+                codes.count(409) == len(codes) - 1,
+                str(codes),
+            )
+
+            avail = c.get("/api/categories/availability").json()
+            cat_row = next(x for x in avail["categories"] if x["category"] == CAP_CATEGORY)
+            check(
+                "category never exceeds capacity under a concurrent race",
+                cat_row["filled"] == app_settings.slots_per_category,
+                str(cat_row),
+            )
+
+            rr = c.post(
+                "/api/registrations",
+                data=form(category=CAP_CATEGORY, email="toolate@example.com"),
+                files={"paymentProof": ("p.png", io.BytesIO(PNG), "image/png")},
+            )
+            check(
+                "submission after the race still gets rejected",
+                rr.status_code == 409,
+                str(rr.status_code),
+            )
+            check(
+                "full-category rejection explains itself",
+                "full" in rr.text.lower(),
+                rr.text[:160],
+            )
+        finally:
+            app_settings.slots_per_category = original_capacity
+
+        # A category with room again (capacity restored) still accepts normally.
+        rr = c.post(
+            "/api/registrations",
+            data=form(category=CAP_CATEGORY, email="after-restore@example.com"),
+            files={"paymentProof": ("p.png", io.BytesIO(PNG), "image/png")},
+        )
+        check(
+            "registration works again once capacity is no longer the limiter",
+            rr.status_code == 201,
+            rr.text[:160],
+        )
+
         # ---------- auth ----------
         r = c.get("/api/admin/registrations")
         check("admin list requires auth", r.status_code == 401, str(r.status_code))
@@ -179,6 +280,11 @@ def main() -> int:
 
         r = c.get("/api/admin/stats")
         check("stats works", r.status_code == 200 and "by_category" in r.text)
+        check(
+            "stats exposes the same capacity the server enforces",
+            r.json().get("capacity_per_category") == app_settings.slots_per_category,
+            str(r.json().get("capacity_per_category")),
+        )
 
         # ---------- CSRF ----------
         r = c.patch(f"/api/admin/registrations/{reg_id}/verify", json={"verified": True})

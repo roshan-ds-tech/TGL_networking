@@ -167,6 +167,10 @@ class StatsOut(BaseModel):
     verified: int
     pending: int
     by_category: list[CategoryCount]
+    # Same value the /api/categories/availability and registration-intake
+    # capacity check use — the dashboard reads this instead of hardcoding a
+    # number, so it can never drift from what's actually enforced.
+    capacity_per_category: int
 
 
 class CategoryAvailability(BaseModel):

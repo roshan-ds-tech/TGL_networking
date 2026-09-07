@@ -19,7 +19,7 @@ from ..schemas import (
     RegistrationCreate,
 )
 from ..security import hash_ip
-from ..storage import save_payment_proof
+from ..storage import delete_proof, save_payment_proof
 
 router = APIRouter(prefix="/api", tags=["public"])
 
@@ -83,6 +83,18 @@ async def create_registration(
             ],
         )
 
+    # Fail fast on an already-full category before spending time on the
+    # upload. This is a courtesy, not the enforcement point — a second
+    # request can still race past it, which is why the real gate is below.
+    filled = await db.scalar(
+        select(func.count()).select_from(Registration).where(Registration.category == data.category)
+    )
+    if filled >= settings.slots_per_category:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Category {data.category} is full. Please choose another category.",
+        )
+
     filename, mime, size = await save_payment_proof(payment_proof)
 
     registration = Registration(
@@ -102,6 +114,38 @@ async def create_registration(
         submitter_ip_hash=hash_ip(ip),
     )
     db.add(registration)
+
+    # Flush (not commit) so the INSERT runs now, inside this transaction, and
+    # re-count in the same transaction before deciding whether to keep it.
+    #
+    # This closes the race the check above leaves open: SQLite — this app's
+    # default and documented deployment target (see the "Postgres for
+    # multi-instance" note in backend/README.md) — takes its single-writer
+    # file lock on the first write in a transaction and holds it until
+    # commit/rollback. A second concurrent request's flush() blocks on that
+    # lock until this transaction finishes, so it always re-counts *after*
+    # this one has either committed or rolled back — never in between. Two
+    # submissions racing for the last slot in a category are therefore
+    # serialised into "one wins, one gets 409", never "both get in". (This
+    # argument is specific to SQLite's single-writer lock and a single
+    # worker process — the same assumption the in-process rate limiter
+    # already makes, see ratelimit.py. A multi-instance Postgres deployment
+    # would need an explicit `SELECT ... FOR UPDATE` or advisory lock here
+    # instead.)
+    await db.flush()
+    filled_after = await db.scalar(
+        select(func.count()).select_from(Registration).where(Registration.category == data.category)
+    )
+    if filled_after > settings.slots_per_category:
+        await db.rollback()
+        # The row never committed, so its proof file would otherwise be an
+        # orphan nobody can reach — remove it rather than leaking disk.
+        delete_proof(filename)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Category {data.category} just filled up. Please choose another category.",
+        )
+
     await db.commit()
 
     # A new row changes the slot counters, so drop the cached snapshot.

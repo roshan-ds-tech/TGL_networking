@@ -39,7 +39,7 @@ function daysLeft() {
   return Math.ceil((REGISTRATION_CLOSE - new Date()) / 86400000);
 }
 
-function validate(fd) {
+function validate(fd, availability) {
   const errors = {};
   const name = (fd.get('name') || '').trim();
   const business = (fd.get('business') || '').trim();
@@ -55,7 +55,18 @@ function validate(fd) {
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) errors.email = 'Enter a valid email address.';
   if (!phone) errors.phone = 'Please enter a phone number.';
   else if (phone.replace(/\D/g, '').length < 10) errors.phone = 'Enter a valid 10-digit number.';
-  if (!fd.get('category')) errors.category = 'Select a category.';
+  const category = fd.get('category');
+  if (!category) errors.category = 'Select a category.';
+  else {
+    // The dropdown already disables full categories, but its data is only
+    // fetched once on page load — if a category filled up since then, catch
+    // it here too rather than letting the upload happen for nothing. The
+    // server enforces this for real; this is purely a faster "no" for the user.
+    const stat = availability?.categories?.find((c) => c.category === category);
+    if (stat && stat.filled >= stat.capacity) {
+      errors.category = 'This category just filled up. Please choose another category.';
+    }
+  }
   const employees = fd.get('employees');
   if (!employees) errors.employees = 'Select your team size.';
   // Season 1 eligibility caps team size at 10. Say so here rather than letting
@@ -81,7 +92,7 @@ export default function App() {
   const [faq, setFaq] = useState({ 1: true, 2: false, 3: false, 4: false, 5: false, 6: false });
 
   // One request per page load, shared by the Categories grid and the popup.
-  const availability = useAvailability();
+  const [availability, refreshAvailability] = useAvailability();
 
   const formRef = useRef(null);
   const progressRef = useRef(null);
@@ -231,7 +242,7 @@ export default function App() {
   const onSubmit = async (ev) => {
     ev.preventDefault();
     const fd = new FormData(ev.target);
-    const { errors: fieldErrors, name } = validate(fd);
+    const { errors: fieldErrors, name } = validate(fd, availability);
     if (Object.keys(fieldErrors).length) {
       setErrors(fieldErrors);
       return;
@@ -250,6 +261,10 @@ export default function App() {
           ? err.fieldErrors
           : { form: err.message || 'Something went wrong. Please try again.' },
       );
+      // A rejection may mean a category just filled up — pull fresh counts so
+      // the dropdown and the Categories section reflect it immediately,
+      // instead of waiting for the next natural reload.
+      refreshAvailability();
     } finally {
       setSubmitting(false);
     }
@@ -281,6 +296,7 @@ export default function App() {
         submittedName={submittedName || 'founder'}
         submitting={submitting}
         submitLabel={submitting ? 'Submitting…' : 'Submit Registration'}
+        availability={availability}
         errName={errors.name || ''}
         errBusiness={errors.business || ''}
         errEmail={errors.email || ''}
