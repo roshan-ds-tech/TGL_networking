@@ -1,8 +1,12 @@
-/* These use the same card treatment as the Eligibility section: a warm cream
-   panel with a gold hairline across the top, a deep-purple circular icon badge
-   and a muted index number. Against this section's purple field the cream
-   reads as a clearly separate surface, which the previous tinted-purple cards
-   did not. */
+/* Warm beige panels on the purple field, built up in layers rather than as a
+   flat fill so they read as a physical surface:
+     - a soft light-source bloom in the top-left corner
+     - a beige gradient that deepens toward the bottom-right
+     - a crisp inset highlight along the top edge, like light catching a lip
+     - a gold hairline border and gold top accent
+     - a deep, soft drop shadow so the panel sits above the background
+   Beige is darker than the cream this replaced, so the body copy was darkened
+   to keep it legible (see CARD_BODY). */
 const OUTCOMES = [
   { icon: 'i-store', title: 'Showcase', body: 'Present your business and story.' },
   { icon: 'i-eye', title: 'Visibility', body: 'Gain opportunities for meaningful brand exposure.' },
@@ -15,13 +19,22 @@ const OUTCOMES = [
 const CARD_STYLE = {
   position: 'relative',
   overflow: 'hidden',
-  background: 'linear-gradient(155deg, rgba(255,252,245,0.96), rgba(246,238,223,0.6))',
-  border: '1px solid rgba(53,26,78,0.1)',
+  background:
+    'radial-gradient(125% 95% at 10% 6%, rgba(255,250,238,0.95), rgba(255,250,238,0) 58%),' +
+    'linear-gradient(158deg, #F1E6D1 0%, #E9DBC1 54%, #DFCFB2 100%)',
+  border: '1px solid rgba(192,141,46,0.36)',
   borderRadius: '24px',
   padding: '34px 32px 32px',
-  boxShadow: '0 20px 48px -34px rgba(53,26,78,0.5)',
+  boxShadow:
+    '0 28px 56px -30px rgba(16,6,30,0.78), 0 2px 6px -2px rgba(16,6,30,0.35),' +
+    'inset 0 1px 0 rgba(255,253,246,0.9)',
   transition: 'transform .3s cubic-bezier(.2,.7,.3,1), border-color .3s ease, box-shadow .3s ease',
 };
+
+/* 0.72 rather than the 0.6 used on the lighter cream cards: beige is a darker
+   surface, and 0.6 fell to roughly 3.9:1 against it, under the 4.5:1 minimum.
+   At 0.72 it measures about 5.5:1. */
+const CARD_BODY = { margin: '0', fontSize: '14.5px', lineHeight: '1.6', color: 'rgba(43,23,64,0.72)' };
 
 export default function WhyTGL() {
   return (
@@ -62,19 +75,19 @@ export default function WhyTGL() {
             <div key={outcome.title} style={CARD_STYLE} className={`hv-${27 + i}`}>
               <span aria-hidden="true" style={{ position: 'absolute', top: '0', left: '32px', right: '32px', height: '1px', background: 'linear-gradient(90deg, rgba(224,181,88,0), #E0B558, rgba(224,181,88,0))' }}></span>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '26px' }}>
-                <span style={{ flexShrink: '0', width: '58px', height: '58px', borderRadius: '999px', background: 'linear-gradient(150deg, #3E1F5C, #22103A)', color: '#E0B558', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 22px -12px rgba(34,16,58,0.8)' }}>
+                <span style={{ flexShrink: '0', width: '58px', height: '58px', borderRadius: '999px', background: 'linear-gradient(150deg, #46245F 0%, #2C1544 55%, #1E0E32 100%)', border: '1px solid rgba(224,181,88,0.4)', color: '#E0B558', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 14px 26px -14px rgba(24,10,42,0.9), inset 0 1px 0 rgba(239,203,119,0.28)' }}>
                   <svg width="27" height="27" viewBox="0 0 24 24" aria-hidden="true">
                     <use href={`#${outcome.icon}`}></use>
                   </svg>
                 </span>
-                <span style={{ fontFamily: '\'IBM Plex Mono\', monospace', fontSize: '12px', letterSpacing: '.1em', color: 'rgba(43,23,64,0.32)' }}>
+                <span style={{ fontFamily: '\'IBM Plex Mono\', monospace', fontSize: '12px', letterSpacing: '.1em', color: 'rgba(43,23,64,0.34)' }}>
                   {String(i + 1).padStart(2, '0')}
                 </span>
               </div>
               <h3 style={{ margin: '0 0 8px', fontSize: '20px', fontWeight: '700', lineHeight: '1.3', letterSpacing: '.04em', textTransform: 'uppercase', color: '#2B1740' }}>
                 {outcome.title}
               </h3>
-              <p style={{ margin: '0', fontSize: '14.5px', lineHeight: '1.6', color: 'rgba(43,23,64,0.6)' }}>
+              <p style={CARD_BODY}>
                 {outcome.body}
               </p>
             </div>
