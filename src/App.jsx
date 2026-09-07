@@ -5,7 +5,6 @@ import Header from './sections/Header';
 import Hero from './sections/Hero';
 import MarqueeBand from './sections/MarqueeBand';
 import About from './sections/About';
-import Positioning from './sections/Positioning';
 import WhyTGL from './sections/WhyTGL';
 import Eligibility from './sections/Eligibility';
 import Categories from './sections/Categories';
@@ -280,7 +279,6 @@ export default function App() {
       <Hero tickerRef={tickerRef} daysLeftLabel={daysLeftLabel} cdD={cdD} cdH={cdH} cdM={cdM} cdS={cdS} />
       <MarqueeBand />
       <About />
-      <Positioning />
       <WhyTGL />
       <Eligibility />
       <Categories availability={availability} />

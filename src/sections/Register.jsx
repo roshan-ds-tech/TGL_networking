@@ -75,25 +75,6 @@ export default function Register({
             <div style={{ display: 'flex', alignItems: 'center', gap: '11px', marginBottom: '18px' }}>
               <span style={{ flexShrink: '0', width: '34px', height: '34px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(224,181,88,0.12)', color: '#E0B558' }}>
                 <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true">
-                  <use href="#i-tag"></use>
-                </svg>
-              </span>
-              <p style={{ margin: '0', fontFamily: "'IBM Plex Mono', monospace", fontSize: '9.5px', letterSpacing: '.2em', lineHeight: '1.5', textTransform: 'uppercase', color: 'rgba(246,238,223,0.62)' }}>
-                Standard price
-              </p>
-            </div>
-            <p style={{ margin: '0 0 6px', fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: '38px', fontWeight: '800', lineHeight: '1.05', letterSpacing: '-0.03em', color: 'rgba(255,251,243,0.55)' }}>
-              ₹2,999
-            </p>
-            <p style={{ margin: '0', fontFamily: "'IBM Plex Mono', monospace", fontSize: '9.5px', letterSpacing: '.16em', textTransform: 'uppercase', color: 'rgba(246,238,223,0.42)' }}>
-              After launch window
-            </p>
-          </div>
-          <div aria-hidden="true" style={{ width: '1px', alignSelf: 'stretch', background: 'linear-gradient(180deg, rgba(224,181,88,0), rgba(224,181,88,0.4), rgba(224,181,88,0))' }}></div>
-          <div style={{ flex: '1 1 210px', minWidth: '0', position: 'relative', padding: '30px 28px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '11px', marginBottom: '18px' }}>
-              <span style={{ flexShrink: '0', width: '34px', height: '34px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(224,181,88,0.12)', color: '#E0B558' }}>
-                <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true">
                   <use href="#i-calendar"></use>
                 </svg>
               </span>

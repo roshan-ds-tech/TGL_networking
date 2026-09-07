@@ -70,7 +70,7 @@ export default function About() {
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '30px' }}>
-              <img src="/images/skykeen_logo.png" alt="SkyKeen Events" style={{ width: '104px', height: 'auto', objectFit: 'contain', flexShrink: '0', opacity: '.9' }} />
+              <img src="/images/skykeen_sponsor.jpeg" alt="SkyKeen Events" style={{ width: '104px', height: 'auto', objectFit: 'contain', flexShrink: '0', opacity: '.9', borderRadius: '8px' }} />
               <p style={{ margin: '0', fontSize: '12px', lineHeight: '1.5', letterSpacing: '.12em', textTransform: 'uppercase', fontWeight: '600', color: 'rgba(43,23,64,0.5)' }}>
                 Powered by
                 <br />
@@ -113,32 +113,6 @@ export default function About() {
               <p style={{ margin: '0', fontSize: '16.5px', lineHeight: '1.72', color: 'rgba(43,23,64,0.8)' }}>
                 TGL Season 1 is designed for small businesses with ten or fewer employees, operating for at least six months, based in or around Bengaluru. It is built for founders seeking structured evaluation, professional content and exposure to a wider business community.
               </p>
-            </div>
-            <div data-cards="" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(150px, 100%), 1fr))', gap: '14px', marginTop: '8px' }}>
-              <div style={{ padding: '22px 22px 20px', border: '1px solid rgba(53,26,78,0.12)', borderRadius: '18px', background: 'rgba(255,252,245,0.6)' }}>
-                <p style={{ margin: '0 0 8px', fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: '30px', fontWeight: '800', letterSpacing: '-0.02em', color: '#2B1740', lineHeight: '1' }}>
-                  ≤ 10
-                </p>
-                <p style={{ margin: '0', fontSize: '12.5px', lineHeight: '1.5', letterSpacing: '.04em', color: 'rgba(43,23,64,0.6)' }}>
-                  Employees to qualify
-                </p>
-              </div>
-              <div style={{ padding: '22px 22px 20px', border: '1px solid rgba(53,26,78,0.12)', borderRadius: '18px', background: 'rgba(255,252,245,0.6)' }}>
-                <p style={{ margin: '0 0 8px', fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: '30px', fontWeight: '800', letterSpacing: '-0.02em', color: '#2B1740', lineHeight: '1' }}>
-                  6 mo
-                </p>
-                <p style={{ margin: '0', fontSize: '12.5px', lineHeight: '1.5', letterSpacing: '.04em', color: 'rgba(43,23,64,0.6)' }}>
-                  Minimum in operation
-                </p>
-              </div>
-              <div style={{ padding: '22px 22px 20px', border: '1px solid rgba(53,26,78,0.12)', borderRadius: '18px', background: 'rgba(255,252,245,0.6)' }}>
-                <p style={{ margin: '0 0 8px', fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: '30px', fontWeight: '800', letterSpacing: '-0.02em', color: '#2B1740', lineHeight: '1' }}>
-                  10
-                </p>
-                <p style={{ margin: '0', fontSize: '12.5px', lineHeight: '1.5', letterSpacing: '.04em', color: 'rgba(43,23,64,0.6)' }}>
-                  Categories in Season 1
-                </p>
-              </div>
             </div>
           </div>
         </div>
