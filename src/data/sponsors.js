@@ -1,19 +1,32 @@
 // Shared by the Sponsors section and the logo marquee band, so the sponsor
 // list only needs to be edited in one place.
 //
-// These logos have very different intrinsic shapes, so a single size rule
-// makes some of them unreadable. Shami Equibooks is a wide 3.5:1 wordmark;
-// Creme Bliss and Saffron are 1:1 squares with generous whitespace baked
-// into the artwork. Both sizes below are therefore tuned per logo so they
-// read at roughly equal optical weight — squares need noticeably more height
-// than the wordmark to look the same size.
-//
 //   maxHeight     — the large Sponsors-section card
-//   marqueeHeight — the compact logo chip in the marquee band
+//   marqueeHeight — the compact logo card in the marquee band
+//
+// marqueeHeight is derived rather than guessed. Each file wraps its artwork
+// in a different amount of blank canvas, so scaling them all to the same
+// height makes some look far bigger than others. Measuring the ink (the
+// non-white bounding box) as a fraction of the canvas gives:
+//
+//   Shami Equibooks  595x169 canvas, ink 88% of height
+//   Creme Bliss      500x500 canvas, ink 60%
+//   Saffron          800x800 canvas, ink 41%
+//   SkyKeen          640x640 canvas, ink 38%
+//
+// Dividing a ~30px target by those fractions gives the heights below, so all
+// four render with roughly 30px of actual logo regardless of their padding.
 export const SPONSORS = [
-  { name: 'Shami Equibooks', file: '/images/sponsor_shamiequibooks.png', maxHeight: '54px', marqueeHeight: '36px' },
-  { name: 'Creme Bliss', file: '/images/sponsor_creme_bliss.jpeg', maxHeight: '120px', marqueeHeight: '70px' },
-  // Saffron's artwork has the most internal whitespace of the three, so it
-  // needs the greatest height to match the others optically.
-  { name: 'Saffron Technologies', file: '/images/sponsor_saffrontechnologies.png', maxHeight: '120px', marqueeHeight: '78px' },
+  { name: 'Shami Equibooks', file: '/images/sponsor_shamiequibooks.png', maxHeight: '54px', marqueeHeight: '34px' },
+  { name: 'Creme Bliss', file: '/images/sponsor_creme_bliss.jpeg', maxHeight: '120px', marqueeHeight: '50px' },
+  { name: 'Saffron Technologies', file: '/images/sponsor_saffrontechnologies.png', maxHeight: '120px', marqueeHeight: '73px' },
+];
+
+// SkyKeen runs the event rather than sponsoring it, so it belongs in the
+// marquee but not in the "Side Sponsors" section above. Same 1:1 shape and
+// baked-in white background as the other square marks, and the most blank
+// canvas of the four — hence the tallest value.
+export const MARQUEE_LOGOS = [
+  ...SPONSORS,
+  { name: 'SkyKeen Events', file: '/images/skykeen_sponsor.jpeg', marqueeHeight: '79px' },
 ];

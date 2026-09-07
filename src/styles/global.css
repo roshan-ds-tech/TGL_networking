@@ -73,7 +73,7 @@
      doesn't eat a third of the screen. Scaling the card and the logo by the
      same factor keeps the per-logo optical sizing (--logo-h) intact. */
   @media (max-width: 640px) {
-    [data-sponsor-card] { width: 176px !important; height: 76px !important; padding: 8px 20px !important; border-radius: 14px !important; }
+    [data-sponsor-card] { width: 176px !important; height: 82px !important; padding: 8px 20px !important; border-radius: 14px !important; }
     [data-sponsor-card] img { height: calc(var(--logo-h) * 0.76) !important; }
   }
   /* Oversized feature-card padding is too costly on narrow screens. */
