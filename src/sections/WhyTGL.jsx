@@ -19,26 +19,20 @@ const OUTCOMES = [
 const CARD_STYLE = {
   position: 'relative',
   overflow: 'hidden',
-  background: 'linear-gradient(155deg, rgba(255,252,245,0.96), rgba(246,238,223,0.6))',
-  border: '1px solid rgba(192,141,46,0.4)',
+  background: 'linear-gradient(160deg, #FFFFFF 0%, #FDFCF9 42%, #F7EFE2 100%)',
+  border: '1px solid rgba(192,141,46,0.38)',
   borderRadius: '24px',
-  padding: '34px 32px 32px 40px',
-  boxShadow: '0 24px 52px -32px rgba(53,26,78,0.55), inset 0 1px 0 rgba(255,255,255,0.65)',
+  padding: '34px 32px 32px',
+  boxShadow: '0 24px 50px -18px rgba(12,3,24,0.7), 0 2px 6px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.95)',
   transition: 'transform .3s cubic-bezier(.2,.7,.3,1), border-color .3s ease, box-shadow .3s ease',
 };
 
-const CARD_BODY = { margin: '0', fontSize: '14.5px', lineHeight: '1.6', color: 'rgba(43,23,64,0.6)' };
-
-/* Gold spine down the left edge — the one piece of ornament these cards get
-   that the plain Eligibility cards don't, so the section still reads as
-   distinct from it despite sharing the same cream. */
-const GOLD_SPINE = {
-  position: 'absolute',
-  left: '0',
-  top: '0',
-  bottom: '0',
-  width: '5px',
-  background: 'linear-gradient(180deg, rgba(224,181,88,0) 0%, #E0B558 18%, #C08D2E 50%, #E0B558 82%, rgba(224,181,88,0) 100%)',
+const CARD_BODY = {
+  margin: '0',
+  fontSize: '14.5px',
+  lineHeight: '1.65',
+  fontWeight: '450',
+  color: '#4B3564',
 };
 
 export default function WhyTGL() {
@@ -78,19 +72,40 @@ export default function WhyTGL() {
         <div data-reveal="" data-cards="" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(300px, 100%), 1fr))', gap: '20px' }}>
           {OUTCOMES.map((outcome, i) => (
             <div key={outcome.title} style={CARD_STYLE} className={`hv-${27 + i}`}>
-              <span aria-hidden="true" style={GOLD_SPINE}></span>
-              <span aria-hidden="true" style={{ position: 'absolute', top: '0', left: '32px', right: '32px', height: '1px', background: 'linear-gradient(90deg, rgba(224,181,88,0), #E0B558, rgba(224,181,88,0))' }}></span>
+              <div style={{ position: 'absolute', top: '0', left: '32px', right: '32px', height: '1px', background: 'linear-gradient(90deg, rgba(224,181,88,0), #E0B558, rgba(224,181,88,0))' }}></div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '26px' }}>
-                <span style={{ flexShrink: '0', width: '58px', height: '58px', borderRadius: '999px', background: 'linear-gradient(150deg, #3E1F5C, #22103A)', color: '#E0B558', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 22px -12px rgba(34,16,58,0.8)' }}>
+                <span style={{
+                  flexShrink: '0',
+                  width: '58px',
+                  height: '58px',
+                  borderRadius: '999px',
+                  background: 'linear-gradient(150deg, #3E1F5C, #22103A)',
+                  border: '1.5px solid rgba(224,181,88,0.35)',
+                  color: '#E0B558',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 10px 22px -12px rgba(34,16,58,0.8), inset 0 1px 1px rgba(255,255,255,0.18)'
+                }}>
                   <svg width="27" height="27" viewBox="0 0 24 24" aria-hidden="true">
                     <use href={`#${outcome.icon}`}></use>
                   </svg>
                 </span>
-                <span style={{ fontFamily: '\'IBM Plex Mono\', monospace', fontSize: '12px', letterSpacing: '.1em', color: 'rgba(43,23,64,0.32)' }}>
+                <span style={{
+                  fontFamily: '\'IBM Plex Mono\', monospace',
+                  fontSize: '11.5px',
+                  fontWeight: '700',
+                  letterSpacing: '.12em',
+                  color: '#9C6F1E',
+                  background: 'rgba(192,141,46,0.12)',
+                  padding: '4px 10px',
+                  borderRadius: '999px',
+                  border: '1px solid rgba(192,141,46,0.22)'
+                }}>
                   {String(i + 1).padStart(2, '0')}
                 </span>
               </div>
-              <h3 style={{ margin: '0 0 8px', fontSize: '20px', fontWeight: '700', lineHeight: '1.3', letterSpacing: '.04em', textTransform: 'uppercase', color: '#2B1740' }}>
+              <h3 style={{ margin: '0 0 8px', fontSize: '20px', fontWeight: '800', lineHeight: '1.3', letterSpacing: '.03em', textTransform: 'uppercase', color: '#241038' }}>
                 {outcome.title}
               </h3>
               <p style={CARD_BODY}>
