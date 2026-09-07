@@ -1,9 +1,8 @@
-/* The six cards were previously a near-transparent cream wash (10% white) over
-   the purple field, which just read as slightly-lighter purple — cards and
-   background blurred into one another. They are now deep warm-onyx panels:
-   dark and warm enough to sit clearly apart from the purple, with a gold
-   hairline, a gold top accent and a deep shadow so they read as raised,
-   premium surfaces rather than tinted rectangles. */
+/* These use the same card treatment as the Eligibility section: a warm cream
+   panel with a gold hairline across the top, a deep-purple circular icon badge
+   and a muted index number. Against this section's purple field the cream
+   reads as a clearly separate surface, which the previous tinted-purple cards
+   did not. */
 const OUTCOMES = [
   { icon: 'i-store', title: 'Showcase', body: 'Present your business and story.' },
   { icon: 'i-eye', title: 'Visibility', body: 'Gain opportunities for meaningful brand exposure.' },
@@ -16,12 +15,12 @@ const OUTCOMES = [
 const CARD_STYLE = {
   position: 'relative',
   overflow: 'hidden',
-  background: 'linear-gradient(158deg, #2C2132 0%, #1F1726 54%, #171018 100%)',
-  border: '1px solid rgba(224,181,88,0.3)',
-  borderRadius: '22px',
+  background: 'linear-gradient(155deg, rgba(255,252,245,0.96), rgba(246,238,223,0.6))',
+  border: '1px solid rgba(53,26,78,0.1)',
+  borderRadius: '24px',
   padding: '34px 32px 32px',
-  boxShadow: '0 30px 60px -32px rgba(0,0,0,0.95), inset 0 1px 0 rgba(255,243,206,0.12)',
-  transition: 'transform .3s cubic-bezier(.2,.7,.3,1), background .3s ease, border-color .3s ease, box-shadow .3s ease',
+  boxShadow: '0 20px 48px -34px rgba(53,26,78,0.5)',
+  transition: 'transform .3s cubic-bezier(.2,.7,.3,1), border-color .3s ease, box-shadow .3s ease',
 };
 
 export default function WhyTGL() {
@@ -61,21 +60,21 @@ export default function WhyTGL() {
         <div data-reveal="" data-cards="" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(300px, 100%), 1fr))', gap: '20px' }}>
           {OUTCOMES.map((outcome, i) => (
             <div key={outcome.title} style={CARD_STYLE} className={`hv-${27 + i}`}>
-              <span aria-hidden="true" style={{ position: 'absolute', top: '0', left: '28px', right: '28px', height: '1px', background: 'linear-gradient(90deg, rgba(224,181,88,0), rgba(224,181,88,0.75), rgba(224,181,88,0))' }}></span>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '26px', color: '#E0B558' }}>
-                <span style={{ flexShrink: '0', width: '54px', height: '54px', borderRadius: '999px', border: '1px solid rgba(224,181,88,0.42)', background: 'radial-gradient(circle at 34% 26%, rgba(239,203,119,0.34), rgba(224,181,88,0.05))', boxShadow: 'inset 0 1px 0 rgba(255,243,206,0.32)', color: '#EFCB77', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <svg width="25" height="25" viewBox="0 0 24 24" aria-hidden="true">
+              <span aria-hidden="true" style={{ position: 'absolute', top: '0', left: '32px', right: '32px', height: '1px', background: 'linear-gradient(90deg, rgba(224,181,88,0), #E0B558, rgba(224,181,88,0))' }}></span>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '26px' }}>
+                <span style={{ flexShrink: '0', width: '58px', height: '58px', borderRadius: '999px', background: 'linear-gradient(150deg, #3E1F5C, #22103A)', color: '#E0B558', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 22px -12px rgba(34,16,58,0.8)' }}>
+                  <svg width="27" height="27" viewBox="0 0 24 24" aria-hidden="true">
                     <use href={`#${outcome.icon}`}></use>
                   </svg>
                 </span>
-                <span style={{ fontFamily: '\'IBM Plex Mono\', monospace', fontSize: '12px', color: 'rgba(224,181,88,0.75)' }}>
+                <span style={{ fontFamily: '\'IBM Plex Mono\', monospace', fontSize: '12px', letterSpacing: '.1em', color: 'rgba(43,23,64,0.32)' }}>
                   {String(i + 1).padStart(2, '0')}
                 </span>
               </div>
-              <h3 style={{ margin: '0 0 10px', fontSize: '20px', fontWeight: '700', letterSpacing: '.04em', textTransform: 'uppercase', color: '#FFFBF3' }}>
+              <h3 style={{ margin: '0 0 8px', fontSize: '20px', fontWeight: '700', lineHeight: '1.3', letterSpacing: '.04em', textTransform: 'uppercase', color: '#2B1740' }}>
                 {outcome.title}
               </h3>
-              <p style={{ margin: '0', fontSize: '15.5px', lineHeight: '1.65', color: 'rgba(246,238,223,0.72)' }}>
+              <p style={{ margin: '0', fontSize: '14.5px', lineHeight: '1.6', color: 'rgba(43,23,64,0.6)' }}>
                 {outcome.body}
               </p>
             </div>

@@ -133,12 +133,12 @@
 .hv-24:hover { transform:translateY(-6px); box-shadow:0 26px 52px -26px rgba(53,26,78,0.3); border-color:rgba(192,141,46,0.5); background:linear-gradient(155deg,#FFFCF5,rgba(250,241,222,0.85)); }
 .hv-25:hover { transform:translateY(-6px); box-shadow:0 26px 52px -26px rgba(53,26,78,0.3); border-color:rgba(192,141,46,0.5); background:linear-gradient(155deg,#FFFCF5,rgba(250,241,222,0.85)); }
 .hv-26:hover { background:rgba(224,181,88,0.16); border-color:#E0B558; transform:translateY(-2px); color:#FFF3CE; }
-.hv-27:hover { transform:translateY(-6px); background:linear-gradient(158deg,#372940 0%,#261C2F 54%,#1C1420 100%); border-color:rgba(224,181,88,0.62); box-shadow:0 38px 70px -30px rgba(0,0,0,1), inset 0 1px 0 rgba(255,243,206,0.2); }
-.hv-28:hover { transform:translateY(-6px); background:linear-gradient(158deg,#372940 0%,#261C2F 54%,#1C1420 100%); border-color:rgba(224,181,88,0.62); box-shadow:0 38px 70px -30px rgba(0,0,0,1), inset 0 1px 0 rgba(255,243,206,0.2); }
-.hv-29:hover { transform:translateY(-6px); background:linear-gradient(158deg,#372940 0%,#261C2F 54%,#1C1420 100%); border-color:rgba(224,181,88,0.62); box-shadow:0 38px 70px -30px rgba(0,0,0,1), inset 0 1px 0 rgba(255,243,206,0.2); }
-.hv-30:hover { transform:translateY(-6px); background:linear-gradient(158deg,#372940 0%,#261C2F 54%,#1C1420 100%); border-color:rgba(224,181,88,0.62); box-shadow:0 38px 70px -30px rgba(0,0,0,1), inset 0 1px 0 rgba(255,243,206,0.2); }
-.hv-31:hover { transform:translateY(-6px); background:linear-gradient(158deg,#372940 0%,#261C2F 54%,#1C1420 100%); border-color:rgba(224,181,88,0.62); box-shadow:0 38px 70px -30px rgba(0,0,0,1), inset 0 1px 0 rgba(255,243,206,0.2); }
-.hv-32:hover { transform:translateY(-6px); background:linear-gradient(158deg,#372940 0%,#261C2F 54%,#1C1420 100%); border-color:rgba(224,181,88,0.62); box-shadow:0 38px 70px -30px rgba(0,0,0,1), inset 0 1px 0 rgba(255,243,206,0.2); }
+.hv-27:hover { transform:translateY(-6px); border-color:rgba(192,141,46,0.55); box-shadow:0 32px 60px -28px rgba(0,0,0,0.6); }
+.hv-28:hover { transform:translateY(-6px); border-color:rgba(192,141,46,0.55); box-shadow:0 32px 60px -28px rgba(0,0,0,0.6); }
+.hv-29:hover { transform:translateY(-6px); border-color:rgba(192,141,46,0.55); box-shadow:0 32px 60px -28px rgba(0,0,0,0.6); }
+.hv-30:hover { transform:translateY(-6px); border-color:rgba(192,141,46,0.55); box-shadow:0 32px 60px -28px rgba(0,0,0,0.6); }
+.hv-31:hover { transform:translateY(-6px); border-color:rgba(192,141,46,0.55); box-shadow:0 32px 60px -28px rgba(0,0,0,0.6); }
+.hv-32:hover { transform:translateY(-6px); border-color:rgba(192,141,46,0.55); box-shadow:0 32px 60px -28px rgba(0,0,0,0.6); }
 .hv-33:hover { transform:translateY(-6px); border-color:rgba(192,141,46,0.55); box-shadow:0 30px 58px -28px rgba(53,26,78,0.32); }
 .hv-34:hover { transform:translateY(-6px); border-color:rgba(192,141,46,0.55); box-shadow:0 30px 58px -28px rgba(53,26,78,0.32); }
 .hv-35:hover { transform:translateY(-6px); border-color:rgba(192,141,46,0.55); box-shadow:0 30px 58px -28px rgba(53,26,78,0.32); }
