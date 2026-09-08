@@ -53,37 +53,48 @@ export default function Hero({ tickerRef, daysLeftLabel, cdD, cdH, cdM, cdS }) {
               Learn More
             </a>
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '34px', paddingTop: '26px', borderTop: '1px solid rgba(53,26,78,0.14)', animation: 'tglRise .8s cubic-bezier(.2,.7,.3,1) both .48s' }}>
-            <div>
-              <p style={{ margin: '0 0 4px', fontSize: '11px', letterSpacing: '.22em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.5)', fontWeight: '600' }}>
+          <div
+            data-hero-meta=""
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              flexWrap: 'nowrap',
+              gap: 'clamp(14px, 2.4vw, 32px)',
+              paddingTop: '26px',
+              borderTop: '1px solid rgba(53,26,78,0.14)',
+              animation: 'tglRise .8s cubic-bezier(.2,.7,.3,1) both .48s',
+            }}
+          >
+            <div style={{ flex: '0 0 auto' }}>
+              <p style={{ margin: '0 0 4px', fontSize: '11px', letterSpacing: '.22em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.5)', fontWeight: '600', whiteSpace: 'nowrap' }}>
                 Grand Finale
               </p>
-              <p style={{ margin: '0', fontSize: '18px', fontWeight: '700', color: '#2B1740' }}>
+              <p style={{ margin: '0', fontSize: '18px', fontWeight: '700', color: '#2B1740', whiteSpace: 'nowrap' }}>
                 5 December 2026
               </p>
-              <p style={{ margin: '2px 0 0', fontSize: '13px', color: 'rgba(43,23,64,0.6)' }}>
+              <p style={{ margin: '2px 0 0', fontSize: '13px', color: 'rgba(43,23,64,0.6)', whiteSpace: 'nowrap' }}>
                 On-site award show
               </p>
             </div>
-            <div>
-              <p style={{ margin: '0 0 4px', fontSize: '11px', letterSpacing: '.22em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.5)', fontWeight: '600' }}>
+            <div style={{ flex: '0 0 auto' }}>
+              <p style={{ margin: '0 0 4px', fontSize: '11px', letterSpacing: '.22em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.5)', fontWeight: '600', whiteSpace: 'nowrap' }}>
                 Registration closes
               </p>
-              <p style={{ margin: '0', fontSize: '18px', fontWeight: '700', color: '#2B1740' }}>
+              <p style={{ margin: '0', fontSize: '18px', fontWeight: '700', color: '#2B1740', whiteSpace: 'nowrap' }}>
                 20 November 2026
               </p>
-              <p style={{ margin: '2px 0 0', fontSize: '13px', color: 'rgba(43,23,64,0.6)' }}>
+              <p style={{ margin: '2px 0 0', fontSize: '13px', color: 'rgba(43,23,64,0.6)', whiteSpace: 'nowrap' }}>
                 {daysLeftLabel}
               </p>
             </div>
-            <div>
-              <p style={{ margin: '0 0 4px', fontSize: '11px', letterSpacing: '.22em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.5)', fontWeight: '600' }}>
+            <div style={{ flex: '0 0 auto' }}>
+              <p style={{ margin: '0 0 4px', fontSize: '11px', letterSpacing: '.22em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.5)', fontWeight: '600', whiteSpace: 'nowrap' }}>
                 Location
               </p>
-              <p style={{ margin: '0', fontSize: '18px', fontWeight: '700', color: '#2B1740' }}>
+              <p style={{ margin: '0', fontSize: '18px', fontWeight: '700', color: '#2B1740', whiteSpace: 'nowrap' }}>
                 Bengaluru
               </p>
-              <p style={{ margin: '2px 0 0', fontSize: '13px', color: 'rgba(43,23,64,0.6)' }}>
+              <p style={{ margin: '2px 0 0', fontSize: '12.5px', color: 'rgba(43,23,64,0.6)', whiteSpace: 'nowrap' }}>
                 [VENUE TO BE CONFIRMED]
               </p>
             </div>

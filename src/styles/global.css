@@ -79,6 +79,7 @@
   /* Oversized feature-card padding is too costly on narrow screens. */
   @media (max-width: 560px) {
     [data-wide-pad] { padding-left: 22px !important; padding-right: 22px !important; }
+    [data-hero-meta] { flex-wrap: wrap !important; gap: 18px 24px !important; }
   }
   /* Pill CTAs stop fitting side by side; stack them full width. */
   @media (max-width: 420px) {
