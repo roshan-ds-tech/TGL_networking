@@ -35,10 +35,16 @@ os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{PROJECT_DIR}/var/tgl.db"
 os.environ["SQLITE_WAL"] = "false"
 os.environ["UPLOAD_DIR"] = f"{PROJECT_DIR}/var/uploads"
 os.environ["ADMIN_DIST_DIR"] = f"{PROJECT_DIR}/static/admin"
-# Comma-separate to allow more than one origin. Add "http://localhost:5173" here
-# if you want to run the site locally against this deployed backend — without it
-# the browser blocks every API call from localhost as a CORS error.
-os.environ["PUBLIC_ORIGIN"] = "https://tglwebsite.vercel.app"
+# EVERY domain the public site is served from must be listed here, comma
+# separated. This is an exact-match allowlist: a domain that is missing still
+# gets a 200 from the API, but without an Access-Control-Allow-Origin header,
+# so the browser refuses to let the page read the response and the slot
+# counters silently fall back to their static copy. Adding a domain in Vercel
+# is therefore only half the job — it has to be added here too, then Reload.
+#
+# Add "http://localhost:5173" as well if you want to run the site locally
+# against this deployed backend.
+os.environ["PUBLIC_ORIGIN"] = "https://tgl.skykeen.in,https://tglwebsite.vercel.app"
 os.environ["SESSION_HOURS"] = "12"
 
 # ---- 3. Create tables / upload dir ----

@@ -81,7 +81,27 @@ through the `a2wsgi` adapter instead of served natively as ASGI.
 | `SECRET_KEY` | **Required in production**, ≥32 chars. Rotating it logs everyone out |
 | `DATABASE_URL` | `sqlite+aiosqlite:///./var/tgl.db` or `postgresql+asyncpg://…` |
 | `UPLOAD_DIR` | Screenshot storage. Keep outside any static/web root |
-| `PUBLIC_ORIGIN` | Public site origin(s), for CORS on the register + availability endpoints. Comma-separate to allow more than one, e.g. `https://tglwebsite.vercel.app,http://localhost:5173`. Explicit allowlist only — `*` is ignored |
+| `PUBLIC_ORIGIN` | Public site origin(s), for CORS on the register + availability endpoints. Comma-separate to allow more than one, e.g. `https://tgl.skykeen.in,https://tglwebsite.vercel.app`. Explicit allowlist only — `*` is ignored. **Every domain the site is served from must be listed** (see below) |
+
+### Adding a domain to the site
+
+`PUBLIC_ORIGIN` is an exact-match allowlist, so pointing a new domain at the
+frontend is only half the job — it has to be added here as well.
+
+The failure is easy to misread: the API still answers `200`, but without an
+`Access-Control-Allow-Origin` header the browser refuses to let the page read
+the response. The site looks completely normal and just shows the static
+"40 slots" fallback instead of live counts, with a CORS error in the console.
+
+To check a domain quickly:
+
+```bash
+curl -sD - -o /dev/null -H "Origin: https://your-domain" \
+  https://roshands.pythonanywhere.com/api/categories/availability | grep -i access-control
+```
+
+No `access-control-allow-origin` line back means that origin is not allowlisted.
+Add it to `PUBLIC_ORIGIN` in the WSGI file and hit **Reload**.
 | `SESSION_HOURS` | Admin session lifetime (default 12) |
 | `SLOTS_PER_CATEGORY` | Capacity per category shown by the public slot counters (default 40) |
 
