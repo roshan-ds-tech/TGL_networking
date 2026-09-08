@@ -231,7 +231,7 @@ export default function App() {
           <input
             type="search"
             className="input"
-            placeholder="Search name, business, email or phone…"
+            placeholder="Search name, business, email, phone or UTR…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             aria-label="Search registrations"
@@ -284,6 +284,7 @@ export default function App() {
                 <th>Operating</th>
                 <th>City</th>
                 <th>Submitted</th>
+                <th>UTR</th>
                 <th>Payment proof</th>
                 <th>Status</th>
                 <th><span className="sr-only">Actions</span></th>
@@ -292,7 +293,7 @@ export default function App() {
             <tbody>
               {rows.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={10} className="empty">
+                  <td colSpan={11} className="empty">
                     No registrations match these filters.
                   </td>
                 </tr>
@@ -317,6 +318,19 @@ export default function App() {
                   <td>{AGES[r.business_age] || r.business_age}</td>
                   <td>{r.city || '—'}</td>
                   <td className="cell__mono">{formatDate(r.created_at)}</td>
+                  <td>
+                    {r.utr ? (
+                      // Selectable in one click: this gets cross-checked against
+                      // a bank statement, so it wants copying, not retyping.
+                      <span className="cell__utr" title="UPI reference for this payment">
+                        {r.utr}
+                      </span>
+                    ) : (
+                      <span className="cell__sub" title="Registered before this field existed">
+                        —
+                      </span>
+                    )}
+                  </td>
                   <td>
                     <button
                       type="button"

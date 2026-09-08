@@ -58,6 +58,13 @@ class Registration(Base):
     proof_mime: Mapped[str] = mapped_column(String(64), nullable=False)
     proof_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
 
+    # UPI reference for the payment, stored normalised (uppercase, no spaces).
+    # Indexed because verifying admins look rows up by it. Nullable only because
+    # registrations taken before this field existed have none — the API requires
+    # it on every new submission. See database.sync_schema for how the column is
+    # added to databases that predate it.
+    utr: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
+
     agreed_terms: Mapped[bool] = mapped_column(Boolean, nullable=False)
     media_consent: Mapped[bool] = mapped_column(Boolean, nullable=False)
 

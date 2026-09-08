@@ -39,6 +39,7 @@ def _to_out(reg: Registration) -> RegistrationOut:
         employees=reg.employees,
         business_age=reg.business_age,
         city=reg.city,
+        utr=reg.utr,
         proof_mime=reg.proof_mime,
         proof_bytes=reg.proof_bytes,
         agreed_terms=reg.agreed_terms,
@@ -70,6 +71,10 @@ async def list_registrations(
                 func.lower(Registration.business_name).like(needle),
                 func.lower(Registration.email).like(needle),
                 Registration.phone.like(needle),
+                # Verifying a payment usually starts from the reference on the
+                # bank statement, so it needs to be searchable. Stored
+                # uppercase, so match against the upper-cased needle.
+                Registration.utr.like(needle.upper()),
             )
         )
     if category:

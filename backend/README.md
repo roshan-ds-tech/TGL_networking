@@ -10,7 +10,7 @@ backend/
   app/
     main.py        FastAPI app, security headers, admin SPA hosting
     config.py      env-driven settings (refuses unsafe prod boot)
-    database.py    async engine (SQLite WAL / Postgres)
+    database.py    async engine (SQLite WAL / Postgres) + sync_schema()
     models.py      Admin, Registration
     schemas.py     request/response validation
     security.py    Argon2id, session JWT, CSRF, auth dependencies
@@ -99,6 +99,24 @@ into database load. The count is *all* registrations, matching the admin
 dashboard's slot-fill logic (a submitted registration holds the slot while its
 payment is being verified).
 
+## Adding a column (there is no Alembic here)
+
+`Base.metadata.create_all` only creates missing **tables** — it will never
+alter one that already exists. Adding a field to a model is therefore not
+enough: against a database that already holds rows, every query would start
+failing with "no such column".
+
+`database.sync_schema()` covers that gap. It runs on every boot (both the ASGI
+lifespan and the WSGI `init_db_sync` path), inspects what the database actually
+has, and issues `ALTER TABLE ... ADD COLUMN` for anything listed in
+`_ADDED_COLUMNS` that is missing. It is idempotent, so repeated reloads are a
+no-op.
+
+To add a column: add it to the model, then add an entry to `_ADDED_COLUMNS`.
+The column **must be nullable** — rows written before it existed cannot have a
+value. Make it required for new submissions in the Pydantic schema instead,
+which is how `utr` works.
+
 ## Production notes
 
 1. **Terminate TLS in front of the app.** Session cookies are `Secure` when
@@ -124,6 +142,7 @@ payment is being verified).
 | Malicious uploads | Magic-byte sniffing (declared type ignored), 8 MB cap, UUID names |
 | Path traversal | Server-generated filenames; reads re-checked inside upload root |
 | IDOR on screenshots | UUID ids + auth required on the proof endpoint |
+| Reused payment evidence | UTR normalised (case/separators) and rejected if already on another registration |
 | Stored XSS via upload | `nosniff` + `sandbox` CSP on proof responses |
 | Clickjacking | `X-Frame-Options: DENY`, `frame-ancestors 'none'` |
 | Info leak on errors | Unhandled exceptions log server-side, return generic 500 |

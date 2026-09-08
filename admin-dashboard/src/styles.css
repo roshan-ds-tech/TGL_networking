@@ -153,6 +153,23 @@ body {
 .slot__flag { display: inline-block; margin-top: 5px; font-size: 10.5px; letter-spacing: 0.04em; color: var(--danger); font-weight: 600; }
 .slot__flag--closed { text-transform: uppercase; letter-spacing: 0.08em; }
 
+/* UPI reference. Monospace so digits line up when scanning a column of them,
+   and select-all on click because it gets copied into a bank statement search
+   rather than read aloud. */
+.cell__utr {
+  display: inline-block;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  background: rgba(53, 26, 78, 0.06);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 3px 7px;
+  user-select: all;
+  white-space: nowrap;
+}
+
 /* ---------- toolbar ---------- */
 .toolbar { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 18px; }
 .toolbar .input { flex: 1 1 240px; }

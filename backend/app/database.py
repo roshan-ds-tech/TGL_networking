@@ -11,7 +11,7 @@ from collections.abc import AsyncGenerator
 
 from pathlib import Path
 
-from sqlalchemy import event
+from sqlalchemy import event, inspect
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -60,6 +60,42 @@ class Base(DeclarativeBase):
     pass
 
 
+# Columns added to a table after its first release.
+#
+# There is no migration tool here, and create_all() only creates missing
+# *tables* — it will never alter one that already exists. Deploying a new model
+# column against a database that already holds rows would therefore leave every
+# query failing with "no such column". sync_schema() closes that gap.
+#
+# Every entry must be nullable: rows written before the column existed cannot
+# have a value for it. Requiring the field for *new* submissions is the API
+# schema's job, not the database's.
+_ADDED_COLUMNS: dict[str, dict[str, str]] = {
+    "registrations": {
+        # UPI reference for the payment, captured alongside the screenshot.
+        "utr": "VARCHAR(32)",
+    },
+}
+
+
+def sync_schema(sync_conn) -> None:
+    """Add model columns the live database is missing. Safe to run every boot.
+
+    Idempotent by construction — it inspects what is actually there first, so
+    reloading the app repeatedly is a no-op once the column exists. Table and
+    column names come from the constant above (our own source), never from
+    request data, so interpolating them into the DDL is safe.
+    """
+    inspector = inspect(sync_conn)
+    for table, columns in _ADDED_COLUMNS.items():
+        if not inspector.has_table(table):
+            continue  # create_all() just made it, already with every column
+        existing = {c["name"] for c in inspector.get_columns(table)}
+        for name, ddl in columns.items():
+            if name not in existing:
+                sync_conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
+
+
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with SessionLocal() as session:
         yield session
@@ -88,6 +124,7 @@ def init_db_sync() -> None:
     async def _create() -> None:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+            await conn.run_sync(sync_schema)
         await engine.dispose()
 
     upload_root()

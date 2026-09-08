@@ -174,7 +174,7 @@ def main() -> int:
     fields = {
         "name": "Test Founder", "business": "Test Biz", "email": "founder@example.com",
         "phone": "9876543210", "category": "01", "employees": "1-3", "age": "lt6",
-        "city": "Bengaluru", "agree": "true", "mediaConsent": "true",
+        "city": "Bengaluru", "utr": "402912345678", "agree": "true", "mediaConsent": "true",
     }
     body, content_type = multipart_body(fields, "proof.png", PNG)
     r = client.post("/api/registrations", data=body, content_type=content_type)

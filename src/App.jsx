@@ -77,6 +77,13 @@ function validate(fd, availability) {
   if (!fd.get('age')) errors.age = 'Select how long you have been operating.';
   const paymentProof = fd.get('paymentProof');
   if (!paymentProof || !paymentProof.size) errors.paymentProof = 'Please upload a screenshot of your payment.';
+  // Mirrors the server's rule: separators stripped, then 12-22 alphanumerics.
+  // A UPI UTR is 12 digits; the wider range also accepts bank (IMPS/NEFT) refs.
+  const utr = (fd.get('utr') || '').trim();
+  if (!utr) errors.utr = 'Please enter the UTR / UPI reference number for your payment.';
+  else if (!/^[A-Za-z0-9]{12,22}$/.test(utr.replace(/[\s-]/g, ''))) {
+    errors.utr = 'Enter the UTR / UPI reference number from your payment app (usually 12 digits).';
+  }
   if (!fd.get('agree')) errors.agree = 'Please acknowledge the selection and refund terms.';
   if (!fd.get('mediaConsent')) errors.mediaConsent = 'Please grant permission to use your footage.';
   return { errors, name };
@@ -303,6 +310,7 @@ export default function App() {
         errEmployees={errors.employees || ''}
         errAge={errors.age || ''}
         errPaymentProof={errors.paymentProof || ''}
+        errUtr={errors.utr || ''}
         errAgree={errors.agree || ''}
         errMediaConsent={errors.mediaConsent || ''}
         errForm={errors.form || ''}

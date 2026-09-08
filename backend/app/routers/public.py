@@ -36,6 +36,37 @@ def invalidate_availability_cache() -> None:
     _availability_cache = None
 
 
+def _conflict(field: str, message: str) -> HTTPException:
+    """A 409 carrying the same {field, message} shape the 422 path uses.
+
+    Lets the SPA show a conflict against the input it belongs to — a full
+    category on the category select, a reused UTR on the UTR box — instead of
+    a generic banner that leaves the user hunting for what to change.
+    """
+    return HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail=[{"field": field, "message": message}],
+    )
+
+
+_UTR_TAKEN_MESSAGE = (
+    "This UTR is already on another registration. Please check the reference "
+    "number from your payment app, or contact us if you think this is a mistake."
+)
+
+
+async def _utr_taken(db: AsyncSession, utr: str, exclude_id: str | None = None) -> bool:
+    """Is this UPI reference already attached to a registration?
+
+    Compares the normalised form (schemas.RegistrationCreate uppercases and
+    strips separators), so "4029 1234-5678" cannot be re-used as "402912345678".
+    """
+    query = select(func.count()).select_from(Registration).where(Registration.utr == utr)
+    if exclude_id is not None:
+        query = query.where(Registration.id != exclude_id)
+    return bool(await db.scalar(query))
+
+
 @router.post("/registrations", status_code=status.HTTP_201_CREATED)
 async def create_registration(
     request: Request,
@@ -47,6 +78,7 @@ async def create_registration(
     employees: str = Form(...),
     business_age: str = Form(..., alias="age"),
     city: str | None = Form(default=None),
+    utr: str = Form(...),
     agreed_terms: bool = Form(..., alias="agree"),
     media_consent: bool = Form(..., alias="mediaConsent"),
     payment_proof: UploadFile = File(..., alias="paymentProof"),
@@ -70,6 +102,7 @@ async def create_registration(
             employees=employees,
             business_age=business_age,
             city=city,
+            utr=utr,
             agreed_terms=agreed_terms,
             media_consent=media_consent,
         )
@@ -90,10 +123,17 @@ async def create_registration(
         select(func.count()).select_from(Registration).where(Registration.category == data.category)
     )
     if filled >= settings.slots_per_category:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Category {data.category} is full. Please choose another category.",
+        raise _conflict(
+            "category", f"Category {data.category} is full. Please choose another category."
         )
+
+    # A UTR identifies exactly one payment, so if it is already attached to
+    # another registration it is not evidence for this one — either a repeat
+    # submission or a reference copied from someone else's payment. Checked
+    # before the upload so a duplicate fails fast, and again after the insert
+    # below so it cannot slip through between the two.
+    if await _utr_taken(db, data.utr):
+        raise _conflict("utr", _UTR_TAKEN_MESSAGE)
 
     filename, mime, size = await save_payment_proof(payment_proof)
 
@@ -106,6 +146,7 @@ async def create_registration(
         employees=data.employees,
         business_age=data.business_age,
         city=data.city or None,
+        utr=data.utr,
         proof_filename=filename,
         proof_mime=mime,
         proof_bytes=size,
@@ -141,10 +182,17 @@ async def create_registration(
         # The row never committed, so its proof file would otherwise be an
         # orphan nobody can reach — remove it rather than leaking disk.
         delete_proof(filename)
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Category {data.category} just filled up. Please choose another category.",
+        raise _conflict(
+            "category",
+            f"Category {data.category} just filled up. Please choose another category.",
         )
+
+    # Same re-check for the UTR, inside the same transaction, excluding the row
+    # just flushed. Covers a duplicate that landed after the fast-fail above.
+    if await _utr_taken(db, data.utr, exclude_id=registration.id):
+        await db.rollback()
+        delete_proof(filename)
+        raise _conflict("utr", _UTR_TAKEN_MESSAGE)
 
     await db.commit()
 

@@ -35,7 +35,9 @@ export async function submitRegistration(formData) {
   }
   const detail = payload?.detail;
 
-  // Field-level validation errors come back as [{field, message}].
+  // Field-level errors arrive as [{field, message}] — both 422 validation
+  // failures and 409 conflicts (a full category, an already-used UTR), so each
+  // one can be shown against the input it belongs to.
   if (Array.isArray(detail)) {
     const fieldErrors = {};
     const apiToForm = {
@@ -49,7 +51,13 @@ export async function submitRegistration(formData) {
       const key = apiToForm[d.field] || d.field;
       if (key) fieldErrors[key] = d.message;
     });
-    throw new SubmissionError('Please correct the highlighted fields.', fieldErrors);
+    // With a single problem, lead with its actual message rather than a vague
+    // "correct the highlighted fields" that makes the user hunt for it.
+    const summary =
+      detail.length === 1 && detail[0].message
+        ? detail[0].message
+        : 'Please correct the highlighted fields.';
+    throw new SubmissionError(summary, fieldErrors);
   }
 
   if (res.status === 429) {
@@ -58,14 +66,13 @@ export async function submitRegistration(formData) {
     );
   }
 
-  // The category filled up between the page loading and this submission —
-  // highlight the category field specifically rather than a generic banner.
+  // Fallback for a conflict that didn't carry the field-level shape above.
   if (res.status === 409) {
-    const message =
+    throw new SubmissionError(
       typeof detail === 'string'
         ? detail
-        : 'This category just filled up. Please choose another category.';
-    throw new SubmissionError(message, { category: message });
+        : 'That submission conflicts with an existing registration. Please review your details.',
+    );
   }
 
   throw new SubmissionError(

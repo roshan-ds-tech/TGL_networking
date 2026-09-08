@@ -38,6 +38,11 @@ VALID_AGES = {"lt6", "6-12", "1-3y", "3y+"}
 
 _PHONE_RE = re.compile(r"^\d{10}$")
 
+# A UPI UTR is 12 digits, but the same field is used to paste references from
+# bank apps (IMPS/NEFT), which run longer and can include letters. Accepting
+# 12-22 alphanumerics covers both without letting obvious junk through.
+_UTR_RE = re.compile(r"^[A-Z0-9]{12,22}$")
+
 
 class LoginRequest(BaseModel):
     """Login deliberately does NOT use EmailStr.
@@ -71,6 +76,7 @@ class RegistrationCreate(BaseModel):
     employees: str
     business_age: str
     city: str | None = Field(default=None, max_length=120)
+    utr: str = Field(max_length=40)
     agreed_terms: bool
     media_consent: bool
 
@@ -86,6 +92,20 @@ class RegistrationCreate(BaseModel):
         if not _PHONE_RE.match(digits):
             raise ValueError("Enter a valid 10-digit phone number.")
         return digits
+
+    @field_validator("utr")
+    @classmethod
+    def _utr(cls, v: str) -> str:
+        # People copy this straight out of a payment app, so spaces and hyphens
+        # come along with it. Normalise before validating, and store the
+        # normalised form so two spellings of one reference can't both be used.
+        cleaned = re.sub(r"[\s-]", "", v or "").upper()
+        if not _UTR_RE.match(cleaned):
+            raise ValueError(
+                "Enter the UTR / UPI reference number from your payment app "
+                "(usually 12 digits)."
+            )
+        return cleaned
 
     @field_validator("category")
     @classmethod
@@ -132,6 +152,8 @@ class RegistrationOut(BaseModel):
     employees: str
     business_age: str
     city: str | None
+    # None for registrations taken before the field existed.
+    utr: str | None = None
     proof_mime: str
     proof_bytes: int
     agreed_terms: bool

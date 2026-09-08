@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .config import settings
-from .database import Base, engine
+from .database import Base, engine, sync_schema
 from .routers import admin as admin_router
 from .routers import auth as auth_router
 from .routers import public as public_router
@@ -27,6 +27,7 @@ async def lifespan(_: FastAPI):
     Path(settings.upload_dir).parent.mkdir(parents=True, exist_ok=True)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(sync_schema)
     yield
     await engine.dispose()
 

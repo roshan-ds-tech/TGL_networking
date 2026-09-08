@@ -18,6 +18,7 @@ export default function Register({
   errEmployees,
   errAge,
   errPaymentProof,
+  errUtr,
   errAgree,
   errMediaConsent,
   errForm,
@@ -246,6 +247,27 @@ export default function Register({
                       />
                     </div>
                     {errPaymentProof && <span role="alert" style={{ fontSize: '13px', color: '#9A2B2B', fontWeight: '600' }}>{errPaymentProof}</span>}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', gridColumn: '1 / -1' }}>
+                    <label htmlFor="tgl-utr" style={{ fontSize: '12.5px', letterSpacing: '.1em', textTransform: 'uppercase', fontWeight: '700', color: '#6B3E96' }}>
+                      UTR / UPI reference number<span style={{ color: '#B8863B' }}>*</span>
+                    </label>
+                    <input
+                      id="tgl-utr"
+                      name="utr"
+                      type="text"
+                      autoComplete="off"
+                      spellCheck="false"
+                      maxLength={40}
+                      placeholder="e.g. 402912345678"
+                      aria-describedby="tgl-utr-hint"
+                      style={{ border: '1px solid rgba(53,26,78,0.24)', background: '#F6EEDF', padding: '15px 16px', fontSize: '15.5px', letterSpacing: '.04em', color: '#2B1740', borderRadius: '12px', minHeight: '52px' }}
+                      className="hv-73"
+                    />
+                    <span id="tgl-utr-hint" style={{ fontSize: '12.5px', lineHeight: '1.55', color: 'rgba(43,23,64,0.58)' }}>
+                      Your payment app shows this as the UTR, UPI reference ID or transaction ID — usually 12 digits. It lets us match your payment to this registration.
+                    </span>
+                    {errUtr && <span role="alert" style={{ fontSize: '13px', color: '#9A2B2B', fontWeight: '600' }}>{errUtr}</span>}
                   </div>
                   <label style={{ gridColumn: '1 / -1', display: 'flex', gap: '12px', alignItems: 'flex-start', fontSize: '14.5px', lineHeight: '1.6', color: 'rgba(43,23,64,0.72)', cursor: 'pointer' }}>
                     <input name="agree" type="checkbox" style={{ width: '20px', height: '20px', marginTop: '2px', accentColor: '#6B3E96', flexShrink: '0' }} />
