@@ -183,7 +183,7 @@ export default function App() {
               Slots filled by category
               <span className="slots__hint">
                 Early-bird price applies for the first {EARLY_BIRD_SLOTS} of{' '}
-                {stats.capacity_per_category}
+                {stats.capacity_per_category ?? DEFAULT_SLOTS_PER_CATEGORY}
               </span>
             </h2>
             <div className="slots__grid">

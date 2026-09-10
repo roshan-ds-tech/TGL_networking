@@ -303,9 +303,18 @@ export default function App() {
   // The server decides when registration is over; REGISTRATION_CLOSE is only
   // the fallback for when the counters could not be fetched, so the two can't
   // drift apart if the date is ever changed on the backend.
-  const registrationClosed = availability
-    ? !availability.registration_open
-    : days <= 0;
+  /* Only trust registration_open when the API actually sent a boolean.
+     An older backend omits the field entirely, and `!undefined` is `true` —
+     which shut registration down on a site whose counters were otherwise
+     loading fine. A missing field means "this backend can't tell us", so fall
+     back to the date. Failing open is also the safe direction here: the server
+     is what actually refuses late submissions, so the worst case is the form
+     staying visible slightly too long, not registration disappearing while
+     it is still meant to be running. */
+  const registrationClosed =
+    typeof availability?.registration_open === 'boolean'
+      ? !availability.registration_open
+      : days <= 0;
 
   return (
     <div className="tgl-shell" style={{ minHeight: '100vh', background: 'linear-gradient(180deg, #F6EEDF 0%, #FBF5E9 12%, #F7F0E2 34%, #FBF5E9 58%, #F6EEDF 78%, #F4EBDC 100%)' }}>
