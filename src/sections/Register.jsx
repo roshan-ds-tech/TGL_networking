@@ -49,7 +49,7 @@ export default function Register({
             Season 1
           </p>
           <p style={{ margin: '0 auto', maxWidth: '620px', fontSize: '17px', lineHeight: '1.72', color: 'rgba(246,238,223,0.75)', textWrap: 'pretty' }}>
-            Registration closes 20 November 2026. Early / launch pricing of ₹2,499 applies before the standard price of ₹2,999 takes effect.
+            Registration closes 20 November 2026. Early / launch pricing of ₹2,499 applies now — the price rises in tiers as each category's slots fill.
           </p>
         </div>
         <div data-reveal="" style={{ position: 'relative', overflow: 'hidden', display: 'flex', flexWrap: 'wrap', marginBottom: '44px', border: '1px solid rgba(224,181,88,0.34)', borderRadius: '24px', background: 'rgba(255,251,243,0.05)', boxShadow: '0 20px 46px rgba(0,0,0,0.22)' }}>
