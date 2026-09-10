@@ -185,11 +185,6 @@ export default function Hero({ tickerRef, daysLeftLabel, cdD, cdH, cdM, cdS }) {
                   ₹2,499
                 </p>
               </div>
-              <p style={{ margin: '0', fontSize: '12px', textAlign: 'right', color: 'rgba(34,16,58,0.78)', fontWeight: '600', lineHeight: '1.5' }}>
-                Standard price
-                <br />
-                ₹2,999
-              </p>
             </div>
           </div>
         </div>
