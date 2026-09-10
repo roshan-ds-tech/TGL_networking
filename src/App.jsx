@@ -34,8 +34,19 @@ const CATEGORY_TICKER_ITEMS = [
   'Emerging & Innovative',
 ];
 
-function daysLeft() {
-  return Math.ceil((REGISTRATION_CLOSE - new Date()) / 86400000);
+function daysLeft(closesAtMs) {
+  return Math.ceil((closesAtMs - Date.now()) / 86400000);
+}
+
+/* Mirrors the server's phone rule (see schemas.RegistrationCreate._phone):
+   strip the +91 country code or a trunk 0, then expect ten digits. Keeping the
+   two in step matters because the user has already paid by the time they
+   submit — a rule the browser accepts but the server rejects strands them. */
+function normalisePhone(raw) {
+  let digits = (raw || '').replace(/\D/g, '');
+  if (digits.length === 12 && digits.startsWith('91')) digits = digits.slice(2);
+  else if (digits.length === 11 && digits.startsWith('0')) digits = digits.slice(1);
+  return digits;
 }
 
 function validate(fd, availability) {
@@ -53,7 +64,7 @@ function validate(fd, availability) {
   if (!email) errors.email = 'Please enter an email address.';
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) errors.email = 'Enter a valid email address.';
   if (!phone) errors.phone = 'Please enter a phone number.';
-  else if (phone.replace(/\D/g, '').length < 10) errors.phone = 'Enter a valid 10-digit number.';
+  else if (normalisePhone(phone).length !== 10) errors.phone = 'Enter a valid 10-digit mobile number.';
   const category = fd.get('category');
   if (!category) errors.category = 'Select a category.';
   else {
@@ -100,6 +111,17 @@ export default function App() {
   // One request per page load, shared by the Categories grid and the popup.
   const [availability, refreshAvailability] = useAvailability();
 
+  /* The deadline the whole page counts down to. The server owns it (it is what
+     actually refuses late submissions), so use its value once the counters
+     load and fall back to the constant above only if that request failed —
+     otherwise changing the date on the backend would leave the countdown here
+     still showing the old one. Kept as a timestamp so it can be a stable
+     effect dependency. */
+  const serverClose = availability?.registration_closes_at
+    ? new Date(availability.registration_closes_at).getTime()
+    : NaN;
+  const closesAtMs = Number.isNaN(serverClose) ? REGISTRATION_CLOSE.getTime() : serverClose;
+
   const formRef = useRef(null);
   const progressRef = useRef(null);
   const headerRef = useRef(null);
@@ -113,7 +135,7 @@ export default function App() {
   useEffect(() => {
     const pad = (n) => (n < 10 ? '0' + n : String(n));
     const tick = () => {
-      let ms = REGISTRATION_CLOSE - new Date();
+      let ms = closesAtMs - Date.now();
       if (ms < 0) ms = 0;
       const s = Math.floor(ms / 1000);
       const set = (ref, v) => { if (ref.current && ref.current.textContent !== v) ref.current.textContent = v; };
@@ -125,7 +147,7 @@ export default function App() {
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [closesAtMs]);
 
   // rotating category ticker
   useEffect(() => {
@@ -276,8 +298,14 @@ export default function App() {
     }
   };
 
-  const days = daysLeft();
+  const days = daysLeft(closesAtMs);
   const daysLeftLabel = days > 0 ? days + ' days remaining' : 'Registration closed';
+  // The server decides when registration is over; REGISTRATION_CLOSE is only
+  // the fallback for when the counters could not be fetched, so the two can't
+  // drift apart if the date is ever changed on the backend.
+  const registrationClosed = availability
+    ? !availability.registration_open
+    : days <= 0;
 
   return (
     <div className="tgl-shell" style={{ minHeight: '100vh', background: 'linear-gradient(180deg, #F6EEDF 0%, #FBF5E9 12%, #F7F0E2 34%, #FBF5E9 58%, #F6EEDF 78%, #F4EBDC 100%)' }}>
@@ -297,6 +325,7 @@ export default function App() {
         formRef={formRef}
         onSubmit={onSubmit}
         showForm={!submitted}
+        registrationClosed={registrationClosed}
         submitted={submitted}
         submittedName={submittedName || 'founder'}
         submitting={submitting}
@@ -320,7 +349,7 @@ export default function App() {
       <Sponsors />
       <Contact />
       <Footer />
-      <UrgencyPopup availability={availability} deadline={REGISTRATION_CLOSE} />
+      <UrgencyPopup availability={availability} deadline={new Date(closesAtMs)} />
     </div>
   );
 }

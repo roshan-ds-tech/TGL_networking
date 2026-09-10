@@ -89,8 +89,16 @@ class RegistrationCreate(BaseModel):
     @classmethod
     def _phone(cls, v: str) -> str:
         digits = re.sub(r"\D", "", v or "")
+        # Accept the ways an Indian mobile is actually written — bare ten
+        # digits, with the +91 country code, or with a trunk 0 — and store the
+        # bare ten. Rejecting "+91 98765 43210" outright meant a registrant who
+        # had *already paid* hit a validation error at the last step.
+        if len(digits) == 12 and digits.startswith("91"):
+            digits = digits[2:]
+        elif len(digits) == 11 and digits.startswith("0"):
+            digits = digits[1:]
         if not _PHONE_RE.match(digits):
-            raise ValueError("Enter a valid 10-digit phone number.")
+            raise ValueError("Enter a valid 10-digit mobile number.")
         return digits
 
     @field_validator("utr")
@@ -214,3 +222,7 @@ class AvailabilityOut(BaseModel):
     total_capacity: int
     total_filled: int
     categories: list[CategoryAvailability]
+    # Served so the site closes at the same instant the API refuses at, rather
+    # than each holding its own copy of the date and drifting apart.
+    registration_closes_at: UtcDatetime
+    registration_open: bool

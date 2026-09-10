@@ -92,6 +92,17 @@ async def create_registration(
         "Too many registration attempts from this network. Please try again later.",
     )
 
+    # The deadline was previously display-only: the countdown hit zero and the
+    # site said "Registration closed", but this endpoint kept accepting
+    # submissions — and the payment that goes with them, which the terms say is
+    # non-refundable. Refuse here so that cannot happen.
+    if not settings.registration_open:
+        raise _conflict(
+            "form",
+            "Registration for Season 1 has closed. Please contact us if you have "
+            "already made a payment.",
+        )
+
     try:
         data = RegistrationCreate(
             full_name=full_name,
@@ -239,6 +250,8 @@ async def category_availability(db: AsyncSession = Depends(get_db)) -> Availabil
         total_capacity=capacity * len(categories),
         total_filled=sum(c.filled for c in categories),
         categories=categories,
+        registration_closes_at=settings.registration_closes_at,
+        registration_open=settings.registration_open,
     )
     _availability_cache = (now, result)
     return result

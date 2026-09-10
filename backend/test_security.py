@@ -31,6 +31,7 @@ from app.config import settings as app_settings  # noqa: E402
 from app.database import Base, SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import Admin  # noqa: E402
+from app.routers.public import invalidate_availability_cache  # noqa: E402
 from app.security import CSRF_COOKIE, SESSION_COOKIE, hash_password  # noqa: E402
 
 PASSWORD = "CorrectHorse123!"
@@ -103,6 +104,30 @@ def main() -> int:
         )
         check("rejects bad phone server-side", r.status_code == 422, str(r.status_code))
 
+        # How an Indian mobile is actually typed. These used to pass the
+        # browser's check and then fail here — after the registrant had paid.
+        for raw, label in [
+            ("+91 9876543210", "+91 with spaces"),
+            ("+919876543210", "+91 no spaces"),
+            ("09876543210", "trunk zero"),
+            ("98765 43210", "internal space"),
+        ]:
+            rr = c.post(
+                "/api/registrations",
+                data=form(phone=raw, email=f"phone{abs(hash(raw))}@example.com"),
+                files={"paymentProof": ("p.png", io.BytesIO(PNG), "image/png")},
+            )
+            check(f"accepts phone written as {label}", rr.status_code == 201, rr.text[:160])
+
+        # ...but genuinely wrong lengths are still refused.
+        for raw, label in [("12345", "too short"), ("98765432101234", "too long")]:
+            rr = c.post(
+                "/api/registrations",
+                data=form(phone=raw),
+                files={"paymentProof": ("p.png", io.BytesIO(PNG), "image/png")},
+            )
+            check(f"still rejects phone {label}", rr.status_code == 422, str(rr.status_code))
+
         r = c.post(
             "/api/registrations",
             data=form(category="99"),
@@ -136,6 +161,58 @@ def main() -> int:
             "over-10 rejection explains eligibility",
             "10 or fewer employees" in r.text,
             r.text[:160],
+        )
+
+        # ---------- registration deadline ----------
+        # The deadline used to be display-only: the site said "closed" while
+        # this endpoint kept accepting submissions, and the payment with them.
+        original_close = app_settings.registration_closes_at
+        app_settings.registration_closes_at = datetime(2020, 1, 1, tzinfo=timezone.utc)
+        try:
+            invalidate_availability_cache()
+            rr = c.post(
+                "/api/registrations",
+                data=form(email="afterclose@example.com"),
+                files={"paymentProof": ("p.png", io.BytesIO(PNG), "image/png")},
+            )
+            check("registration refused after the deadline", rr.status_code == 409, str(rr.status_code))
+            check(
+                "closed message mentions closure",
+                "closed" in rr.text.lower(),
+                rr.text[:160],
+            )
+            avail = c.get("/api/categories/availability").json()
+            check("availability reports registration closed", avail["registration_open"] is False)
+
+            uploads_dir = pathlib.Path(TMP) / "uploads"
+            before = len(list(uploads_dir.iterdir())) if uploads_dir.is_dir() else 0
+            c.post(
+                "/api/registrations",
+                data=form(email="afterclose2@example.com"),
+                files={"paymentProof": ("p.png", io.BytesIO(PNG), "image/png")},
+            )
+            after = len(list(uploads_dir.iterdir())) if uploads_dir.is_dir() else 0
+            check(
+                "a refused late submission stores no proof file",
+                after == before,
+                f"before={before} after={after}",
+            )
+        finally:
+            app_settings.registration_closes_at = original_close
+            invalidate_availability_cache()
+
+        rr = c.post(
+            "/api/registrations",
+            data=form(email="beforeclose@example.com"),
+            files={"paymentProof": ("p.png", io.BytesIO(PNG), "image/png")},
+        )
+        check("registration works again while open", rr.status_code == 201, rr.text[:160])
+        avail = c.get("/api/categories/availability").json()
+        check("availability reports registration open", avail["registration_open"] is True)
+        check(
+            "availability publishes the deadline",
+            str(avail.get("registration_closes_at", "")).startswith("2026-11-20"),
+            str(avail.get("registration_closes_at")),
         )
 
         # ---------- UTR (UPI reference) ----------

@@ -5,6 +5,7 @@ export default function Register({
   formRef,
   onSubmit,
   showForm,
+  registrationClosed,
   submitted,
   submittedName,
   submitting,
@@ -138,7 +139,29 @@ export default function Register({
         </div>
         <div data-reveal="" style={{ display: 'flex', flexWrap: 'wrap', gap: '28px', alignItems: 'flex-start' }}>
           <div data-register-panel="form" style={{ flex: '1 1 540px', minWidth: '0', background: '#FFFBF3', color: '#2B1740', padding: '44px 42px', borderRadius: '20px', boxShadow: '0 30px 70px rgba(0,0,0,0.28)' }}>
-            {showForm && (
+            {registrationClosed && (
+              /* Shown instead of the form once the deadline passes. The server
+                 refuses late submissions anyway, but the payment happens before
+                 the form is filled in — so the form has to disappear here, or
+                 someone pays for a registration that can no longer be made. */
+              <div>
+                <h3 style={{ margin: '0 0 8px', fontSize: '25px', fontWeight: '800', color: '#2B1740' }}>
+                  Registration Has Closed
+                </h3>
+                <p style={{ margin: '0 0 20px', fontSize: '15px', lineHeight: '1.7', color: 'rgba(43,23,64,0.7)' }}>
+                  Season 1 entries closed on 20 November 2026. Please do not make a
+                  payment for Season 1 — it can no longer be accepted.
+                </p>
+                <p style={{ margin: '0', fontSize: '15px', lineHeight: '1.7', color: 'rgba(43,23,64,0.7)' }}>
+                  Already paid, or want to hear about Season 2?{' '}
+                  <a href="#contact" style={{ color: '#6B3E96', fontWeight: '700' }}>
+                    Get in touch
+                  </a>
+                  .
+                </p>
+              </div>
+            )}
+            {showForm && !registrationClosed && (
               <div>
                 <h3 style={{ margin: '0 0 8px', fontSize: '25px', fontWeight: '800', color: '#2B1740' }}>
                   Season 1 Registration
