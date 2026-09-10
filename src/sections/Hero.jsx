@@ -83,7 +83,11 @@ export default function Hero({ tickerRef, daysLeftLabel, cdD, cdH, cdM, cdS }) {
               <p style={{ margin: '0', fontSize: '18px', fontWeight: '700', color: '#2B1740', whiteSpace: 'nowrap' }}>
                 20 November 2026
               </p>
-              <p style={{ margin: '2px 0 0', fontSize: '13px', color: 'rgba(43,23,64,0.6)', whiteSpace: 'nowrap' }}>
+              {/* Time-dependent: the prerendered build stamps the days-left at
+                  build time, the browser recomputes it on load. That is an
+                  intentional mismatch, so tell React rather than let it warn —
+                  it patches the text node during hydration, before paint. */}
+              <p suppressHydrationWarning style={{ margin: '2px 0 0', fontSize: '13px', color: 'rgba(43,23,64,0.6)', whiteSpace: 'nowrap' }}>
                 {daysLeftLabel}
               </p>
             </div>

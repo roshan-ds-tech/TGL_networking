@@ -320,7 +320,12 @@ export default function App() {
     <div className="tgl-shell" style={{ minHeight: '100vh', background: 'linear-gradient(180deg, #F6EEDF 0%, #FBF5E9 12%, #F7F0E2 34%, #FBF5E9 58%, #F6EEDF 78%, #F4EBDC 100%)' }}>
       <IconSprite />
       <Header headerRef={headerRef} progressRef={progressRef} menuOpen={menuOpen} toggleMenu={toggleMenu} closeMenu={closeMenu} />
-      <Hero tickerRef={tickerRef} daysLeftLabel={daysLeftLabel} cdD={cdD} cdH={cdH} cdM={cdM} cdS={cdS} />
+      {/* Landmark only — <main> is display:block by default, so this adds a
+          semantic wrapper without introducing any box that affects layout.
+          Header stays outside it so its position:sticky still resolves
+          against the same ancestor it did before. */}
+      <main>
+        <Hero tickerRef={tickerRef} daysLeftLabel={daysLeftLabel} cdD={cdD} cdH={cdH} cdM={cdM} cdS={cdS} />
       <MarqueeBand />
       <About />
       <WhyTGL />
@@ -356,7 +361,8 @@ export default function App() {
       />
       <Faq faq={faq} toggleFaq={toggleFaq} />
       <Sponsors />
-      <Contact />
+        <Contact />
+      </main>
       <Footer />
       <UrgencyPopup availability={availability} deadline={new Date(closesAtMs)} />
     </div>

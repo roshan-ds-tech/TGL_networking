@@ -66,6 +66,13 @@ async def security_headers(request: Request, call_next):
     response.headers.setdefault(
         "Permissions-Policy", "geolocation=(), microphone=(), camera=()"
     )
+    # Nothing on this origin belongs in search results — it serves only the
+    # admin dashboard and the registration API. The public marketing site is a
+    # separate origin and is unaffected. Sent as a header rather than via
+    # robots.txt on purpose: robots.txt would stop the page being *crawled*,
+    # which also stops crawlers ever seeing a noindex, so a linked-to admin URL
+    # could still surface. This way they can fetch it and are told not to index.
+    response.headers.setdefault("X-Robots-Tag", "noindex, nofollow")
     if settings.is_production:
         response.headers.setdefault(
             "Strict-Transport-Security", "max-age=31536000; includeSubDomains"

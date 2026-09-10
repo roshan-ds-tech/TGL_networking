@@ -5,7 +5,7 @@ const faqItems = [
   },
   {
     q: 'What does registration cost?',
-    a: 'Early / launch price is ₹2,499. The standard price is ₹2,999. Registration payment is non-refundable once payment is confirmed.',
+    a: 'The first 20 slots in each category are priced at the early / launch rate of ₹2,499. Once those fill, the price for that category is ₹3,499, and the final 3 slots are priced higher still. Registration payment is non-refundable once payment is confirmed.',
   },
   {
     q: 'Does registering guarantee selection?',

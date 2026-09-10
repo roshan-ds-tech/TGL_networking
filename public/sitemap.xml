@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  TGL is a single-page site: every section (#about, #categories, #register …)
+  is an in-page anchor, not a separate URL. Search engines discard the
+  fragment, so listing those anchors would just be the same URL repeated and
+  would be treated as an error rather than as extra pages. One canonical URL
+  is therefore the correct and complete sitemap here.
+
+  lastmod is the date the page content last actually changed. Keep it honest —
+  bumping it without a real content change is a quality signal problem, not a
+  ranking trick.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://tgl.skykeen.in/</loc>
+    <lastmod>2026-09-10</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>

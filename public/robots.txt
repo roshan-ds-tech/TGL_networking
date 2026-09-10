@@ -1,0 +1,41 @@
+# The Growth League (TGL) — Season 1
+# https://tgl.skykeen.in
+#
+# This is a single-page public marketing site. Everything served from this
+# origin is public and intended to be indexed, so nothing here is disallowed.
+# The admin dashboard and registration API are on a separate origin and are
+# not reachable from this one.
+
+User-agent: *
+Allow: /
+
+# Named explicitly so a future blanket restriction can't silently cut off AI
+# search. These read public pages to answer questions about the event, which
+# is exactly what TGL wants.
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+# ChatGPT Search
+User-agent: OAI-SearchBot
+Allow: /
+
+# ChatGPT user-initiated browsing
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-SearchBot
+Allow: /
+
+User-agent: Applebot
+Allow: /
+
+Sitemap: https://tgl.skykeen.in/sitemap.xml
