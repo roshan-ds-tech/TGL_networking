@@ -185,6 +185,21 @@ export default function IconSprite() {
           <path d="M4 12h15M13 6l6 6-6 6"></path>
         </g>
       </symbol>
+      <symbol id="i-instagram" viewBox="0 0 24 24">
+        <g fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3.5" y="3.5" width="17" height="17" rx="4.5"></rect>
+          <circle cx="12" cy="12" r="4"></circle>
+          <circle cx="17.2" cy="6.8" r="0.9" fill="currentColor" stroke="none"></circle>
+        </g>
+      </symbol>
+      <symbol id="i-linkedin" viewBox="0 0 24 24">
+        <g fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3.5" y="3.5" width="17" height="17" rx="3"></rect>
+          <path d="M8 10.5v6.2M8 7.8v.1"></path>
+          <path d="M12.2 16.7v-3.6c0-1.5 1-2.6 2.4-2.6s2.4 1 2.4 2.6v3.6"></path>
+          <path d="M12.2 10.5v6.2"></path>
+        </g>
+      </symbol>
     </svg>
   );
 }

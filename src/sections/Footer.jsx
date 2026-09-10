@@ -84,12 +84,39 @@ export default function Footer() {
                   Bengaluru, India
                 </span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '16px', padding: '11px 0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', padding: '13px 0' }}>
                 <span style={{ fontFamily: '\'IBM Plex Mono\', monospace', fontSize: '9.5px', letterSpacing: '.18em', textTransform: 'uppercase', color: 'rgba(246,238,223,0.45)' }}>
-                  Social links
+                  Follow along
                 </span>
-                <span style={{ fontSize: '13.5px', fontWeight: '600', color: 'rgba(246,238,223,0.85)', textAlign: 'right' }}>
-                  To Be Announced
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '10px' }}>
+                  <a
+                    href="https://www.instagram.com/thegrowthleague/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="The Growth League on Instagram"
+                    title="Instagram"
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '34px', height: '34px', borderRadius: '999px', border: '1px solid rgba(224,181,88,0.35)', color: 'rgba(246,238,223,0.85)', transition: 'color .22s ease, border-color .22s ease, transform .22s ease' }}
+                    className="hv-92"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+                      <use href="#i-instagram"></use>
+                    </svg>
+                  </a>
+                  {/* LinkedIn URL not confirmed yet. Rendered as a disabled
+                      placeholder (not a link) rather than href="#" or a guessed
+                      URL, so it never becomes a dead or wrong click target.
+                      Swap in an <a> like the Instagram one above once the
+                      client provides the real link. */}
+                  <span
+                    aria-disabled="true"
+                    aria-label="LinkedIn — link coming soon"
+                    title="LinkedIn — coming soon"
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '34px', height: '34px', borderRadius: '999px', border: '1px solid rgba(224,181,88,0.16)', color: 'rgba(246,238,223,0.32)', cursor: 'not-allowed' }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+                      <use href="#i-linkedin"></use>
+                    </svg>
+                  </span>
                 </span>
               </div>
             </div>

@@ -199,6 +199,7 @@
 .hv-89:hover { color:#EFCB77; transform:translateX(4px); }
 .hv-90:hover { color:#EFCB77; transform:translateX(4px); }
 .hv-91:hover { color:#EFCB77; transform:translateX(4px); }
+.hv-92:hover { color:#22103A; border-color:#E0B558; background:#E0B558; transform:translateY(-2px); }
 /* ---- urgency popup ---- */
 @keyframes tglUrgencyIn {
   from { opacity: 0; transform: translateY(18px) scale(.97); }
