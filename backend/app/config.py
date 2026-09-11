@@ -47,7 +47,7 @@ class Settings(BaseSettings):
     admin_dist_dir: str = "./static/admin"
 
     session_hours: int = 12
-    max_upload_bytes: int = 8 * 1024 * 1024  # 8 MB
+    max_upload_bytes: int = 2 * 1024 * 1024  # 2 MB — caps worst-case disk use on free-tier hosting
 
     # Season capacity. Drives the public "x of 40 slots filled" counters and the
     # admin dashboard's early-bird thresholds.
