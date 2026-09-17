@@ -13,7 +13,7 @@ export default function Footer() {
             <p style={{ margin: '0 0 26px', fontSize: '15px', lineHeight: '1.72', color: 'rgba(246,238,223,0.6)', maxWidth: '390px', textWrap: 'pretty' }}>
               A platform for visibility. A stage for recognition. An ecosystem for growth. Season 1, powered by SkyKeen Events.
             </p>
-            <a href="#register" style={{ display: 'inline-flex', alignItems: 'center', gap: '12px', background: 'linear-gradient(135deg, #E0B558, #C08D2E)', color: '#22103A', fontWeight: '700', fontSize: '13px', letterSpacing: '.08em', textTransform: 'uppercase', padding: '16px 32px', borderRadius: '999px', textDecoration: 'none', boxShadow: '0 12px 28px rgba(192,141,46,0.28)', transition: 'transform .22s ease, box-shadow .22s ease' }} className="hv-85">
+            <a href="#register-form" style={{ display: 'inline-flex', alignItems: 'center', gap: '12px', background: 'linear-gradient(135deg, #E0B558, #C08D2E)', color: '#22103A', fontWeight: '700', fontSize: '13px', letterSpacing: '.08em', textTransform: 'uppercase', padding: '16px 32px', borderRadius: '999px', textDecoration: 'none', boxShadow: '0 12px 28px rgba(192,141,46,0.28)', transition: 'transform .22s ease, box-shadow .22s ease' }} className="hv-85">
               Register Now
               <span aria-hidden="true" style={{ width: '5px', height: '5px', background: '#22103A', transform: 'rotate(45deg)', flexShrink: '0' }}></span>
             </a>

@@ -76,7 +76,7 @@ export default function Contact() {
               </span>
             </div>
           </div>
-          <a href="#register" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginTop: '30px', textAlign: 'center', background: 'linear-gradient(135deg, #E0B558, #C08D2E)', color: '#22103A', fontWeight: '700', fontSize: '13.5px', letterSpacing: '.08em', textTransform: 'uppercase', padding: '18px', borderRadius: '999px', textDecoration: 'none', boxShadow: '0 12px 28px rgba(192,141,46,0.28)', transition: 'transform .22s ease, box-shadow .22s ease' }} className="hv-84">
+          <a href="#register-form" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginTop: '30px', textAlign: 'center', background: 'linear-gradient(135deg, #E0B558, #C08D2E)', color: '#22103A', fontWeight: '700', fontSize: '13.5px', letterSpacing: '.08em', textTransform: 'uppercase', padding: '18px', borderRadius: '999px', textDecoration: 'none', boxShadow: '0 12px 28px rgba(192,141,46,0.28)', transition: 'transform .22s ease, box-shadow .22s ease' }} className="hv-84">
             Register for Season 1
             <span aria-hidden="true" style={{ width: '5px', height: '5px', background: '#22103A', transform: 'rotate(45deg)', flexShrink: '0' }}></span>
           </a>

@@ -43,7 +43,7 @@ export default function Hero({ tickerRef, daysLeftLabel, cdD, cdH, cdM, cdS }) {
             </span>
           </div>
           <div data-cta-row="" style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', marginBottom: '38px', animation: 'tglRise .8s cubic-bezier(.2,.7,.3,1) both .44s' }}>
-            <a href="#register" style={{ background: 'linear-gradient(135deg, #E0B558, #C08D2E)', color: '#22103A', fontWeight: '700', fontSize: '14px', letterSpacing: '.08em', textTransform: 'uppercase', padding: '18px clamp(20px, 5vw, 36px)', borderRadius: '999px', boxShadow: '0 10px 26px rgba(192,141,46,0.35)', transition: 'transform .2s ease, box-shadow .2s ease', display: 'inline-flex', alignItems: 'center', gap: '12px', whiteSpace: 'nowrap' }} className="hv-14">
+            <a href="#register-form" style={{ background: 'linear-gradient(135deg, #E0B558, #C08D2E)', color: '#22103A', fontWeight: '700', fontSize: '14px', letterSpacing: '.08em', textTransform: 'uppercase', padding: '18px clamp(20px, 5vw, 36px)', borderRadius: '999px', boxShadow: '0 10px 26px rgba(192,141,46,0.35)', transition: 'transform .2s ease, box-shadow .2s ease', display: 'inline-flex', alignItems: 'center', gap: '12px', whiteSpace: 'nowrap' }} className="hv-14">
               Register for Season 1
               <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style={{ flexShrink: '0' }}>
                 <use href="#i-arrow"></use>

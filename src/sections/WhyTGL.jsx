@@ -62,7 +62,7 @@ export default function WhyTGL() {
               Six outcomes a Season 1 participant works toward across the journey.
             </p>
           </div>
-          <a href="#register" style={{ flexShrink: '0', display: 'inline-flex', alignItems: 'center', gap: '12px', padding: '15px 28px', borderRadius: '999px', border: '1px solid rgba(224,181,88,0.45)', background: 'rgba(224,181,88,0.08)', color: '#E0B558', fontSize: '12px', letterSpacing: '.14em', textTransform: 'uppercase', fontWeight: '700', transition: 'background .25s ease, border-color .25s ease, transform .25s ease, color .25s ease' }} className="hv-26">
+          <a href="#register-form" style={{ flexShrink: '0', display: 'inline-flex', alignItems: 'center', gap: '12px', padding: '15px 28px', borderRadius: '999px', border: '1px solid rgba(224,181,88,0.45)', background: 'rgba(224,181,88,0.08)', color: '#E0B558', fontSize: '12px', letterSpacing: '.14em', textTransform: 'uppercase', fontWeight: '700', transition: 'background .25s ease, border-color .25s ease, transform .25s ease, color .25s ease' }} className="hv-26">
             Register Now
             <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true" style={{ flexShrink: '0' }}>
               <use href="#i-arrow"></use>

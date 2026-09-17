@@ -100,7 +100,7 @@ export default function UrgencyPopup({ availability, deadline }) {
       )}
 
       <div className="urgency__actions">
-        <a href="#register" onClick={dismiss} className="urgency__cta">
+        <a href="#register-form" onClick={dismiss} className="urgency__cta">
           Register now
           <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
             <use href="#i-arrow" />

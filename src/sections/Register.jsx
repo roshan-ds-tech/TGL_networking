@@ -137,7 +137,7 @@ export default function Register({
             </span>
           </div>
         </div>
-        <div data-reveal="" style={{ display: 'flex', flexWrap: 'wrap', gap: '28px', alignItems: 'flex-start' }}>
+        <div id="register-form" data-reveal="" style={{ display: 'flex', flexWrap: 'wrap', gap: '28px', alignItems: 'flex-start' }}>
           <div data-register-panel="form" style={{ flex: '1 1 540px', minWidth: '0', background: '#FFFBF3', color: '#2B1740', padding: '44px 42px', borderRadius: '20px', boxShadow: '0 30px 70px rgba(0,0,0,0.28)' }}>
             {registrationClosed && (
               /* Shown instead of the form once the deadline passes. The server
