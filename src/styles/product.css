@@ -1,0 +1,932 @@
+/* =========================================================
+   TGL Product App (SaaS & Networking Portal) Stylesheet
+   Theme: Light Ivory (#F6EEDF) & Regal Gold (#C08D2E)
+   100% Faithful to the TGL Main Website Aesthetic
+   ========================================================= */
+
+:root {
+  --tgl-ivory-bg: #F6EEDF;
+  --tgl-ivory-card: #FFFDF8;
+  --tgl-ivory-border: rgba(192, 141, 46, 0.22);
+  --tgl-ivory-border-hover: rgba(192, 141, 46, 0.45);
+  --tgl-text-dark: #2B1740;
+  --tgl-text-muted: rgba(43, 23, 64, 0.7);
+  --tgl-text-faint: rgba(43, 23, 64, 0.45);
+  --tgl-gold-brand: #C08D2E;
+  --tgl-gold-light: #E0B558;
+  --tgl-gold-gradient: linear-gradient(135deg, #EFCB77 0%, #E0B558 45%, #C08D2E 100%);
+}
+
+/* Master portal page wrapper. The gradient, and everything below it, mirrors
+   the product design source (TGL Product Platform.dc.html) exactly — the
+   product app (Vertex, Networking, Profile, Events) is that document rendered
+   in React. The public homepage keeps its own shell in src/App.jsx.
+
+   `overflow-x: clip` rather than `hidden`: hidden would make this a scroll
+   container and silently break the sticky header (same reasoning as
+   .tgl-shell in global.css). */
+.tgl-portal-root {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #F6EEDF 0%, #FBF5E9 18%, #F7F0E2 55%, #F6EEDF 100%);
+  color: var(--tgl-text-dark);
+  font-family: Archivo, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  position: relative;
+  overflow-x: clip;
+}
+
+@supports not (overflow-x: clip) {
+  .tgl-portal-root { overflow-x: visible; }
+}
+
+/* Portal Navbar (Matches Header.jsx) */
+.tgl-portal-nav {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  background: linear-gradient(180deg, rgba(252, 246, 234, 0.96), rgba(246, 238, 223, 0.9));
+  backdrop-filter: blur(18px) saturate(1.35);
+  -webkit-backdrop-filter: blur(18px) saturate(1.35);
+  border-bottom: 1px solid rgba(192, 141, 46, 0.22);
+  box-shadow: 0 8px 24px -10px rgba(53, 26, 78, 0.08);
+  transition: box-shadow .3s ease;
+  animation: tglNavIn .32s ease;
+}
+
+.tgl-portal-nav-inner {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 13px 28px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.tgl-portal-nav-rail {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  margin-left: auto;
+  /* Matches the public Header.jsx nav rail (padding, border, font) so the
+     navbar doesn't visibly shrink when navigating from the homepage into the
+     product app — they're two different mounted components, so any mismatch
+     here reads as a jump cut. */
+  padding: 10px 26px;
+  border: 1px solid rgba(53, 26, 78, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 252, 245, 0.55);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+
+.tgl-portal-nav-link {
+  color: rgba(43, 23, 64, 0.78);
+  text-decoration: none;
+  transition: color 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+  white-space: nowrap;
+}
+
+.tgl-portal-nav-link:hover {
+  color: #B8863B;
+}
+
+.tgl-portal-nav-link.active {
+  color: var(--tgl-text-dark);
+}
+
+.tgl-portal-nav-link.active::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -4px;
+  height: 2px;
+  background: var(--tgl-gold-brand);
+  border-radius: 1px;
+}
+
+/* Portal Card (Clean Ivory & Gold) */
+.tgl-portal-card {
+  position: relative;
+  background: #FFFCF5;
+  border: 1px solid rgba(53, 26, 78, 0.1);
+  border-radius: 22px;
+  padding: clamp(26px, 4vw, 40px) clamp(24px, 4vw, 38px);
+  box-shadow: 0 30px 60px -24px rgba(34, 16, 58, 0.28);
+  transition: transform 0.24s ease, border-color 0.24s ease, box-shadow 0.24s ease;
+  color: var(--tgl-text-dark);
+}
+
+.tgl-portal-card-interactive:hover {
+  border-color: var(--tgl-ivory-border-hover);
+  box-shadow: 0 22px 48px -10px rgba(192, 141, 46, 0.22), 0 4px 12px rgba(53, 26, 78, 0.05), inset 0 1px 0 rgba(255, 255, 255, 1);
+  transform: translateY(-2px);
+}
+
+/* Primary Button (Gold Gradient) */
+.tgl-btn-gold {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: linear-gradient(135deg, #E0B558, #C08D2E);
+  color: #22103A;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  padding: 16px 28px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 10px 26px rgba(192, 141, 46, 0.35);
+  transition: transform .2s ease, box-shadow .2s ease;
+  text-decoration: none;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.tgl-btn-gold:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 32px rgba(192, 141, 46, 0.45);
+}
+
+.tgl-btn-gold:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.tgl-btn-gold:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Ghost / Secondary Button */
+.tgl-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: transparent;
+  color: #35194E;
+  font-weight: 700;
+  font-size: 11.5px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  padding: 15px 24px;
+  border-radius: 999px;
+  border: 1px solid rgba(53, 26, 78, 0.3);
+  cursor: pointer;
+  transition: background .2s ease, border-color .2s ease;
+  text-decoration: none;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.tgl-btn-ghost:hover:not(:disabled) {
+  background: rgba(53, 26, 78, 0.06);
+  border-color: #35194E;
+}
+
+.tgl-btn-ghost:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Inputs & Form Controls */
+.tgl-input {
+  width: 100%;
+  background: #FFFBF3;
+  border: 1px solid rgba(53, 26, 78, 0.16);
+  border-radius: 12px;
+  padding: 14px 16px;
+  font-size: 14.5px;
+  color: #2B1740;
+  font-family: inherit;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.tgl-input::placeholder {
+  color: rgba(43, 23, 64, 0.42);
+}
+
+.tgl-input:focus {
+  border-color: #6B3E96;
+  box-shadow: 0 0 0 4px rgba(107, 62, 150, 0.1);
+}
+
+select.tgl-input {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23C08D2E' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+  padding-right: 42px;
+  cursor: pointer;
+}
+
+select.tgl-input option {
+  background: #FFFDF8;
+  color: #2B1740;
+}
+
+textarea.tgl-input {
+  resize: vertical;
+  line-height: 1.55;
+}
+
+/* Form fields — label sits above the control, matching the design source's
+   10.5px / .16em uppercase caption rather than wrapping it. */
+.tgl-field {
+  display: block;
+  min-width: 0;
+}
+
+.tgl-label {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: rgba(43, 23, 64, 0.55);
+  margin-bottom: 8px;
+}
+
+.tgl-label-optional {
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--tgl-text-faint);
+  margin-left: 6px;
+}
+
+.tgl-field-error {
+  display: block;
+  margin-top: 7px;
+  color: #9A2B2B;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+/* Stepper Component */
+.tgl-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 30px;
+  position: relative;
+}
+
+.tgl-step-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tgl-step-dot {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  background: rgba(53, 26, 78, 0.06);
+  border: 1px solid rgba(53, 26, 78, 0.18);
+  color: rgba(43, 23, 64, 0.6);
+  transition: all 0.25s ease;
+}
+
+.tgl-step-item.active .tgl-step-dot {
+  background: var(--tgl-gold-gradient);
+  border-color: #E0B558;
+  color: #22103A;
+  box-shadow: 0 4px 14px rgba(192, 141, 46, 0.45);
+}
+
+.tgl-step-item.completed .tgl-step-dot {
+  background: rgba(192, 141, 46, 0.15);
+  border-color: var(--tgl-gold-brand);
+  color: var(--tgl-gold-brand);
+}
+
+.tgl-step-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: rgba(43, 23, 64, 0.6);
+}
+
+.tgl-step-item.active .tgl-step-title {
+  color: #2B1740;
+}
+
+.tgl-step-item.completed .tgl-step-title {
+  color: var(--tgl-gold-brand);
+}
+
+.tgl-step-line {
+  height: 2px;
+  width: 44px;
+  background: rgba(53, 26, 78, 0.14);
+}
+
+.tgl-step-line.completed {
+  background: var(--tgl-gold-brand);
+}
+
+/* Badges & Tags */
+.tgl-badge-gold {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(192, 141, 46, 0.12);
+  border: 1px solid rgba(192, 141, 46, 0.35);
+  color: #9D6F22;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.tgl-badge-neutral {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(53, 26, 78, 0.06);
+  border: 1px solid rgba(53, 26, 78, 0.16);
+  color: #2B1740;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.tgl-badge-green {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(46, 182, 125, 0.12);
+  border: 1px solid rgba(46, 182, 125, 0.35);
+  color: #178351;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+/* Alert boxes */
+.tgl-alert-error {
+  background: rgba(154, 43, 43, 0.08);
+  border: 1px solid rgba(154, 43, 43, 0.28);
+  border-radius: 12px;
+  padding: 12px 16px;
+  color: #9A2B2B;
+  font-size: 13.5px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tgl-alert-info {
+  background: rgba(192, 141, 46, 0.1);
+  border: 1px solid rgba(192, 141, 46, 0.3);
+  border-radius: 12px;
+  padding: 14px 18px;
+  color: #2B1740;
+  font-size: 13.5px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Member Directory Cards */
+.tgl-member-card {
+  background: linear-gradient(180deg, #FFFFFF 0%, #FFFDF8 100%);
+  border: 1px solid rgba(192, 141, 46, 0.24);
+  border-radius: 18px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: all 0.26s cubic-bezier(.2,.7,.3,1);
+  cursor: pointer;
+  text-align: left;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 8px 20px -6px rgba(53, 26, 78, 0.08);
+}
+
+.tgl-member-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--tgl-gold-brand);
+  box-shadow: 0 16px 36px -8px rgba(192, 141, 46, 0.25), 0 0 0 1px rgba(192, 141, 46, 0.3);
+}
+
+.tgl-member-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(192, 141, 46, 0.7), transparent);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.tgl-member-card:hover::before {
+  opacity: 1;
+}
+
+/* Grid layout utilities */
+.tgl-portal-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+/* =========================================================
+   Homepage signature elements (mirrors Hero.jsx exactly)
+   ========================================================= */
+
+/* Gold line + rotated diamond + uppercase purple label */
+.tgl-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 26px;
+}
+
+.tgl-eyebrow-line {
+  width: 46px;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(192, 141, 46, 0), #C08D2E);
+  flex-shrink: 0;
+}
+
+.tgl-eyebrow-dot {
+  width: 6px;
+  height: 6px;
+  background: #C08D2E;
+  transform: rotate(45deg);
+  display: block;
+  flex-shrink: 0;
+  animation: tglGlow 2.6s ease-in-out infinite;
+}
+
+.tgl-eyebrow-text {
+  font-size: 11.5px;
+  letter-spacing: clamp(.12em, 1.4vw, .32em);
+  text-transform: uppercase;
+  font-weight: 700;
+  color: #6B3E96;
+  line-height: 1.5;
+  min-width: 0;
+}
+
+.tgl-eyebrow--center {
+  justify-content: center;
+}
+
+.tgl-eyebrow--compact {
+  margin-bottom: 14px;
+}
+
+/* Kaushan Script gold shimmer accent word ("Rise." on the homepage) */
+.tgl-script-word {
+  font-family: 'Kaushan Script', cursive;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  background: linear-gradient(100deg, #A8762F 6%, #E0B558 24%, #FFF3CE 33%, #E0B558 42%, #A8762F 62%);
+  background-size: 240% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: tglShimmer 7s linear infinite;
+}
+
+/* Hero-style headline: Archivo 800 uppercase, tight tracking */
+.tgl-hero-headline {
+  margin: 0;
+  font-family: Archivo, Helvetica, sans-serif;
+  font-size: clamp(34px, 4.4vw, 54px);
+  line-height: 1;
+  letter-spacing: -0.035em;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #2B1740;
+}
+
+.tgl-hero-headline .tgl-script-word {
+  display: block;
+  margin-top: 8px;
+  font-size: clamp(56px, 7vw, 96px);
+  line-height: 0.94;
+}
+
+/* Hero-style meta row (Grand Finale / Registration closes / Location) */
+.tgl-hero-meta {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: clamp(14px, 2.4vw, 32px);
+  padding-top: 24px;
+  border-top: 1px solid rgba(53, 26, 78, 0.14);
+  margin-top: 30px;
+}
+
+.tgl-hero-meta-label {
+  margin: 0 0 4px;
+  font-size: 11px;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: rgba(43, 23, 64, 0.5);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.tgl-hero-meta-value {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: #2B1740;
+  white-space: nowrap;
+}
+
+.tgl-hero-meta-sub {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: rgba(43, 23, 64, 0.6);
+  white-space: nowrap;
+}
+
+/* =========================================================
+   Auth screens (login / signup / verify)
+   ========================================================= */
+
+.tgl-auth-layout {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 64px 28px 88px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: 64px;
+  align-items: center;
+  position: relative;
+  z-index: 1;
+}
+
+.tgl-auth-story-lede {
+  font-size: 12px;
+  letter-spacing: .42em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: rgba(43, 23, 64, 0.45);
+  margin: 0 0 12px;
+}
+
+.tgl-auth-story-copy {
+  font-size: clamp(15.5px, 1.4vw, 18px);
+  line-height: 1.6;
+  max-width: 480px;
+  margin: 24px 0 0;
+  color: rgba(43, 23, 64, 0.8);
+}
+
+.tgl-auth-story-copy--muted {
+  margin-top: 12px;
+  font-size: 15px;
+  line-height: 1.7;
+  color: rgba(43, 23, 64, 0.62);
+}
+
+/* Offset gold frame behind the form card (hero panel treatment) */
+.tgl-auth-frame {
+  position: relative;
+}
+
+.tgl-auth-frame::before {
+  content: "";
+  position: absolute;
+  inset: 14px -14px -14px 14px;
+  border: 1px solid rgba(192, 141, 46, 0.6);
+  border-radius: 22px;
+  pointer-events: none;
+}
+
+/* Password field with show/hide toggle */
+.tgl-password-wrap {
+  position: relative;
+  display: block;
+}
+
+.tgl-password-wrap .tgl-input {
+  padding-right: 74px;
+}
+
+.tgl-password-toggle {
+  position: absolute;
+  right: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(192, 141, 46, 0.1);
+  border: 1px solid rgba(192, 141, 46, 0.3);
+  border-radius: 8px;
+  color: #9D6F22;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  padding: 7px 10px;
+  cursor: pointer;
+  transition: background .18s ease, border-color .18s ease;
+}
+
+.tgl-password-toggle:hover {
+  background: rgba(192, 141, 46, 0.2);
+  border-color: rgba(192, 141, 46, 0.5);
+}
+
+/* Small helper text under inputs */
+.tgl-field-hint {
+  font-size: 12px;
+  color: var(--tgl-text-faint);
+  letter-spacing: 0;
+  text-transform: none;
+  font-weight: 500;
+}
+
+/* Dark hero/card gradient — used for the Networking locked hero, Membership
+   timeline card, Vertex provider header, member sticky card, and modal
+   "what happens next" panels. */
+.tgl-dark-card {
+  background: linear-gradient(165deg, #35194E, #22103A);
+  color: #F6EEDF;
+}
+
+/* Toast */
+.tgl-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 96px;
+  transform: translateX(-50%);
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(224, 181, 88, 0.3);
+  background: linear-gradient(168deg, #321B4B, #1E0F31);
+  color: #F6EEDF;
+  box-shadow: 0 26px 60px -18px rgba(20, 8, 36, 0.75);
+  font-size: 13.5px;
+  font-weight: 600;
+  max-width: calc(100vw - 32px);
+  animation: tglRise .35s cubic-bezier(.2, .7, .3, 1) both;
+}
+
+/* Modal */
+.tgl-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(34, 16, 58, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.tgl-modal-card {
+  width: 100%;
+  padding: 34px;
+  border-radius: 22px;
+  background: #FFFCF5;
+  box-shadow: 0 40px 80px -20px rgba(20, 8, 36, 0.6);
+  animation: tglRise .35s cubic-bezier(.2, .7, .3, 1) both;
+}
+
+@media (max-width: 940px) {
+  .tgl-auth-layout {
+    grid-template-columns: 1fr;
+    gap: 30px;
+    padding-top: 24px;
+  }
+  .tgl-auth-story {
+    text-align: center;
+  }
+  .tgl-auth-story .tgl-eyebrow {
+    justify-content: center;
+  }
+  .tgl-auth-story-copy {
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .tgl-hero-headline .tgl-script-word {
+    font-size: clamp(52px, 12vw, 76px);
+  }
+  .tgl-hero-meta {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 768px) {
+  .tgl-portal-grid-2 {
+    grid-template-columns: 1fr;
+  }
+  .tgl-step-title {
+    display: none;
+  }
+  .tgl-auth-frame {
+    margin: 0 14px 14px 14px;
+  }
+}
+
+/* =========================================================
+   Hover states
+   The design source expresses these as `style-hover` attributes on inline
+   styles; React has no such thing, so each one becomes a class here. Names
+   describe the effect, not the element, because several elements share one.
+   ========================================================= */
+
+.tglp-lift {
+  transition: transform .3s cubic-bezier(.2, .7, .3, 1), box-shadow .3s ease, border-color .3s ease;
+}
+.tglp-lift:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 26px 52px -26px rgba(53, 26, 78, 0.3);
+  border-color: rgba(192, 141, 46, 0.5);
+}
+
+.tglp-lift-sm {
+  transition: transform .3s ease, box-shadow .3s ease, border-color .3s ease;
+}
+.tglp-lift-sm:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 28px 56px -26px rgba(53, 26, 78, 0.32);
+  border-color: rgba(192, 141, 46, 0.5);
+}
+
+.tglp-lift-flat {
+  transition: transform .3s ease, border-color .3s ease;
+}
+.tglp-lift-flat:hover {
+  transform: translateY(-4px);
+  border-color: rgba(192, 141, 46, 0.5);
+}
+
+/* Gold CTA */
+.tglp-gold {
+  transition: transform .35s cubic-bezier(.34, 1.56, .64, 1), box-shadow .3s ease;
+}
+.tglp-gold:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 34px -6px rgba(192, 141, 46, 0.9);
+}
+.tglp-gold:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+/* Outlined button on ivory */
+.tglp-ghost {
+  transition: background .2s ease, border-color .2s ease, color .2s ease;
+}
+.tglp-ghost:hover:not(:disabled) {
+  background: rgba(53, 26, 78, 0.06);
+  border-color: #35194E;
+}
+.tglp-ghost:disabled,
+.tglp-solid:disabled,
+.tglp-help:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+/* Outlined button on the dark purple card */
+.tglp-ghost-dark {
+  transition: background .2s ease, border-color .2s ease;
+}
+.tglp-ghost-dark:hover:not(:disabled) {
+  background: rgba(224, 181, 88, 0.12);
+  border-color: #E0B558;
+}
+
+/* Filter / suggestion chip */
+.tglp-chip {
+  transition: border-color .2s ease, background .2s ease;
+}
+.tglp-chip:hover {
+  border-color: #C08D2E;
+  background: #FFFCF5;
+}
+
+/* "I Can Help" outline pill that fills gold */
+.tglp-help {
+  transition: background .2s ease, color .2s ease;
+}
+.tglp-help:hover:not(:disabled) {
+  background: #C08D2E;
+  color: #22103A;
+}
+
+/* Next-step pill that inverts to ink */
+.tglp-invert {
+  transition: background .2s ease, color .2s ease;
+}
+.tglp-invert:hover:not(:disabled) {
+  background: #2B1740;
+  color: #F6EEDF;
+}
+
+/* Full-bleed list row */
+.tglp-row {
+  transition: background .25s ease;
+}
+.tglp-row:hover {
+  background: rgba(192, 141, 46, 0.05);
+}
+
+/* List row that also slides */
+.tglp-row-slide {
+  transition: background .25s ease, transform .25s ease;
+}
+.tglp-row-slide:hover {
+  background: rgba(192, 141, 46, 0.05);
+  transform: translateX(5px);
+}
+
+/* Header / inline nav link */
+.tglp-navlink {
+  transition: color .2s ease;
+}
+.tglp-navlink:hover {
+  color: #6B3E96;
+}
+
+/* Circular icon button in the header */
+.tglp-icon-btn {
+  transition: border-color .2s ease;
+}
+.tglp-icon-btn:hover {
+  border-color: #C08D2E;
+}
+
+/* Entrance animations used by the design source */
+.tglp-rise { animation: tglRise .7s cubic-bezier(.2, .7, .3, 1) both; }
+.tglp-rise-2 { animation: tglRise .85s cubic-bezier(.2, .7, .3, 1) both .12s; }
+.tglp-rise-3 { animation: tglRise .9s cubic-bezier(.2, .7, .3, 1) both .2s; }
+.tglp-rise-fast { animation: tglRise .45s cubic-bezier(.2, .7, .3, 1) both; }
+.tglp-tick { animation: tglTick 1.6s ease-in-out infinite; }
+.tglp-glow { animation: tglGlow 9s ease-in-out infinite; }
+
+/* Offset gold frame drawn behind a card (hero panel treatment) */
+.tglp-framed { position: relative; }
+.tglp-framed::before {
+  content: "";
+  position: absolute;
+  inset: 14px -14px -14px 14px;
+  border: 1px solid rgba(192, 141, 46, 0.6);
+  border-radius: 22px;
+  pointer-events: none;
+}
+.tglp-framed > * { position: relative; }
+
+/* =========================================================
+   Portal responsive rules (mirrors the design source's media queries).
+   Scoped to .tgl-portal-root so the public homepage is untouched.
+   ========================================================= */
+
+@media (max-width: 900px) {
+  [data-grid-2] { grid-template-columns: minmax(0, 1fr) !important; }
+}
+
+@media (max-width: 640px) {
+  .tgl-portal-root main,
+  .tgl-portal-root section > div {
+    padding-left: 18px !important;
+    padding-right: 18px !important;
+  }
+}

@@ -17,6 +17,11 @@ export async function submitRegistration(formData) {
   try {
     res = await fetch(`${API_BASE}/api/registrations`, {
       method: 'POST',
+      // If the visitor is logged in, the customer session cookie needs to
+      // reach the backend so the registration links to their account (see
+      // public.py's create_registration) — same-origin fetch would send it
+      // by default, but API_BASE is a different origin in local dev.
+      credentials: 'include',
       body: formData,
     });
   } catch {
@@ -36,8 +41,8 @@ export async function submitRegistration(formData) {
   const detail = payload?.detail;
 
   // Field-level errors arrive as [{field, message}] — both 422 validation
-  // failures and 409 conflicts (a full category, an already-used UTR), so each
-  // one can be shown against the input it belongs to.
+  // failures and 409 conflicts (a full category), so each one can be shown
+  // against the input it belongs to.
   if (Array.isArray(detail)) {
     const fieldErrors = {};
     const apiToForm = {

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AGES, api, ApiError, CATEGORIES, EMPLOYEES } from './api';
+import Accounts from './Accounts';
 import DeleteModal from './DeleteModal';
 import Login from './Login';
 import ProofModal from './ProofModal';
@@ -35,6 +36,7 @@ function StatCard({ label, value, tone }) {
 export default function App() {
   const [admin, setAdmin] = useState(null);
   const [booting, setBooting] = useState(true);
+  const [view, setView] = useState('registrations');
 
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
@@ -52,6 +54,8 @@ export default function App() {
   const [pendingId, setPendingId] = useState(null);
   const [proof, setProof] = useState(null);
   const [toDelete, setToDelete] = useState(null);
+  const [finaleResult, setFinaleResult] = useState(null);
+  const [finaleBusy, setFinaleBusy] = useState(false);
 
   const abortRef = useRef(null);
 
@@ -69,7 +73,7 @@ export default function App() {
   }, [search]);
 
   const load = useCallback(async () => {
-    if (!admin) return;
+    if (!admin || view !== 'registrations') return;
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -104,7 +108,7 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  }, [admin, page, debouncedSearch, category, verifiedFilter]);
+  }, [admin, view, page, debouncedSearch, category, verifiedFilter]);
 
   useEffect(() => {
     load();
@@ -135,6 +139,27 @@ export default function App() {
     // one, so the counts, page total and any row pulled up from the next page
     // all need to come from the server.
     await load();
+  }
+
+  async function completeFinale() {
+    if (!window.confirm('Record the Season 1 Grand Finale as completed and activate all eligible pending Networking memberships?')) {
+      return;
+    }
+    setFinaleBusy(true);
+    setError('');
+    try {
+      const result = await api.completeSeason1();
+      setFinaleResult(result);
+      await load();
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        setAdmin(null);
+        return;
+      }
+      setError(err.message || 'Could not complete the Grand Finale activation.');
+    } finally {
+      setFinaleBusy(false);
+    }
   }
 
   async function handleLogout() {
@@ -169,6 +194,31 @@ export default function App() {
       </header>
 
       <main className="main">
+        <div className="tabs" role="tablist" aria-label="Admin views">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === 'registrations'}
+            className={`tab${view === 'registrations' ? ' tab--active' : ''}`}
+            onClick={() => setView('registrations')}
+          >
+            Registrations
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === 'accounts'}
+            className={`tab${view === 'accounts' ? ' tab--active' : ''}`}
+            onClick={() => setView('accounts')}
+          >
+            Accounts
+          </button>
+        </div>
+
+        {view === 'accounts' ? (
+          <Accounts onUnauthorized={() => setAdmin(null)} />
+        ) : (
+          <>
         {stats && (
           <section className="stats" aria-label="Summary">
             <StatCard label="Total registrations" value={stats.total} />
@@ -176,6 +226,23 @@ export default function App() {
             <StatCard label="Awaiting verification" value={stats.pending} tone="warn" />
           </section>
         )}
+
+        <section className="finale-admin" aria-label="Grand Finale membership activation">
+          <div>
+            <h2 className="finale-admin__title">Grand Finale activation</h2>
+            <p className="finale-admin__copy">
+              Records Season 1 completion and activates eligible confirmed Networking memberships for 3 calendar months.
+            </p>
+            {finaleResult && (
+              <p className="finale-admin__result">
+                Activated {finaleResult.activated}; already active {finaleResult.already_active}.
+              </p>
+            )}
+          </div>
+          <button type="button" className="btn btn--verify" onClick={completeFinale} disabled={finaleBusy}>
+            {finaleBusy ? 'Activating…' : 'Complete Grand Finale'}
+          </button>
+        </section>
 
         {stats && stats.by_category.length > 0 && (
           <section className="slots" aria-label="Slots by category">
@@ -231,7 +298,7 @@ export default function App() {
           <input
             type="search"
             className="input"
-            placeholder="Search name, business, email, phone or UTR…"
+            placeholder="Search name, business, email or phone…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             aria-label="Search registrations"
@@ -284,7 +351,6 @@ export default function App() {
                 <th>Operating</th>
                 <th>City</th>
                 <th>Submitted</th>
-                <th>UTR</th>
                 <th>Payment proof</th>
                 <th>Status</th>
                 <th><span className="sr-only">Actions</span></th>
@@ -293,7 +359,7 @@ export default function App() {
             <tbody>
               {rows.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={11} className="empty">
+                  <td colSpan={10} className="empty">
                     No registrations match these filters.
                   </td>
                 </tr>
@@ -318,19 +384,6 @@ export default function App() {
                   <td>{AGES[r.business_age] || r.business_age}</td>
                   <td>{r.city || '—'}</td>
                   <td className="cell__mono">{formatDate(r.created_at)}</td>
-                  <td>
-                    {r.utr ? (
-                      // Selectable in one click: this gets cross-checked against
-                      // a bank statement, so it wants copying, not retyping.
-                      <span className="cell__utr" title="UPI reference for this payment">
-                        {r.utr}
-                      </span>
-                    ) : (
-                      <span className="cell__sub" title="Registered before this field existed">
-                        —
-                      </span>
-                    )}
-                  </td>
                   <td>
                     <button
                       type="button"
@@ -403,6 +456,8 @@ export default function App() {
             Next
           </button>
         </nav>
+          </>
+        )}
       </main>
 
       {proof && <ProofModal registration={proof} onClose={() => setProof(null)} />}

@@ -24,6 +24,9 @@ os.environ["SECRET_KEY"] = "test-secret-key-that-is-definitely-long-enough-12345
 os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{TMP}/test.db".replace("\\", "/")
 os.environ["UPLOAD_DIR"] = f"{TMP}/uploads"
 os.environ["ADMIN_DIST_DIR"] = f"{TMP}/nonexistent"
+# Never let a real key in a developer's backend/.env cause this run to hit
+# the live Resend API — env vars set here win over .env either way.
+os.environ["RESEND_API_KEY"] = ""
 
 from fastapi.testclient import TestClient  # noqa: E402
 
@@ -61,10 +64,6 @@ async def seed() -> None:
     await engine.dispose()
 
 
-# The API rejects a UTR already attached to another registration, and most
-# checks below submit several forms, so each call needs its own reference.
-_utr_seq = itertools.count(100000000000)
-
 
 def form(**over) -> dict:
     data = {
@@ -72,7 +71,6 @@ def form(**over) -> dict:
         "business": "Test Biz",
         "email": "founder@example.com",
         "phone": "9876543210",
-        "utr": str(next(_utr_seq)),
         "category": "01",
         "employees": "1-3",
         "age": "lt6",
@@ -215,58 +213,6 @@ def main() -> int:
             str(avail.get("registration_closes_at")),
         )
 
-        # ---------- UTR (UPI reference) ----------
-        for bad, label in [
-            ("", "empty"),
-            ("12345", "too short"),
-            ("!!!!!!!!!!!!", "punctuation"),
-            ("A" * 30, "too long"),
-        ]:
-            rr = c.post(
-                "/api/registrations",
-                data=form(utr=bad),
-                files={"paymentProof": ("p.png", io.BytesIO(PNG), "image/png")},
-            )
-            check(f"rejects invalid UTR ({label})", rr.status_code == 422, str(rr.status_code))
-
-        # Separators and case are normalised, so one reference can't be spent twice
-        # by re-typing it differently.
-        rr = c.post(
-            "/api/registrations",
-            data=form(utr="4111 2222-3333", email="utrnorm@example.com"),
-            files={"paymentProof": ("p.png", io.BytesIO(PNG), "image/png")},
-        )
-        check("accepts a UTR with spaces and hyphens", rr.status_code == 201, rr.text[:160])
-
-        # Not authenticated yet at this point, so normalisation is verified via a
-        # re-submit: the same reference in a different spelling must be refused.
-        rr = c.post(
-            "/api/registrations",
-            data=form(utr="411122223333", email="utrdupe@example.com"),
-            files={"paymentProof": ("p.png", io.BytesIO(PNG), "image/png")},
-        )
-        check("same UTR re-spelled is rejected as duplicate", rr.status_code == 409, str(rr.status_code))
-        check(
-            "duplicate UTR is reported against the utr field",
-            any(d.get("field") == "utr" for d in (rr.json().get("detail") or [])),
-            rr.text[:200],
-        )
-
-        # A rejected duplicate must not leave its uploaded proof behind.
-        uploads_dir = pathlib.Path(TMP) / "uploads"
-        before_dupe = len(list(uploads_dir.iterdir())) if uploads_dir.is_dir() else 0
-        rr = c.post(
-            "/api/registrations",
-            data=form(utr="411122223333", email="utrdupe2@example.com"),
-            files={"paymentProof": ("p.png", io.BytesIO(PNG), "image/png")},
-        )
-        after_dupe = len(list(uploads_dir.iterdir())) if uploads_dir.is_dir() else 0
-        check("duplicate UTR still rejected", rr.status_code == 409, str(rr.status_code))
-        check(
-            "rejected duplicate leaves no orphaned proof file",
-            after_dupe == before_dupe,
-            f"before={before_dupe} after={after_dupe}",
-        )
 
         # ---------- category capacity enforcement ----------
         CAP_CATEGORY = "08"  # unused by any other check in this file
@@ -413,26 +359,6 @@ def main() -> int:
             "created_at is close to now (not offset by a timezone)",
             abs((datetime.now(timezone.utc) - parsed).total_seconds()) < 300,
             f"{created_raw} vs now {datetime.now(timezone.utc).isoformat()}",
-        )
-
-        # The UTR has to reach the dashboard, and be findable — verifying a
-        # payment usually starts from the reference on the bank statement.
-        check(
-            "admin rows expose the UTR",
-            all("utr" in item for item in body["items"]),
-        )
-        r = c.get("/api/admin/registrations", params={"search": "411122223333"})
-        found = r.json()
-        check(
-            "admin can search by UTR",
-            found["total"] == 1 and found["items"][0]["utr"] == "411122223333",
-            r.text[:200],
-        )
-        r = c.get("/api/admin/registrations", params={"search": "411122223333".lower()})
-        check(
-            "UTR search is case-insensitive",
-            r.json()["total"] == 1,
-            r.text[:200],
         )
 
         r = c.get("/api/admin/stats")

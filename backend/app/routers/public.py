@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
 from ..database import get_db
-from ..models import Registration
+from ..models import Business, EventRegistration, PersonalProfile, Registration, User
 from ..ratelimit import client_ip, enforce
 from ..schemas import (
     VALID_CATEGORIES,
@@ -18,7 +18,8 @@ from ..schemas import (
     CategoryAvailability,
     RegistrationCreate,
 )
-from ..security import hash_ip
+from ..security import get_optional_user, hash_ip
+from ..services import get_or_create_season_1, link_registration_to_account
 from ..storage import delete_proof, save_payment_proof
 
 router = APIRouter(prefix="/api", tags=["public"])
@@ -40,8 +41,8 @@ def _conflict(field: str, message: str) -> HTTPException:
     """A 409 carrying the same {field, message} shape the 422 path uses.
 
     Lets the SPA show a conflict against the input it belongs to — a full
-    category on the category select, a reused UTR on the UTR box — instead of
-    a generic banner that leaves the user hunting for what to change.
+    category on the category select — instead of a generic banner that leaves
+    the user hunting for what to change.
     """
     return HTTPException(
         status_code=status.HTTP_409_CONFLICT,
@@ -49,22 +50,7 @@ def _conflict(field: str, message: str) -> HTTPException:
     )
 
 
-_UTR_TAKEN_MESSAGE = (
-    "This UTR is already on another registration. Please check the reference "
-    "number from your payment app, or contact us if you think this is a mistake."
-)
 
-
-async def _utr_taken(db: AsyncSession, utr: str, exclude_id: str | None = None) -> bool:
-    """Is this UPI reference already attached to a registration?
-
-    Compares the normalised form (schemas.RegistrationCreate uppercases and
-    strips separators), so "4029 1234-5678" cannot be re-used as "402912345678".
-    """
-    query = select(func.count()).select_from(Registration).where(Registration.utr == utr)
-    if exclude_id is not None:
-        query = query.where(Registration.id != exclude_id)
-    return bool(await db.scalar(query))
 
 
 @router.post("/registrations", status_code=status.HTTP_201_CREATED)
@@ -78,10 +64,10 @@ async def create_registration(
     employees: str = Form(...),
     business_age: str = Form(..., alias="age"),
     city: str | None = Form(default=None),
-    utr: str = Form(...),
     agreed_terms: bool = Form(..., alias="agree"),
     media_consent: bool = Form(..., alias="mediaConsent"),
     payment_proof: UploadFile = File(..., alias="paymentProof"),
+    user: User | None = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     ip = client_ip(request)
@@ -103,20 +89,58 @@ async def create_registration(
             "already made a payment.",
         )
 
-    try:
-        data = RegistrationCreate(
-            full_name=full_name,
-            business_name=business_name,
-            email=email,
-            phone=phone,
-            category=category,
-            employees=employees,
-            business_age=business_age,
-            city=city,
-            utr=utr,
-            agreed_terms=agreed_terms,
-            media_consent=media_consent,
+    # A logged-in visitor's identity/business fields come from their saved
+    # profile, not from the submitted form — the SPA sends them pre-filled
+    # for display, but they are never trusted, so there is no path where a
+    # logged-in submission can end up attached to the wrong business. Only
+    # the two consent checkboxes are taken from what they actually ticked.
+    event = None
+    business = None
+    if user is not None:
+        event = await get_or_create_season_1(db)
+        profile = await db.get(PersonalProfile, user.id)
+        if profile is None:
+            raise _conflict("form", "Complete your personal profile before registering.")
+        business = await db.scalar(
+            select(Business).where(Business.user_id == user.id).order_by(Business.created_at.asc()).limit(1)
         )
+        if business is None:
+            raise _conflict("form", "Complete your business profile before registering.")
+        existing = await db.scalar(
+            select(EventRegistration).where(
+                EventRegistration.user_id == user.id, EventRegistration.event_id == event.id
+            )
+        )
+        if existing is not None:
+            raise _conflict("form", "You already have a Season 1 registration.")
+
+    try:
+        if user is not None:
+            data = RegistrationCreate(
+                full_name=profile.full_name,
+                business_name=business.business_name,
+                email=user.email,
+                phone=profile.phone,
+                category=business.category,
+                employees=business.employee_band,
+                business_age=business.business_age,
+                city=business.city,
+                agreed_terms=agreed_terms,
+                media_consent=media_consent,
+            )
+        else:
+            data = RegistrationCreate(
+                full_name=full_name,
+                business_name=business_name,
+                email=email,
+                phone=phone,
+                category=category,
+                employees=employees,
+                business_age=business_age,
+                city=city,
+                agreed_terms=agreed_terms,
+                media_consent=media_consent,
+            )
     except ValidationError as exc:
         # Surface field-level messages the SPA can map back onto inputs.
         raise HTTPException(
@@ -138,13 +162,7 @@ async def create_registration(
             "category", f"Category {data.category} is full. Please choose another category."
         )
 
-    # A UTR identifies exactly one payment, so if it is already attached to
-    # another registration it is not evidence for this one — either a repeat
-    # submission or a reference copied from someone else's payment. Checked
-    # before the upload so a duplicate fails fast, and again after the insert
-    # below so it cannot slip through between the two.
-    if await _utr_taken(db, data.utr):
-        raise _conflict("utr", _UTR_TAKEN_MESSAGE)
+
 
     filename, mime, size = await save_payment_proof(payment_proof)
 
@@ -157,13 +175,14 @@ async def create_registration(
         employees=data.employees,
         business_age=data.business_age,
         city=data.city or None,
-        utr=data.utr,
         proof_filename=filename,
         proof_mime=mime,
         proof_bytes=size,
         agreed_terms=data.agreed_terms,
         media_consent=data.media_consent,
         submitter_ip_hash=hash_ip(ip),
+        user_id=user.id if user is not None else None,
+        business_id=business.id if business is not None else None,
     )
     db.add(registration)
 
@@ -198,12 +217,10 @@ async def create_registration(
             f"Category {data.category} just filled up. Please choose another category.",
         )
 
-    # Same re-check for the UTR, inside the same transaction, excluding the row
-    # just flushed. Covers a duplicate that landed after the fast-fail above.
-    if await _utr_taken(db, data.utr, exclude_id=registration.id):
-        await db.rollback()
-        delete_proof(filename)
-        raise _conflict("utr", _UTR_TAKEN_MESSAGE)
+
+
+    if user is not None:
+        await link_registration_to_account(db, event=event, user=user, business=business, legacy=registration)
 
     await db.commit()
 

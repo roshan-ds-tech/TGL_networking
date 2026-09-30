@@ -1,4 +1,8 @@
-export default function Footer() {
+import { moduleClickHandler } from '../lib/moduleNav';
+
+export default function Footer({ onOpenModule, authUser, authChecked }) {
+  const openModule = moduleClickHandler({ authUser, authChecked, onOpenModule });
+
   return (
     <footer style={{ position: 'relative', overflow: 'hidden', background: 'linear-gradient(180deg, #22103A 0%, #1A0B2E 100%)', color: '#F6EEDF', padding: '78px 28px 34px' }}>
       <span aria-hidden="true" style={{ position: 'absolute', top: '0', left: '0', right: '0', height: '1px', background: 'linear-gradient(90deg, rgba(224,181,88,0), rgba(224,181,88,0.7), rgba(224,181,88,0))' }}></span>
@@ -21,32 +25,68 @@ export default function Footer() {
           <div style={{ flex: '1 1 180px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
               <p style={{ margin: '0', fontSize: '10.5px', letterSpacing: '.24em', textTransform: 'uppercase', fontWeight: '700', color: '#E0B558' }}>
-                Explore
+                Ecosystem
               </p>
               <span aria-hidden="true" style={{ flex: '1', height: '1px', background: 'linear-gradient(90deg, rgba(224,181,88,0.5), rgba(224,181,88,0))' }}></span>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '13px', fontSize: '15px' }}>
-              <a href="#about" style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'rgba(246,238,223,0.72)', textDecoration: 'none', transition: 'color .22s ease, transform .22s ease' }} className="hv-86">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '11px', fontSize: '14.5px' }}>
+              <a
+                href="#vertex"
+                onClick={openModule('vertex')}
+                style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'rgba(246,238,223,0.72)', textDecoration: 'none', transition: 'color .22s ease, transform .22s ease' }}
+                className="hv-86"
+              >
                 <span aria-hidden="true" style={{ width: '4px', height: '4px', background: 'rgba(224,181,88,0.7)', transform: 'rotate(45deg)', flexShrink: '0' }}></span>
-                About TGL
+                Vertex (B2B Ecosystem)
               </a>
-              <a href="#why" style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'rgba(246,238,223,0.72)', textDecoration: 'none', transition: 'color .22s ease, transform .22s ease' }} className="hv-87">
+              <a
+                href="#networking"
+                onClick={openModule('networking')}
+                style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'rgba(246,238,223,0.72)', textDecoration: 'none', transition: 'color .22s ease, transform .22s ease' }}
+                className="hv-87"
+              >
                 <span aria-hidden="true" style={{ width: '4px', height: '4px', background: 'rgba(224,181,88,0.7)', transform: 'rotate(45deg)', flexShrink: '0' }}></span>
-                Why TGL
+                Networking Community
               </a>
-              <a href="#categories" style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'rgba(246,238,223,0.72)', textDecoration: 'none', transition: 'color .22s ease, transform .22s ease' }} className="hv-88">
+              <a
+                href="#events"
+                style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'rgba(246,238,223,0.72)', textDecoration: 'none', transition: 'color .22s ease, transform .22s ease' }}
+                className="hv-88"
+              >
                 <span aria-hidden="true" style={{ width: '4px', height: '4px', background: 'rgba(224,181,88,0.7)', transform: 'rotate(45deg)', flexShrink: '0' }}></span>
-                Categories
+                Events (Season 1)
               </a>
-              <a href="#journey" style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'rgba(246,238,223,0.72)', textDecoration: 'none', transition: 'color .22s ease, transform .22s ease' }} className="hv-89">
+              <a
+                href="#awards"
+                onClick={openModule('awards')}
+                style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'rgba(246,238,223,0.72)', textDecoration: 'none', transition: 'color .22s ease, transform .22s ease' }}
+                className="hv-89"
+              >
                 <span aria-hidden="true" style={{ width: '4px', height: '4px', background: 'rgba(224,181,88,0.7)', transform: 'rotate(45deg)', flexShrink: '0' }}></span>
-                Participant Journey
+                Awards
               </a>
-              <a href="#finale" style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'rgba(246,238,223,0.72)', textDecoration: 'none', transition: 'color .22s ease, transform .22s ease' }} className="hv-90">
+              <a
+                href="#podcasts"
+                onClick={openModule('podcasts')}
+                style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'rgba(246,238,223,0.72)', textDecoration: 'none', transition: 'color .22s ease, transform .22s ease' }}
+                className="hv-90"
+              >
+                <span aria-hidden="true" style={{ width: '4px', height: '4px', background: 'rgba(224,181,88,0.7)', transform: 'rotate(45deg)', flexShrink: '0' }}></span>
+                Podcasts & Stories
+              </a>
+              <a
+                href="#finale"
+                style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'rgba(246,238,223,0.72)', textDecoration: 'none', transition: 'color .22s ease, transform .22s ease' }}
+                className="hv-91"
+              >
                 <span aria-hidden="true" style={{ width: '4px', height: '4px', background: 'rgba(224,181,88,0.7)', transform: 'rotate(45deg)', flexShrink: '0' }}></span>
                 Grand Finale
               </a>
-              <a href="#faq" style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'rgba(246,238,223,0.72)', textDecoration: 'none', transition: 'color .22s ease, transform .22s ease' }} className="hv-91">
+              <a
+                href="#faq"
+                style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'rgba(246,238,223,0.72)', textDecoration: 'none', transition: 'color .22s ease, transform .22s ease' }}
+                className="hv-91"
+              >
                 <span aria-hidden="true" style={{ width: '4px', height: '4px', background: 'rgba(224,181,88,0.7)', transform: 'rotate(45deg)', flexShrink: '0' }}></span>
                 FAQ
               </a>

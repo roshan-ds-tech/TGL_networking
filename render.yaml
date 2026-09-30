@@ -24,7 +24,11 @@ services:
       - key: PUBLIC_ORIGIN
         value: https://CHANGE-ME.example.com
       - key: SESSION_HOURS
-        value: "12"
+        value: "24"
+      - key: RESEND_API_KEY
+        sync: false # set manually in the Render dashboard — never committed
+      - key: EMAIL_FROM
+        value: "TGL <tgl@skykeen.in>"
     disk:
       name: tgl-data
       mountPath: /app/var

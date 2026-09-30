@@ -57,12 +57,20 @@ export const api = {
   logout: () => request('/api/auth/logout', { method: 'POST' }),
   me: () => request('/api/auth/me'),
   stats: () => request('/api/admin/stats'),
+  completeSeason1: () => request('/api/admin/events/season-1/complete', { method: 'POST' }),
   registrations: (params, signal) => {
     const qs = new URLSearchParams();
     Object.entries(params).forEach(([k, v]) => {
       if (v !== '' && v !== null && v !== undefined) qs.set(k, v);
     });
     return request(`/api/admin/registrations?${qs}`, { signal });
+  },
+  customers: (params, signal) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== '' && v !== null && v !== undefined) qs.set(k, v);
+    });
+    return request(`/api/admin/customers?${qs}`, { signal });
   },
   setVerified: (id, verified) =>
     request(`/api/admin/registrations/${encodeURIComponent(id)}/verify`, {

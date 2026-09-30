@@ -1,13 +1,27 @@
 import { StrictMode } from 'react'
 import { createRoot, hydrateRoot } from 'react-dom/client'
 import './index.css'
+import { useState, useEffect } from 'react'
 import App from './App.jsx'
+import ProductApp from './ProductApp.jsx'
 
 const container = document.getElementById('root')
 
+function Router() {
+  const [path, setPath] = useState(window.location.pathname)
+  useEffect(() => {
+    const onPop = () => setPath(window.location.pathname)
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
+  
+  const isProductApp = ['/login', '/signup', '/verify-email', '/forgot-password', '/reset-password'].includes(path) || path.startsWith('/app') || path.startsWith('/onboarding')
+  return isProductApp ? <ProductApp /> : <App />
+}
+
 const tree = (
   <StrictMode>
-    <App />
+    <Router />
   </StrictMode>
 )
 

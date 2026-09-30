@@ -38,10 +38,7 @@ VALID_AGES = {"lt6", "6-12", "1-3y", "3y+"}
 
 _PHONE_RE = re.compile(r"^\d{10}$")
 
-# A UPI UTR is 12 digits, but the same field is used to paste references from
-# bank apps (IMPS/NEFT), which run longer and can include letters. Accepting
-# 12-22 alphanumerics covers both without letting obvious junk through.
-_UTR_RE = re.compile(r"^[A-Z0-9]{12,22}$")
+
 
 
 class LoginRequest(BaseModel):
@@ -76,7 +73,6 @@ class RegistrationCreate(BaseModel):
     employees: str
     business_age: str
     city: str | None = Field(default=None, max_length=120)
-    utr: str = Field(max_length=40)
     agreed_terms: bool
     media_consent: bool
 
@@ -101,19 +97,7 @@ class RegistrationCreate(BaseModel):
             raise ValueError("Enter a valid 10-digit mobile number.")
         return digits
 
-    @field_validator("utr")
-    @classmethod
-    def _utr(cls, v: str) -> str:
-        # People copy this straight out of a payment app, so spaces and hyphens
-        # come along with it. Normalise before validating, and store the
-        # normalised form so two spellings of one reference can't both be used.
-        cleaned = re.sub(r"[\s-]", "", v or "").upper()
-        if not _UTR_RE.match(cleaned):
-            raise ValueError(
-                "Enter the UTR / UPI reference number from your payment app "
-                "(usually 12 digits)."
-            )
-        return cleaned
+
 
     @field_validator("category")
     @classmethod
@@ -160,8 +144,6 @@ class RegistrationOut(BaseModel):
     employees: str
     business_age: str
     city: str | None
-    # None for registrations taken before the field existed.
-    utr: str | None = None
     proof_mime: str
     proof_bytes: int
     agreed_terms: bool
@@ -184,6 +166,39 @@ class RegistrationPage(BaseModel):
 
 class VerifyRequest(BaseModel):
     verified: bool
+
+
+class CustomerListItem(BaseModel):
+    """A TGL product-app account — separate from Season 1 event registration.
+
+    Signing up, verifying email, and completing a profile does not register
+    anyone for Season 1 or take a payment; this is purely "does this person
+    have an account."
+    """
+
+    id: str
+    email: str
+    email_verified_at: UtcDatetime | None
+    is_active: bool
+    created_at: UtcDatetime
+    full_name: str | None = None
+    business_name: str | None = None
+    business_id: str | None = None
+    verification_status: str | None = None
+    personal_profile_complete: bool
+    business_profile_complete: bool
+
+
+class BusinessVerificationUpdate(BaseModel):
+    status: str
+
+
+class CustomerPage(BaseModel):
+    items: list[CustomerListItem]
+    total: int
+    page: int
+    page_size: int
+    pages: int
 
 
 class CategoryCount(BaseModel):
@@ -226,3 +241,270 @@ class AvailabilityOut(BaseModel):
     # than each holding its own copy of the date and drifting apart.
     registration_closes_at: UtcDatetime
     registration_open: bool
+
+
+class CustomerSignup(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=256)
+
+
+class CustomerLogin(BaseModel):
+    email: str = Field(min_length=3, max_length=255)
+    password: str = Field(min_length=1, max_length=256)
+
+
+class CustomerOut(BaseModel):
+    id: str
+    email: EmailStr
+    email_verified_at: UtcDatetime | None
+    is_active: bool
+
+    model_config = {"from_attributes": True}
+
+
+class AuthOut(BaseModel):
+    user: CustomerOut
+    dev_verification_token: str | None = None
+
+
+class OtpRequestIn(BaseModel):
+    email: EmailStr
+
+
+class OtpVerifyIn(BaseModel):
+    email: EmailStr
+    code: str = Field(min_length=6, max_length=6)
+
+
+class OtpRequestOut(BaseModel):
+    dev_otp: str | None = None
+
+
+class ForgotPasswordIn(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordIn(BaseModel):
+    token: str = Field(min_length=10, max_length=256)
+    new_password: str = Field(min_length=8, max_length=256)
+
+
+class ConnectionCreate(BaseModel):
+    target_user_id: str
+    note: str | None = Field(default=None, max_length=2000)
+
+
+class ConnectionOut(BaseModel):
+    id: str
+    requester_user_id: str
+    target_user_id: str
+    note: str | None
+    created_at: UtcDatetime
+
+    model_config = {"from_attributes": True}
+
+
+class ReferralRequestCreate(BaseModel):
+    target_user_id: str
+    note: str | None = Field(default=None, max_length=2000)
+
+
+class PersonalProfileIn(BaseModel):
+    full_name: str = Field(min_length=2, max_length=120)
+    phone: str
+    city: str = Field(min_length=2, max_length=120)
+    role: str = Field(min_length=2, max_length=120)
+    short_bio: str = Field(min_length=10, max_length=1000)
+    profile_photo_url: str | None = Field(default=None, max_length=500)
+
+    @field_validator("phone")
+    @classmethod
+    def _phone(cls, v: str) -> str:
+        return RegistrationCreate._phone(v)
+
+
+class PersonalProfileOut(PersonalProfileIn):
+    user_id: str
+    completed_at: UtcDatetime
+
+    model_config = {"from_attributes": True}
+
+
+class BusinessIn(BaseModel):
+    business_name: str = Field(min_length=2, max_length=160)
+    category: str
+    description: str = Field(min_length=10, max_length=2000)
+    city: str = Field(min_length=2, max_length=120)
+    employee_band: str
+    business_age: str
+    website: str | None = Field(default=None, max_length=300)
+    instagram: str | None = Field(default=None, max_length=300)
+    linkedin: str | None = Field(default=None, max_length=300)
+    logo_url: str | None = Field(default=None, max_length=500)
+    founder_story: str | None = Field(default=None, max_length=2000)
+    business_stage: str = Field(min_length=2, max_length=80)
+
+    @field_validator("category")
+    @classmethod
+    def _category(cls, v: str) -> str:
+        return RegistrationCreate._category(v)
+
+    @field_validator("employee_band")
+    @classmethod
+    def _employees(cls, v: str) -> str:
+        return RegistrationCreate._employees(v)
+
+    @field_validator("business_age")
+    @classmethod
+    def _age(cls, v: str) -> str:
+        return RegistrationCreate._age(v)
+
+
+class BusinessOut(BusinessIn):
+    id: str
+    user_id: str
+    tgl_verified: bool
+    tgl_verified_at: UtcDatetime | None
+    verification_status: str
+    verification_submitted_at: UtcDatetime | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class NetworkingProfileOut(BaseModel):
+    trust_score: int
+    growth_points: int
+    open_to_mentoring: bool
+    seeking_mentor: bool
+
+    model_config = {"from_attributes": True}
+
+
+class MembershipOut(BaseModel):
+    id: str | None = None
+    status: str | None = None
+    membership_type: str = "NETWORKING"
+    pathway: str | None = None
+    starts_at: UtcDatetime | None = None
+    expires_at: UtcDatetime | None = None
+
+
+class EventOut(BaseModel):
+    id: str
+    slug: str
+    name: str
+    grand_finale_at: UtcDatetime | None
+    completed_at: UtcDatetime | None
+    registration_open: bool
+    registration_closes_at: UtcDatetime
+    membership_duration_months: int
+
+    model_config = {"from_attributes": True}
+
+
+class MyStatusOut(BaseModel):
+    user: CustomerOut
+    personal_profile: PersonalProfileOut | None = None
+    business: BusinessOut | None = None
+    event: EventOut
+    event_registration: dict | None = None
+    membership: MembershipOut | None = None
+    networking_profile: NetworkingProfileOut | None = None
+    unread_notifications: int = 0
+
+
+class MemberListItem(BaseModel):
+    member_id: str
+    user_id: str
+    founder_name: str
+    business_name: str
+    category: str
+    city: str | None
+    headline: str | None
+    tgl_verified: bool
+    open_to_mentoring: bool
+    trust_score: int
+
+
+class MemberDetail(MemberListItem):
+    business_description: str | None
+    founder_story: str | None
+    interests: str | None
+    seeking_mentor: bool
+    trust_score: int
+    growth_points: int
+    referrals_given: int
+    referrals_received: int
+
+
+class ReferralCreate(BaseModel):
+    receiver_user_id: str
+    business_need: str = Field(min_length=4, max_length=240)
+    note: str | None = Field(default=None, max_length=2000)
+
+
+class ReferralTransition(BaseModel):
+    status: str
+
+
+class ReferralOut(BaseModel):
+    id: str
+    giver_user_id: str
+    receiver_user_id: str
+    giver_name: str | None = None
+    giver_business: str | None = None
+    receiver_name: str | None = None
+    receiver_business: str | None = None
+    business_need: str
+    note: str | None
+    status: str
+    accepted_at: UtcDatetime | None = None
+    meeting_done_at: UtcDatetime | None = None
+    business_closed_at: UtcDatetime | None = None
+    revenue_generated_at: UtcDatetime | None = None
+    cancelled_at: UtcDatetime | None = None
+    declined_at: UtcDatetime | None = None
+    created_at: UtcDatetime
+    updated_at: UtcDatetime
+
+    model_config = {"from_attributes": True}
+
+
+class BusinessNeedCreate(BaseModel):
+    title: str = Field(min_length=4, max_length=200)
+    category: str
+    description: str | None = Field(default=None, max_length=2000)
+
+
+class BusinessNeedOut(BaseModel):
+    id: str
+    title: str
+    category: str
+    description: str | None
+    status: str
+    poster_user_id: str
+    poster_name: str
+    business_name: str
+    city: str | None
+    created_at: UtcDatetime
+
+    model_config = {"from_attributes": True}
+
+
+class NotificationOut(BaseModel):
+    id: str
+    type: str
+    title: str
+    body: str
+    related_entity_type: str | None
+    related_entity_id: str | None
+    read_at: UtcDatetime | None
+    created_at: UtcDatetime
+
+    model_config = {"from_attributes": True}
+
+
+class FinaleCompleteOut(BaseModel):
+    event: EventOut
+    activated: int
+    already_active: int

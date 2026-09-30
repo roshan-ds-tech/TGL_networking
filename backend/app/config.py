@@ -46,7 +46,10 @@ class Settings(BaseSettings):
     # Built admin SPA; served same-origin by this app so cookies stay SameSite=Strict.
     admin_dist_dir: str = "./static/admin"
 
-    session_hours: int = 12
+    # Must be >= the 24h email-verification token lifetime (see services.py /
+    # customer.py register()) — otherwise a user's session can expire before
+    # their still-valid verification token, leaving them stuck.
+    session_hours: int = 24
     max_upload_bytes: int = 2 * 1024 * 1024  # 2 MB — caps worst-case disk use on free-tier hosting
 
     # Season capacity. Drives the public "x of 40 slots filled" counters and the
@@ -66,9 +69,24 @@ class Settings(BaseSettings):
     login_window_seconds: int = 900  # 15 min
     register_max_per_hour: int = 10
 
+    # Resend (https://resend.com) — free-tier transactional email for signup
+    # verification codes. Empty means "don't send" (dev falls back to
+    # returning the code in the API response; production just has no way to
+    # verify).
+    resend_api_key: str = ""
+    email_from: str = "TGL <tgl@skykeen.in>"
+
     @property
     def is_production(self) -> bool:
         return self.environment.lower() in {"production", "prod"}
+
+    @property
+    def expose_dev_codes(self) -> bool:
+        """Return signup/login codes in the API response (and so let the SPA
+        pre-fill them) only when they cannot be emailed: local dev without a
+        RESEND_API_KEY. Once email is configured the code must come from the
+        inbox, even in development — otherwise verification proves nothing."""
+        return not self.is_production and not self.resend_api_key
 
     @property
     def registration_open(self) -> bool:

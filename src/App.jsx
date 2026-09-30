@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import IconSprite from './components/IconSprite';
 import UrgencyPopup from './components/UrgencyPopup';
-import Header from './sections/Header';
+import ModuleModal from './components/ModuleModal';
+import SiteHeader from './components/SiteHeader';
 import Hero from './sections/Hero';
 import MarqueeBand from './sections/MarqueeBand';
 import About from './sections/About';
@@ -19,6 +20,7 @@ import Sponsors from './sections/Sponsors';
 import Footer from './sections/Footer';
 import { submitRegistration } from './services/registrationService';
 import useAvailability from './hooks/useAvailability';
+import { api } from './lib/customerApi';
 
 const REGISTRATION_CLOSE = new Date('2026-11-20T23:59:59');
 const CATEGORY_TICKER_ITEMS = [
@@ -49,59 +51,64 @@ function normalisePhone(raw) {
   return digits;
 }
 
-function validate(fd, availability) {
+function validate(fd, availability, authed) {
   const errors = {};
   const name = (fd.get('name') || '').trim();
-  const business = (fd.get('business') || '').trim();
-  const email = (fd.get('email') || '').trim();
-  const phone = (fd.get('phone') || '').trim();
-  // Length floors mirror the server's, so a one-character entry is caught here
-  // instead of coming back as a 422 after the upload has already been sent.
-  if (!name) errors.name = 'Please enter your full name.';
-  else if (name.length < 2) errors.name = 'Please enter your full name.';
-  if (!business) errors.business = 'Please enter your business name.';
-  else if (business.length < 2) errors.business = 'Please enter your business name.';
-  if (!email) errors.email = 'Please enter an email address.';
-  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) errors.email = 'Enter a valid email address.';
-  if (!phone) errors.phone = 'Please enter a phone number.';
-  else if (normalisePhone(phone).length !== 10) errors.phone = 'Enter a valid 10-digit mobile number.';
-  const category = fd.get('category');
-  if (!category) errors.category = 'Select a category.';
-  else {
-    // The dropdown already disables full categories, but its data is only
-    // fetched once on page load — if a category filled up since then, catch
-    // it here too rather than letting the upload happen for nothing. The
-    // server enforces this for real; this is purely a faster "no" for the user.
-    const stat = availability?.categories?.find((c) => c.category === category);
-    if (stat && stat.filled >= stat.capacity) {
-      errors.category = 'This category just filled up. Please choose another category.';
+  // Identity/business fields are hidden inputs pre-filled from the account's
+  // saved (already-validated) profile when logged in — and the server
+  // ignores whatever is submitted there anyway for an authenticated
+  // request, re-deriving from the profile server-side. Nothing here can be
+  // wrong, so skip re-validating it.
+  if (!authed) {
+    const business = (fd.get('business') || '').trim();
+    const email = (fd.get('email') || '').trim();
+    const phone = (fd.get('phone') || '').trim();
+    // Length floors mirror the server's, so a one-character entry is caught here
+    // instead of coming back as a 422 after the upload has already been sent.
+    if (!name) errors.name = 'Please enter your full name.';
+    else if (name.length < 2) errors.name = 'Please enter your full name.';
+    if (!business) errors.business = 'Please enter your business name.';
+    else if (business.length < 2) errors.business = 'Please enter your business name.';
+    if (!email) errors.email = 'Please enter an email address.';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) errors.email = 'Enter a valid email address.';
+    if (!phone) errors.phone = 'Please enter a phone number.';
+    else if (normalisePhone(phone).length !== 10) errors.phone = 'Enter a valid 10-digit mobile number.';
+    const category = fd.get('category');
+    if (!category) errors.category = 'Select a category.';
+    else {
+      // The dropdown already disables full categories, but its data is only
+      // fetched once on page load — if a category filled up since then, catch
+      // it here too rather than letting the upload happen for nothing. The
+      // server enforces this for real; this is purely a faster "no" for the user.
+      const stat = availability?.categories?.find((c) => c.category === category);
+      if (stat && stat.filled >= stat.capacity) {
+        errors.category = 'This category just filled up. Please choose another category.';
+      }
     }
+    const employees = fd.get('employees');
+    if (!employees) errors.employees = 'Select your team size.';
+    // Season 1 eligibility caps team size at 10. Say so here rather than letting
+    // the server reject it, and don't quietly drop the option — a business with
+    // 12 staff should learn it isn't eligible, not be nudged into picking "7-10".
+    else if (employees === '10+') {
+      errors.employees = 'TGL Season 1 is open to businesses with 10 or fewer employees.';
+    }
+    if (!fd.get('age')) errors.age = 'Select how long you have been operating.';
   }
-  const employees = fd.get('employees');
-  if (!employees) errors.employees = 'Select your team size.';
-  // Season 1 eligibility caps team size at 10. Say so here rather than letting
-  // the server reject it, and don't quietly drop the option — a business with
-  // 12 staff should learn it isn't eligible, not be nudged into picking "7-10".
-  else if (employees === '10+') {
-    errors.employees = 'TGL Season 1 is open to businesses with 10 or fewer employees.';
-  }
-  if (!fd.get('age')) errors.age = 'Select how long you have been operating.';
   const paymentProof = fd.get('paymentProof');
   if (!paymentProof || !paymentProof.size) errors.paymentProof = 'Please upload a screenshot of your payment.';
-  // Mirrors the server's rule: separators stripped, then 12-22 alphanumerics.
-  // A UPI UTR is 12 digits; the wider range also accepts bank (IMPS/NEFT) refs.
-  const utr = (fd.get('utr') || '').trim();
-  if (!utr) errors.utr = 'Please enter the UTR / UPI reference number for your payment.';
-  else if (!/^[A-Za-z0-9]{12,22}$/.test(utr.replace(/[\s-]/g, ''))) {
-    errors.utr = 'Enter the UTR / UPI reference number from your payment app (usually 12 digits).';
-  }
+
   if (!fd.get('agree')) errors.agree = 'Please acknowledge the selection and refund terms.';
   if (!fd.get('mediaConsent')) errors.mediaConsent = 'Please grant permission to use your footage.';
   return { errors, name };
 }
 
 export default function App() {
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [activeModule, setActiveModule] = useState(null);
+  const [authStatus, setAuthStatus] = useState(null);
+  // False until the session check below settles, so nav clicks made before
+  // then aren't mistaken for "logged out".
+  const [authChecked, setAuthChecked] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submittedName, setSubmittedName] = useState('');
@@ -110,6 +117,21 @@ export default function App() {
 
   // One request per page load, shared by the Categories grid and the popup.
   const [availability, refreshAvailability] = useAvailability();
+
+  // The product app and this marketing site share one origin and one
+  // customer session cookie, so a visitor who is already logged in should
+  // see that reflected here too — instead of "Create Account" and nav links
+  // that dump them into an OTP wall for an account they already verified.
+  // The full status (not just identity) is fetched so the registration form
+  // below can pre-fill and lock itself from the account's saved profile.
+  useEffect(() => {
+    let cancelled = false;
+    api.status()
+      .then((s) => { if (!cancelled) setAuthStatus(s); })
+      .catch(() => {}) // not logged in — keep the anonymous UI
+      .finally(() => { if (!cancelled) setAuthChecked(true); });
+    return () => { cancelled = true; };
+  }, []);
 
   /* The deadline the whole page counts down to. The server owns it (it is what
      actually refuses late submissions), so use its value once the counters
@@ -256,8 +278,6 @@ export default function App() {
     };
   }, []);
 
-  const toggleMenu = () => setMenuOpen((v) => !v);
-  const closeMenu = () => setMenuOpen(false);
 
   const toggleFaq = (n) => setFaq((s) => ({ ...s, [n]: !s[n] }));
 
@@ -270,7 +290,7 @@ export default function App() {
   const onSubmit = async (ev) => {
     ev.preventDefault();
     const fd = new FormData(ev.target);
-    const { errors: fieldErrors, name } = validate(fd, availability);
+    const { errors: fieldErrors, name } = validate(fd, availability, !!authStatus?.user);
     if (Object.keys(fieldErrors).length) {
       setErrors(fieldErrors);
       return;
@@ -319,7 +339,7 @@ export default function App() {
   return (
     <div className="tgl-shell" style={{ minHeight: '100vh', background: 'linear-gradient(180deg, #F6EEDF 0%, #FBF5E9 12%, #F7F0E2 34%, #FBF5E9 58%, #F6EEDF 78%, #F4EBDC 100%)' }}>
       <IconSprite />
-      <Header headerRef={headerRef} progressRef={progressRef} menuOpen={menuOpen} toggleMenu={toggleMenu} closeMenu={closeMenu} />
+      <SiteHeader path="/" headerRef={headerRef} progressRef={progressRef} onOpenModule={setActiveModule} authUser={authStatus?.user} authChecked={authChecked} unread={authStatus?.unread_notifications || 0} />
       {/* Landmark only — <main> is display:block by default, so this adds a
           semantic wrapper without introducing any box that affects layout.
           Header stays outside it so its position:sticky still resolves
@@ -338,6 +358,7 @@ export default function App() {
       <Register
         formRef={formRef}
         onSubmit={onSubmit}
+        authStatus={authStatus}
         showForm={!submitted}
         registrationClosed={registrationClosed}
         submitted={submitted}
@@ -353,7 +374,6 @@ export default function App() {
         errEmployees={errors.employees || ''}
         errAge={errors.age || ''}
         errPaymentProof={errors.paymentProof || ''}
-        errUtr={errors.utr || ''}
         errAgree={errors.agree || ''}
         errMediaConsent={errors.mediaConsent || ''}
         errForm={errors.form || ''}
@@ -363,8 +383,11 @@ export default function App() {
       <Sponsors />
         <Contact />
       </main>
-      <Footer />
+      <Footer onOpenModule={setActiveModule} authUser={authStatus?.user} authChecked={authChecked} />
       <UrgencyPopup availability={availability} deadline={new Date(closesAtMs)} />
+      {activeModule && (
+        <ModuleModal moduleKey={activeModule} onClose={() => setActiveModule(null)} />
+      )}
     </div>
   );
 }

@@ -20,6 +20,9 @@ os.environ["SECRET_KEY"] = "test-secret-key-that-is-definitely-long-enough-12345
 os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{TMP}/test.db".replace("\\", "/")
 os.environ["UPLOAD_DIR"] = f"{TMP}/uploads"
 os.environ["ADMIN_DIST_DIR"] = f"{TMP}/nonexistent"
+# Never let a real key in a developer's backend/.env cause this run to hit
+# the live Resend API — env vars set here win over .env either way.
+os.environ["RESEND_API_KEY"] = ""
 
 from werkzeug.test import Client  # noqa: E402
 
@@ -174,7 +177,7 @@ def main() -> int:
     fields = {
         "name": "Test Founder", "business": "Test Biz", "email": "founder@example.com",
         "phone": "9876543210", "category": "01", "employees": "1-3", "age": "lt6",
-        "city": "Bengaluru", "utr": "402912345678", "agree": "true", "mediaConsent": "true",
+        "city": "Bengaluru", "agree": "true", "mediaConsent": "true",
     }
     body, content_type = multipart_body(fields, "proof.png", PNG)
     r = client.post("/api/registrations", data=body, content_type=content_type)

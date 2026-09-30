@@ -27,10 +27,12 @@ from sqlalchemy import select
 
 from .config import settings
 from .database import get_db
-from .models import Admin
+from .models import Admin, TGLMembership, User, utcnow
 
 SESSION_COOKIE = "tgl_session"
 CSRF_COOKIE = "tgl_csrf"
+CUSTOMER_SESSION_COOKIE = "tgl_customer_session"
+CUSTOMER_CSRF_COOKIE = "tgl_customer_csrf"
 CSRF_HEADER = "x-csrf-token"
 ALGORITHM = "HS256"
 
@@ -77,6 +79,19 @@ def create_session_token(admin: Admin) -> str:
     return jwt.encode(payload, settings.secret_key, algorithm=ALGORITHM)
 
 
+def create_customer_session_token(user: User) -> str:
+    now = datetime.now(timezone.utc)
+    payload = {
+        "sub": user.id,
+        "typ": "customer",
+        "ver": user.token_version,
+        "iat": int(now.timestamp()),
+        "exp": int((now + timedelta(hours=settings.session_hours)).timestamp()),
+        "jti": secrets.token_urlsafe(16),
+    }
+    return jwt.encode(payload, settings.secret_key, algorithm=ALGORITHM)
+
+
 def new_csrf_token() -> str:
     return secrets.token_urlsafe(32)
 
@@ -114,6 +129,103 @@ async def get_current_admin(
     return admin
 
 
+async def get_current_user(
+    session: str | None = Cookie(default=None, alias=CUSTOMER_SESSION_COOKIE),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    if not session:
+        raise _unauthorised()
+    try:
+        payload = jwt.decode(
+            session,
+            settings.secret_key,
+            algorithms=[ALGORITHM],
+            options={"require": ["exp", "iat", "sub"]},
+        )
+    except jwt.PyJWTError:
+        raise _unauthorised()
+
+    if payload.get("typ") != "customer":
+        raise _unauthorised()
+
+    user = await db.get(User, payload.get("sub"))
+    if user is None or not user.is_active:
+        raise _unauthorised()
+    if int(payload.get("ver", -1)) != user.token_version:
+        raise _unauthorised()
+    return user
+
+
+async def get_optional_user(
+    session: str | None = Cookie(default=None, alias=CUSTOMER_SESSION_COOKIE),
+    db: AsyncSession = Depends(get_db),
+) -> User | None:
+    """Same checks as get_current_user, but None instead of 401.
+
+    For endpoints that work for both anonymous visitors and logged-in
+    customers (the public registration form), where "not logged in" is a
+    normal case, not an error.
+    """
+    if not session:
+        return None
+    try:
+        payload = jwt.decode(
+            session,
+            settings.secret_key,
+            algorithms=[ALGORITHM],
+            options={"require": ["exp", "iat", "sub"]},
+        )
+    except jwt.PyJWTError:
+        return None
+    if payload.get("typ") != "customer":
+        return None
+    user = await db.get(User, payload.get("sub"))
+    if user is None or not user.is_active:
+        return None
+    if int(payload.get("ver", -1)) != user.token_version:
+        return None
+    return user
+
+
+async def require_verified_user(user: User = Depends(get_current_user)) -> User:
+    if user.email_verified_at is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Email verification required")
+    return user
+
+
+async def require_customer_csrf(
+    request: Request,
+    csrf_cookie: str | None = Cookie(default=None, alias=CUSTOMER_CSRF_COOKIE),
+    csrf_header: str | None = Header(default=None, alias=CSRF_HEADER),
+) -> None:
+    if request.method in {"GET", "HEAD", "OPTIONS"}:
+        return
+    if not csrf_cookie or not csrf_header:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="CSRF token missing")
+    if not hmac.compare_digest(csrf_cookie, csrf_header):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="CSRF token invalid")
+
+
+async def require_active_networking_member(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    now = utcnow()
+    result = await db.execute(
+        select(TGLMembership).where(
+            TGLMembership.user_id == user.id,
+            TGLMembership.membership_type == "NETWORKING",
+            TGLMembership.status == "ACTIVE",
+            TGLMembership.starts_at.is_not(None),
+            TGLMembership.expires_at.is_not(None),
+            TGLMembership.expires_at > now,
+        )
+    )
+    if result.scalar_one_or_none() is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Active Networking membership required")
+    return user
+
+
 async def require_csrf(
     request: Request,
     csrf_cookie: str | None = Cookie(default=None, alias=CSRF_COOKIE),
@@ -130,4 +242,9 @@ async def require_csrf(
 
 async def get_admin_by_email(db: AsyncSession, email: str) -> Admin | None:
     result = await db.execute(select(Admin).where(Admin.email == email.lower().strip()))
+    return result.scalar_one_or_none()
+
+
+async def get_user_by_email(db: AsyncSession, email: str) -> User | None:
+    result = await db.execute(select(User).where(User.email == email.lower().strip()))
     return result.scalar_one_or_none()

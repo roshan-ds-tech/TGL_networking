@@ -1,9 +1,13 @@
 import { useState } from 'react';
 import { CATEGORIES } from '../data/categories';
 
+const EMPLOYEE_LABELS = { '1-3': '1–3', '4-6': '4–6', '7-10': '7–10' };
+const AGE_LABELS = { lt6: 'Less than 6 months', '6-12': '6–12 months', '1-3y': '1–3 years', '3y+': 'More than 3 years' };
+
 export default function Register({
   formRef,
   onSubmit,
+  authStatus,
   showForm,
   registrationClosed,
   submitted,
@@ -19,7 +23,7 @@ export default function Register({
   errEmployees,
   errAge,
   errPaymentProof,
-  errUtr,
+
   errAgree,
   errMediaConsent,
   errForm,
@@ -27,6 +31,12 @@ export default function Register({
 }) {
   const [paymentProofName, setPaymentProofName] = useState('');
   const byCode = new Map((availability?.categories ?? []).map((c) => [c.category, c]));
+
+  const authed = !!authStatus?.user;
+  const profile = authStatus?.personal_profile;
+  const business = authStatus?.business;
+  const profileComplete = authed && !!profile && !!business;
+  const alreadyRegistered = authed && !!authStatus?.event_registration;
 
   return (
     <section id="register" style={{ position: 'relative', overflow: 'hidden', padding: '104px 28px 100px', background: 'linear-gradient(180deg, #35194E, #22103A)', color: '#F6EEDF' }}>
@@ -161,15 +171,77 @@ export default function Register({
                 </p>
               </div>
             )}
-            {showForm && !registrationClosed && (
+            {showForm && !registrationClosed && alreadyRegistered && (
+              <div>
+                <h3 style={{ margin: '0 0 8px', fontSize: '25px', fontWeight: '800', color: '#2B1740' }}>
+                  You're Already Registered
+                </h3>
+                <p style={{ margin: '0 0 8px', fontSize: '15px', lineHeight: '1.65', color: 'rgba(43,23,64,0.7)' }}>
+                  Your Season 1 entry for <strong>{business?.business_name}</strong> is currently{' '}
+                  <strong>{authStatus.event_registration.status}</strong>. Our operations team is reviewing it.
+                </p>
+                <p style={{ margin: '0', fontSize: '14px', lineHeight: '1.65', color: 'rgba(43,23,64,0.55)' }}>
+                  Track its status any time from{' '}
+                  <a href="/app/events" style={{ color: '#6B3E96', fontWeight: '700' }}>your dashboard</a>.
+                </p>
+              </div>
+            )}
+            {showForm && !registrationClosed && authed && !profileComplete && (
+              <div>
+                <h3 style={{ margin: '0 0 8px', fontSize: '25px', fontWeight: '800', color: '#2B1740' }}>
+                  Finish Your TGL Profile First
+                </h3>
+                <p style={{ margin: '0 0 20px', fontSize: '15px', lineHeight: '1.65', color: 'rgba(43,23,64,0.7)' }}>
+                  Season 1 registration uses the personal and business details from your account, so complete those first — it only takes a minute.
+                </p>
+                <a
+                  href={!profile ? '/onboarding/personal' : '/onboarding/business'}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: 'linear-gradient(135deg, #E0B558, #C08D2E)', color: '#22103A', fontWeight: 700, fontSize: '13px', letterSpacing: '.08em', textTransform: 'uppercase', padding: '16px 32px', borderRadius: 999, textDecoration: 'none' }}
+                >
+                  Complete Your Profile
+                </a>
+              </div>
+            )}
+            {showForm && !registrationClosed && !alreadyRegistered && !(authed && !profileComplete) && (
               <div>
                 <h3 style={{ margin: '0 0 8px', fontSize: '25px', fontWeight: '800', color: '#2B1740' }}>
                   Season 1 Registration
                 </h3>
                 <p style={{ margin: '0 0 30px', fontSize: '15px', lineHeight: '1.6', color: 'rgba(43,23,64,0.66)' }}>
-                  Tell us about your business. Fields marked <span style={{ color: '#B8863B', fontWeight: '700' }}>*</span> are required. Registration does not guarantee selection.
+                  {authed
+                    ? 'Your account details are filled in below. Add your payment screenshot to finish.'
+                    : <>Tell us about your business. Fields marked <span style={{ color: '#B8863B', fontWeight: '700' }}>*</span> are required. Registration does not guarantee selection.</>}
                 </p>
                 <form ref={formRef} onSubmit={onSubmit} noValidate style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(240px, 100%), 1fr))', gap: '22px' }}>
+                  {authed ? (
+                    <div style={{ gridColumn: '1 / -1', display: 'grid', gap: '10px', padding: '18px 20px', borderRadius: '14px', background: 'rgba(107,62,150,0.06)', border: '1px solid rgba(107,62,150,0.18)' }}>
+                      <span style={{ fontSize: '11px', letterSpacing: '.14em', textTransform: 'uppercase', fontWeight: '700', color: '#6B3E96' }}>
+                        Registering from your account
+                      </span>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px 24px', fontSize: '14.5px', color: '#2B1740' }}>
+                        <span><strong>{profile?.full_name}</strong></span>
+                        <span>{business?.business_name}</span>
+                        <span>{authStatus.user.email}</span>
+                        <span>{profile?.phone}</span>
+                        <span>{CATEGORIES.find((c) => c.code === business?.category)?.name || business?.category}</span>
+                        <span>{EMPLOYEE_LABELS[business?.employee_band] || business?.employee_band} employees</span>
+                        <span>{AGE_LABELS[business?.business_age] || business?.business_age}</span>
+                        <span>{business?.city}</span>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '12.5px', color: 'rgba(43,23,64,0.55)' }}>
+                        Wrong details? <a href="/onboarding/business" style={{ color: '#6B3E96', fontWeight: '700' }}>Update your profile</a> before submitting.
+                      </p>
+                      <input type="hidden" name="name" value={profile?.full_name || ''} />
+                      <input type="hidden" name="business" value={business?.business_name || ''} />
+                      <input type="hidden" name="email" value={authStatus.user.email || ''} />
+                      <input type="hidden" name="phone" value={profile?.phone || ''} />
+                      <input type="hidden" name="category" value={business?.category || ''} />
+                      <input type="hidden" name="employees" value={business?.employee_band || ''} />
+                      <input type="hidden" name="age" value={business?.business_age || ''} />
+                      <input type="hidden" name="city" value={business?.city || ''} />
+                    </div>
+                  ) : (
+                    <>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <label htmlFor="tgl-name" style={{ fontSize: '12.5px', letterSpacing: '.1em', textTransform: 'uppercase', fontWeight: '700', color: '#6B3E96' }}>
                       Full name<span style={{ color: '#B8863B' }}>*</span>
@@ -248,6 +320,8 @@ export default function Register({
                     </label>
                     <input id="tgl-city" name="city" maxLength={120} type="text" placeholder="e.g. Indiranagar, Bengaluru" style={{ border: '1px solid rgba(53,26,78,0.24)', background: '#F6EEDF', padding: '15px 16px', fontSize: '15.5px', color: '#2B1740', borderRadius: '12px', minHeight: '52px' }} className="hv-73" />
                   </div>
+                    </>
+                  )}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', gridColumn: '1 / -1' }}>
                     <label htmlFor="tgl-payment-proof" style={{ fontSize: '12.5px', letterSpacing: '.1em', textTransform: 'uppercase', fontWeight: '700', color: '#6B3E96' }}>
                       Payment screenshot<span style={{ color: '#B8863B' }}>*</span>
@@ -271,27 +345,7 @@ export default function Register({
                     </div>
                     {errPaymentProof && <span role="alert" style={{ fontSize: '13px', color: '#9A2B2B', fontWeight: '600' }}>{errPaymentProof}</span>}
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', gridColumn: '1 / -1' }}>
-                    <label htmlFor="tgl-utr" style={{ fontSize: '12.5px', letterSpacing: '.1em', textTransform: 'uppercase', fontWeight: '700', color: '#6B3E96' }}>
-                      UTR / UPI reference number<span style={{ color: '#B8863B' }}>*</span>
-                    </label>
-                    <input
-                      id="tgl-utr"
-                      name="utr"
-                      type="text"
-                      autoComplete="off"
-                      spellCheck="false"
-                      maxLength={40}
-                      placeholder="e.g. 402912345678"
-                      aria-describedby="tgl-utr-hint"
-                      style={{ border: '1px solid rgba(53,26,78,0.24)', background: '#F6EEDF', padding: '15px 16px', fontSize: '15.5px', letterSpacing: '.04em', color: '#2B1740', borderRadius: '12px', minHeight: '52px' }}
-                      className="hv-73"
-                    />
-                    <span id="tgl-utr-hint" style={{ fontSize: '12.5px', lineHeight: '1.55', color: 'rgba(43,23,64,0.58)' }}>
-                      Your payment app shows this as the UTR, UPI reference ID or transaction ID — usually 12 digits. It lets us match your payment to this registration.
-                    </span>
-                    {errUtr && <span role="alert" style={{ fontSize: '13px', color: '#9A2B2B', fontWeight: '600' }}>{errUtr}</span>}
-                  </div>
+
                   <label style={{ gridColumn: '1 / -1', display: 'flex', gap: '12px', alignItems: 'flex-start', fontSize: '14.5px', lineHeight: '1.6', color: 'rgba(43,23,64,0.72)', cursor: 'pointer' }}>
                     <input name="agree" type="checkbox" style={{ width: '20px', height: '20px', marginTop: '2px', accentColor: '#6B3E96', flexShrink: '0' }} />
                     <span>

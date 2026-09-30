@@ -200,6 +200,76 @@ export default function IconSprite() {
           <path d="M12.2 10.5v6.2"></path>
         </g>
       </symbol>
+      <symbol id="i-search" viewBox="0 0 24 24">
+        <g fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="11" cy="11" r="7"></circle>
+          <path d="m20 20-3.9-3.9"></path>
+        </g>
+      </symbol>
+      <symbol id="i-bell" viewBox="0 0 24 24">
+        <g fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path>
+          <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path>
+        </g>
+      </symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24">
+        <g fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="4" y="11" width="16" height="10" rx="2"></rect>
+          <path d="M8 11V7a4 4 0 0 1 8 0v4"></path>
+        </g>
+      </symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24">
+        <g fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path>
+          <path d="m9 12 2 2 4-4"></path>
+        </g>
+      </symbol>
+      <symbol id="i-user" viewBox="0 0 24 24">
+        <g fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="8" r="3.6"></circle>
+          <path d="M5 20.5c0-3.6 3.1-6 7-6s7 2.4 7 6"></path>
+        </g>
+      </symbol>
+      <symbol id="i-compass" viewBox="0 0 24 24">
+        <g fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="8.5"></circle>
+          <path d="m15.8 8.2-1.7 5.1a1.3 1.3 0 0 1-.8.8l-5.1 1.7 1.7-5.1a1.3 1.3 0 0 1 .8-.8z"></path>
+        </g>
+      </symbol>
+      <symbol id="i-back" viewBox="0 0 24 24">
+        <g fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20 12H5M11 6l-6 6 6 6"></path>
+        </g>
+      </symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24">
+        <g fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+          <path d="M5 12h14M12 5v14"></path>
+        </g>
+      </symbol>
+      <symbol id="i-x" viewBox="0 0 24 24">
+        <g fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+          <path d="M18 6 6 18M6 6l12 12"></path>
+        </g>
+      </symbol>
+      <symbol id="i-grid" viewBox="0 0 24 24">
+        <g fill="none" stroke="currentColor" strokeWidth="1.5">
+          <rect x="4" y="4" width="6.5" height="6.5" rx="1.2"></rect>
+          <rect x="13.5" y="4" width="6.5" height="6.5" rx="1.2"></rect>
+          <rect x="4" y="13.5" width="6.5" height="6.5" rx="1.2"></rect>
+          <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.2"></rect>
+        </g>
+      </symbol>
+      <symbol id="i-list" viewBox="0 0 24 24">
+        <g fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+          <path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"></path>
+        </g>
+      </symbol>
+      <symbol id="i-send" viewBox="0 0 24 24">
+        <g fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="m21 3-7 18-3.5-7.5L3 10z"></path>
+          <path d="M21 3 10.5 13.5"></path>
+        </g>
+      </symbol>
     </svg>
   );
 }

@@ -67,13 +67,34 @@ class Base(DeclarativeBase):
 # column against a database that already holds rows would therefore leave every
 # query failing with "no such column". sync_schema() closes that gap.
 #
-# Every entry must be nullable: rows written before the column existed cannot
-# have a value for it. Requiring the field for *new* submissions is the API
-# schema's job, not the database's.
-_ADDED_COLUMNS: dict[str, dict[str, str]] = {
+# Each value is the SQL literal existing rows should get. None means the column
+# is nullable and pre-existing rows can simply hold NULL; anything else is a
+# NOT NULL column, and the literal both backfills the old rows and satisfies
+# the constraint while ALTER TABLE runs. Requiring the field for *new*
+# submissions is the API schema's job, not the database's.
+#
+# Types are not listed: they are read off the model at run time, so a column
+# can never be added here with a type that drifts from the one create_all()
+# would have produced — and so the DDL is correct on both SQLite and Postgres.
+_ADDED_COLUMNS: dict[str, dict[str, str | None]] = {
     "registrations": {
-        # UPI reference for the payment, captured alongside the screenshot.
-        "utr": "VARCHAR(32)",
+        # Nullable bridge fields for authenticated P0 registrations. Legacy
+        # public registrations stay valid; new product registrations point to
+        # the customer/user-owned event-registration domain.
+        "user_id": None,
+        "business_id": None,
+        "event_registration_id": None,
+    },
+    "user_verification_tokens": {
+        # Added when passwordless login and password reset joined signup on
+        # this table. Every token that predates the split was a signup code.
+        "purpose": "'EMAIL_VERIFY'",
+    },
+    "businesses": {
+        # KYB submission workflow, added after the tgl_verified badge it sets.
+        # Businesses that predate it have, correctly, not started it.
+        "verification_status": "'NOT_STARTED'",
+        "verification_submitted_at": None,
     },
 }
 
@@ -87,13 +108,19 @@ def sync_schema(sync_conn) -> None:
     request data, so interpolating them into the DDL is safe.
     """
     inspector = inspect(sync_conn)
-    for table, columns in _ADDED_COLUMNS.items():
+    for table, backfills in _ADDED_COLUMNS.items():
         if not inspector.has_table(table):
             continue  # create_all() just made it, already with every column
+        model_table = Base.metadata.tables[table]
         existing = {c["name"] for c in inspector.get_columns(table)}
-        for name, ddl in columns.items():
-            if name not in existing:
-                sync_conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
+        for name, backfill in backfills.items():
+            if name in existing:
+                continue
+            column = model_table.columns[name]
+            ddl = f"ALTER TABLE {table} ADD COLUMN {name} {column.type.compile(sync_conn.dialect)}"
+            if backfill is not None:
+                ddl += f" NOT NULL DEFAULT {backfill}"
+            sync_conn.exec_driver_sql(ddl)
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:

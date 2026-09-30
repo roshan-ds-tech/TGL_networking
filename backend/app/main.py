@@ -15,6 +15,7 @@ from .config import settings
 from .database import Base, engine, sync_schema
 from .routers import admin as admin_router
 from .routers import auth as auth_router
+from .routers import customer as customer_router
 from .routers import public as public_router
 from .storage import upload_root
 
@@ -44,14 +45,14 @@ app = FastAPI(
 
 app.add_middleware(GZipMiddleware, minimum_size=500)
 
-# Only the public marketing site needs cross-origin access: POST to submit a
-# registration, GET to read the public slot-availability counters. The admin SPA
-# is served same-origin, so it needs no CORS grant.
+# The public marketing site reads availability and submits legacy registrations.
+# The authenticated Vite app uses HttpOnly customer cookies during local
+# development, so credentialed CORS is required for configured public origins.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.public_origins,
-    allow_credentials=False,
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
     max_age=600,
 )
@@ -100,6 +101,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 app.include_router(auth_router.router)
 app.include_router(public_router.router)
 app.include_router(admin_router.router)
+app.include_router(customer_router.router)
 
 
 @app.get("/api/health", tags=["ops"])
