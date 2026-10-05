@@ -27,10 +27,19 @@ Auth is not used, so there is no Supabase key in the browser at all.
    `postgresql://postgres.<ref>:<password>@aws-0-ap-south-1.pooler.supabase.com:5432/postgres`.
    Use the session pooler: it is IPv4-reachable from Render (the direct
    connection is IPv6-only on new projects).
+   Paste it exactly as shown — a password containing `@`, `!` or `:` does
+   not need manual percent-encoding; the app handles it. The connection is
+   TLS-encrypted (`sslmode=require`, Supabase's default). For full
+   certificate verification, download Supabase's CA (*Database → SSL
+   Configuration*), add it to the image and set `DATABASE_SSL_ROOT_CERT`.
 3. **API** — *Project Settings → API*: copy the **Project URL**
    (`https://<ref>.supabase.co`) and the **service_role / secret** key.
    The service key bypasses all access rules: it goes only into Render's
    environment, never into code, chat, or the frontend.
+
+> **The production Supabase project is already provisioned** — tables,
+> RLS lockdown and the private bucket were created and verified on
+> 2026-10-05. Re-running is harmless.
 
 Nothing else to click. On first boot the app:
 

@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     # storage; safe to leave on (the default) anywhere with a normal local disk.
     sqlite_wal: bool = True
 
+    # Optional CA bundle for verifying the Postgres server certificate
+    # (Supabase: Project Settings -> Database -> SSL -> download certificate).
+    # Unset, Supabase connections are encrypted but not CA-verified.
+    database_ssl_root_cert: str = ""
+
     # Open a fresh DB connection per checkout instead of pooling. For test
     # harnesses that run the app across several event loops; production keeps
     # the pool.

@@ -221,6 +221,17 @@ def main() -> int:
         big = io.BytesIO(bytes.fromhex("89504e470d0a1a0a") + b"\0" * (6 * 1024 * 1024))
         r = c.post("/api/registrations", data=form(email="big@example.com"), files={"paymentProof": ("big.png", big, "image/png")})
         check("oversized request refused up front (413)", r.status_code == 413, str(r.status_code))
+        # ---------------- DATABASE_URL as pasted from Supabase ----------------
+        import ssl as _ssl
+        from sqlalchemy.engine import make_url
+        from app.database import _normalise_url
+        url, args = _normalise_url("postgresql://postgres.ref:Pa@ss!w0rd@aws-0-ap-south-1.pooler.supabase.com:5432/postgres")
+        u = make_url(url)
+        check("unencoded '@'/'!' in the password parse correctly", (u.username, u.password, u.host, u.database) == ("postgres.ref", "Pa@ss!w0rd", "aws-0-ap-south-1.pooler.supabase.com", "postgres"), str((u.username, u.host)))
+        check("Supabase host gets TLS (encrypted, sslmode=require default)", isinstance(args.get("ssl"), _ssl.SSLContext) and args["ssl"].verify_mode == _ssl.CERT_NONE)
+        check("pooler-safe: statement caches disabled", args.get("statement_cache_size") == 0 and args.get("prepared_statement_cache_size") == 0)
+        u2 = make_url(_normalise_url("postgres://u:p%40ss@db.example.com/x?sslmode=verify-full")[0])
+        check("encoded password + libpq params handled", u2.password == "p@ss" and "sslmode" not in str(u2), str(u2))
         r = c.get("/api/health")
         check("health check", r.status_code == 200 and r.json() == {"status": "ok"})
         check("API responses stay noindex", "noindex" in r.headers.get("x-robots-tag", ""))

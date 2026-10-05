@@ -12,7 +12,7 @@ from collections.abc import AsyncGenerator
 from pathlib import Path
 
 import ssl
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, quote, unquote, urlencode, urlsplit, urlunsplit
 
 from sqlalchemy import event, inspect
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -35,6 +35,16 @@ def _normalise_url(raw: str) -> tuple[str, dict]:
     for prefix in ("postgres://", "postgresql://"):
         if raw.startswith(prefix):
             raw = "postgresql+asyncpg://" + raw[len(prefix):]
+    # Passwords pasted straight from a dashboard often contain '@', ':' or
+    # '!' unencoded. The host starts after the LAST '@', so percent-encode
+    # the credentials before parsing rather than mis-splitting them.
+    scheme, sep, rest = raw.partition("://")
+    authority, slash, tail = rest.partition("/")
+    if authority.count("@") > 1 or ("@" in authority and any(c in authority.rpartition("@")[0] for c in "!#?[]")):
+        creds, _, hostport = authority.rpartition("@")
+        user, colon, password = creds.partition(":")
+        creds = quote(unquote(user), safe="") + (colon + quote(unquote(password), safe="") if colon else "")
+        raw = f"{scheme}{sep}{creds}@{hostport}{slash}{tail}"
     parts = urlsplit(raw)
     query = dict(parse_qsl(parts.query))
     sslmode = query.pop("sslmode", None)
@@ -49,12 +59,20 @@ def _normalise_url(raw: str) -> tuple[str, dict]:
         "prepared_statement_cache_size": 0,
     }
     host = parts.hostname or ""
-    if sslmode in {"require", "verify-ca", "verify-full"} or host.endswith((".supabase.co", ".supabase.com")):
-        ctx = ssl.create_default_context()
+    root_cert = query.pop("sslrootcert", None) or settings.database_ssl_root_cert
+    if host.endswith((".supabase.co", ".supabase.com")) and sslmode is None:
+        # Supabase's documented default. Its certificates chain to Supabase's
+        # own root CA, which is not in public trust stores — so full
+        # verification needs that CA file (DATABASE_SSL_ROOT_CERT).
+        sslmode = "verify-full" if root_cert else "require"
+    if sslmode in {"require", "verify-ca", "verify-full"}:
+        ctx = ssl.create_default_context(cafile=root_cert) if root_cert else ssl.create_default_context()
         if sslmode == "require":
-            # libpq "require" encrypts without verifying the certificate.
+            # libpq "require": always encrypted, certificate not verified.
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
+        elif sslmode == "verify-ca":
+            ctx.check_hostname = False
         connect_args["ssl"] = ctx
     return urlunsplit(parts._replace(query=urlencode(query))), connect_args
 
