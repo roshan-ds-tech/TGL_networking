@@ -16,7 +16,7 @@ import getpass
 import re
 import sys
 
-from app.database import Base, SessionLocal, engine
+from app.database import Base, SessionLocal, engine, lock_down_postgres, sync_schema
 from app.models import Admin
 from app.security import get_admin_by_email, hash_password
 
@@ -54,8 +54,12 @@ async def main() -> int:
         print("error: passwords do not match", file=sys.stderr)
         return 1
 
+    # Same schema steps as the app's startup, so running this before the first
+    # deploy never leaves tables exposed to Supabase's Data API.
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(sync_schema)
+        await conn.run_sync(lock_down_postgres)
 
     async with SessionLocal() as db:
         existing = await get_admin_by_email(db, email)

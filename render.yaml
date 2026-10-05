@@ -1,9 +1,9 @@
 # Render Blueprint — https://render.com/docs/blueprint-spec
 #
-# One Docker web service serves the public site, the member app, the admin
-# dashboard (/admin) and the API (/api) from a single origin. Data lives in
-# Supabase: Postgres for records, a private Storage bucket for payment proofs —
-# so the service needs no persistent disk.
+# One FREE Docker web service serves the public site, the member app, the
+# admin dashboard (/admin) and the API (/api) from a single origin. Data lives
+# in Supabase: Postgres for records, a private Storage bucket for payment
+# proofs — so no Render Postgres, no persistent disk, no workers, no cron.
 #
 # Deploy: Render dashboard -> New -> Blueprint -> pick this repo. Render will
 # prompt for every `sync: false` value below. See DEPLOY_RENDER.md.
@@ -13,9 +13,11 @@ services:
     runtime: docker
     dockerfilePath: ./Dockerfile
     dockerContext: .
-    # starter: always on. The free plan works too but sleeps after 15 idle
-    # minutes (~1 minute cold start for the next visitor).
-    plan: starter
+    # Free web service: no card needed for the project's resources. It sleeps
+    # after 15 idle minutes (~1 minute cold start) and has no persistent disk —
+    # fine here, since all data lives in Supabase. Change to `starter` later
+    # for an always-on instance; nothing else in this file depends on it.
+    plan: free
     region: singapore # closest Render region to Bengaluru
     healthCheckPath: /api/health
     autoDeploy: true
@@ -36,8 +38,10 @@ services:
         sync: false
       - key: SUPABASE_STORAGE_BUCKET
         value: payment-proofs
-      # The site's public address (custom domain once attached, else the
-      # onrender.com URL). Used in password-reset email links.
+      # The site's public address, used in password-reset email links. May be
+      # left EMPTY on first deploy: the app then uses Render's own
+      # RENDER_EXTERNAL_URL (the onrender.com address). Set it to
+      # https://tgl.skykeen.in once the custom domain is attached.
       - key: PUBLIC_ORIGIN
         sync: false
       - key: TRUSTED_PROXY_HOPS

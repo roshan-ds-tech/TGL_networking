@@ -52,6 +52,10 @@ class Settings(BaseSettings):
     #   PUBLIC_ORIGIN="https://tglwebsite.vercel.app,http://localhost:5173"
     # Always an explicit allowlist — "*" is deliberately not supported.
     public_origin: str = "http://localhost:5173"
+    # Set automatically by Render on every web service (its onrender.com URL).
+    # Used as the public origin when PUBLIC_ORIGIN is left empty, so a first
+    # deploy works before a custom domain exists — no placeholder needed.
+    render_external_url: str = ""
 
     # Built admin SPA; served same-origin by this app so cookies stay SameSite=Strict.
     admin_dist_dir: str = "./static/admin"
@@ -153,11 +157,22 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _validate_storage(self) -> "Settings":
+        if not self.public_origin.strip() or "public_origin" not in self.model_fields_set:
+            if self.render_external_url.strip():
+                self.public_origin = self.render_external_url.strip()
         self.storage_backend = self.storage_backend.lower().strip()
         if self.storage_backend not in {"local", "supabase"}:
             raise ValueError('STORAGE_BACKEND must be "local" or "supabase".')
         if self.storage_backend == "supabase" and not (self.supabase_url and self.supabase_service_role_key):
             raise ValueError("STORAGE_BACKEND=supabase needs SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.")
+        if self.is_production and self.storage_backend == "supabase" and self.database_url.startswith("sqlite"):
+            # The Render deployment (no persistent disk): a missing DATABASE_URL
+            # would otherwise fall back to SQLite inside the container and every
+            # record would silently vanish on the next deploy or restart.
+            raise ValueError(
+                "DATABASE_URL must point at Supabase Postgres in production — refusing to "
+                "store records in a local SQLite file on an ephemeral filesystem."
+            )
         return self
 
 

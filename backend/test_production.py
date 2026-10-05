@@ -232,6 +232,26 @@ def main() -> int:
         check("pooler-safe: statement caches disabled", args.get("statement_cache_size") == 0 and args.get("prepared_statement_cache_size") == 0)
         u2 = make_url(_normalise_url("postgres://u:p%40ss@db.example.com/x?sslmode=verify-full")[0])
         check("encoded password + libpq params handled", u2.password == "p@ss" and "sslmode" not in str(u2), str(u2))
+        # ---------------- free-tier safety: no silent SQLite on Render ----------------
+        from app.config import Settings
+        base = dict(environment="production", secret_key="k" * 48, storage_backend="supabase",
+                    supabase_url="https://x.supabase.co", supabase_service_role_key="test-only")
+        try:
+            Settings(_env_file=None, database_url="sqlite+aiosqlite:////app/var/tgl.db", **base)
+            check("production refuses SQLite when DATABASE_URL is missing on Render", False, "booted")
+        except Exception as exc:
+            check("production refuses SQLite when DATABASE_URL is missing on Render", "DATABASE_URL" in str(exc), str(exc)[:120])
+        try:
+            Settings(_env_file=None, database_url="postgresql://u:p@db.example.com/x", **base)
+            check("production boots with a Postgres DATABASE_URL", True)
+        except Exception as exc:
+            check("production boots with a Postgres DATABASE_URL", False, str(exc)[:120])
+        rs = Settings(_env_file=None, environment="development", render_external_url="https://tgl-abc.onrender.com")
+        check("PUBLIC_ORIGIN unset -> Render's own URL is used", rs.public_origins == ["https://tgl-abc.onrender.com"], str(rs.public_origins))
+        rs = Settings(_env_file=None, environment="development", public_origin="", render_external_url="https://tgl-abc.onrender.com")
+        check("PUBLIC_ORIGIN left empty -> Render's own URL is used", rs.public_origins == ["https://tgl-abc.onrender.com"], str(rs.public_origins))
+        rs = Settings(_env_file=None, environment="development", public_origin="https://tgl.skykeen.in", render_external_url="https://tgl-abc.onrender.com")
+        check("explicit PUBLIC_ORIGIN (custom domain) wins", rs.public_origins == ["https://tgl.skykeen.in"], str(rs.public_origins))
         r = c.get("/api/health")
         check("health check", r.status_code == 200 and r.json() == {"status": "ok"})
         check("API responses stay noindex", "noindex" in r.headers.get("x-robots-tag", ""))
