@@ -38,14 +38,19 @@ services:
         sync: false
       - key: SUPABASE_STORAGE_BUCKET
         value: payment-proofs
-      # The site's public address, used in password-reset email links. May be
-      # left EMPTY on first deploy: the app then uses Render's own
-      # RENDER_EXTERNAL_URL (the onrender.com address). Set it to
-      # https://tgl.skykeen.in once the custom domain is attached.
+      # The site's public address, used in password-reset email links. With
+      # the site on Vercel this MUST be the Vercel URL (e.g.
+      # https://tgl-networking.vercel.app) — links to the Render URL would land
+      # users on a different origin than the one holding their session.
+      # (Left empty, it falls back to Render's own RENDER_EXTERNAL_URL.)
       - key: PUBLIC_ORIGIN
         sync: false
+      # Proxies that append to X-Forwarded-For in front of the app:
+      # Vercel (which serves the site and forwards /api, /admin) + Render's
+      # load balancer = 2. Use 1 if the site is served from Render directly.
+      # Check after deploy: GET /api/admin/diagnostics/client-ip (admin).
       - key: TRUSTED_PROXY_HOPS
-        value: "1" # Render's load balancer
+        value: "2"
       - key: SESSION_HOURS
         value: "24"
       - key: RESEND_API_KEY # email codes; required in production

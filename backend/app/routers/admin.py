@@ -4,11 +4,12 @@ from __future__ import annotations
 import logging
 import math
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy import Integer, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
+from ..ratelimit import client_ip
 from ..database import get_db
 from ..models import Admin, Business, EventRegistration, PersonalProfile, Registration, TGLMembership, User, utcnow
 from ..schemas import (
@@ -183,6 +184,20 @@ async def list_customers(
         page_size=page_size,
         pages=max(1, math.ceil(total / page_size)),
     )
+
+
+@router.get("/diagnostics/client-ip")
+async def diagnostics_client_ip(request: Request, _: Admin = Depends(get_current_admin)) -> dict:
+    """Shows how the rate limiter identifies *your* request, so the proxy
+    setting (TRUSTED_PROXY_HOPS) can be checked on a live deployment: open it
+    from your own browser and `client_ip` should be your public IP, not a
+    Vercel/Render address. Admin-only; reveals nothing about anyone else."""
+    chain = [p.strip() for p in (request.headers.get("x-forwarded-for") or "").split(",") if p.strip()]
+    return {
+        "client_ip": client_ip(request),
+        "forwarded_for_entries": len(chain),
+        "trusted_proxy_hops": settings.trusted_proxy_hops,
+    }
 
 
 @router.get("/events/season-1", response_model=FinaleStateOut)

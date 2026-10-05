@@ -1,5 +1,11 @@
 # Deploying TGL to Render + Supabase
 
+> **Serving the frontend from Vercel instead?** Deploy the backend here, then
+> follow `DEPLOY_VERCEL.md` (Vercel proxies `/api` and `/admin` to Render).
+> In that setup `PUBLIC_ORIGIN` is the Vercel URL and `TRUSTED_PROXY_HOPS`
+> is `2`; when Render serves the site itself, use the Render URL / custom
+> domain and `1`.
+
 One Render web service (Docker) serves everything from a single origin:
 
 ```

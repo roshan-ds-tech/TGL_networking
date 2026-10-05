@@ -279,6 +279,9 @@ def main() -> int:
 
         c.post("/api/auth/login", json={"email": ADMIN_EMAIL, "password": PASSWORD})
         csrf = c.cookies.get("tgl_csrf") or ""
+        check("client-IP diagnostics need an admin session", TestClient(app).get("/api/admin/diagnostics/client-ip").status_code == 401)
+        d = c.get("/api/admin/diagnostics/client-ip", headers={"X-Forwarded-For": "198.51.100.23, 10.1.2.3"}).json()
+        check("client-IP diagnostics show the resolved IP and chain length", d == {"client_ip": "10.1.2.3", "forwarded_for_entries": 2, "trusted_proxy_hops": 1}, str(d))
         reg = c.get("/api/admin/registrations").json()["items"][0]
         r = c.get(f"/api/admin/registrations/{reg['id']}/proof")
         check("admin can view the proof from storage", r.status_code == 200 and r.content == PNG, str(r.status_code))

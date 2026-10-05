@@ -36,3 +36,6 @@ backend/.venv/
 # the DOMAIN env file and the bind-mounted database/uploads volume.
 /.env
 /data/
+
+# Vercel build output (scripts/vercel-output.mjs) and CLI link state
+.vercel
