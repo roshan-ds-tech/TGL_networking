@@ -96,6 +96,10 @@ class User(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    # Collected on the signup form so the admin Accounts view has them from
+    # the moment the account exists. Nullable for accounts created before.
+    full_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     failed_attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -305,6 +309,11 @@ class Notification(Base):
     body: Mapped[str] = mapped_column(Text, nullable=False)
     related_entity_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
     related_entity_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    # The member whose action caused this (requester, referrer, helper). NULL
+    # for system notifications (registration, membership).
+    actor_user_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True, nullable=False)
 

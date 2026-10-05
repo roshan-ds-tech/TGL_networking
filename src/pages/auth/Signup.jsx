@@ -34,8 +34,7 @@ export default function Signup() {
     setError('');
     setSubmitting(true);
     try {
-      const result = await api.signup(form.email.trim(), form.password);
-      if (result?.dev_verification_token) sessionStorage.setItem('tgl_dev_otp', result.dev_verification_token);
+      await api.signup({ full_name: form.full_name.trim(), email: form.email.trim(), phone: form.phone.trim(), password: form.password });
       sessionStorage.setItem(SIGNUP_DETAILS_KEY, JSON.stringify({ full_name: form.full_name.trim(), phone: form.phone.trim() }));
       go('/verify-email');
     } catch (err) {
@@ -54,7 +53,7 @@ export default function Signup() {
   return (
     <WizardShell step={1}>
       <h1 style={{ margin: '0 0 8px', fontSize: 30, fontWeight: 800, letterSpacing: '-0.025em', color: '#2B1740' }}>Create your TGL account</h1>
-      <p style={{ margin: '0 0 30px', fontSize: 15, color: 'rgba(43,23,64,0.62)' }}>Your account is the first step of the TGL journey.</p>
+      <p style={{ margin: '0 0 30px', fontSize: 15, color: 'rgba(43,23,64,0.65)' }}>Your account is the first step of the TGL journey.</p>
 
       <form onSubmit={submit} noValidate>
         <Field label="Full name" error={fieldErrors.full_name}>
@@ -71,7 +70,7 @@ export default function Signup() {
         <Field label="Password" error={fieldErrors.password}>
           <input className="tgl-input" type="password" placeholder="At least 8 characters" value={form.password} onChange={(e) => set('password', e.target.value)} autoComplete="new-password" />
         </Field>
-        <p style={{ margin: '10px 0 30px', fontSize: 12.5, color: 'rgba(43,23,64,0.5)' }}>
+        <p style={{ margin: '10px 0 30px', fontSize: 12.5, color: 'rgba(43,23,64,0.65)' }}>
           Prefer a one-time code? You can switch to OTP sign-in anytime.
         </p>
 
@@ -88,7 +87,7 @@ export default function Signup() {
         </button>
       </form>
 
-      <p style={{ margin: '22px 0 0', fontSize: 13.5, color: 'rgba(43,23,64,0.6)' }}>
+      <p style={{ margin: '22px 0 0', fontSize: 13.5, color: 'rgba(43,23,64,0.65)' }}>
         Already have an account?{' '}
         <a href="/login" onClick={(e) => { e.preventDefault(); go('/login'); }} style={{ fontWeight: 700 }}>Sign in</a>
       </p>

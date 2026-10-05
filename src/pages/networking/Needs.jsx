@@ -60,7 +60,7 @@ export default function Needs({ status }) {
       <main style={{ maxWidth: 1240, margin: '0 auto', padding: '48px 28px 96px' }}>
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap', marginBottom: 34 }}>
           <div>
-            <p style={{ margin: '0 0 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.26em', textTransform: 'uppercase', color: '#C08D2E' }}>Business Need Board · Members only</p>
+            <p style={{ margin: '0 0 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.26em', textTransform: 'uppercase', color: '#8F6420' }}>Business Need Board · Members only</p>
             <h1 style={{ margin: 0, fontSize: 'clamp(30px,3.4vw,44px)', fontWeight: 800, letterSpacing: '-0.035em', color: '#2B1740' }}>What does your business need?</h1>
           </div>
           <button
@@ -122,13 +122,13 @@ export default function Needs({ status }) {
                     <span style={{ padding: '6px 12px', borderRadius: 999, background: 'rgba(107,62,150,0.08)', fontSize: 10.5, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: '#6B3E96' }}>
                       {CATEGORY_MAP.get(n.category) || n.category}
                     </span>
-                    <span style={{ fontSize: 12, color: 'rgba(43,23,64,0.45)' }}>{timeAgo(n.created_at)}</span>
+                    <span style={{ fontSize: 12, color: 'rgba(43,23,64,0.65)' }}>{timeAgo(n.created_at)}</span>
                   </div>
                   <p style={{ margin: '0 0 10px', fontSize: 20, fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.25, color: '#2B1740' }}>{n.title}</p>
                   {expanded && n.description && (
                     <p style={{ margin: '0 0 14px', fontSize: 14, lineHeight: 1.6, color: 'rgba(43,23,64,0.72)' }}>{n.description}</p>
                   )}
-                  <p style={{ margin: '0 0 24px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'rgba(43,23,64,0.58)', flex: 1 }}>
+                  <p style={{ margin: '0 0 24px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'rgba(43,23,64,0.65)', flex: 1 }}>
                     {n.poster_name}
                     <span style={{ width: 3, height: 3, borderRadius: '50%', background: 'rgba(43,23,64,0.35)' }} />
                     <svg width="13" height="13" viewBox="0 0 24 24"><use href="#i-pin" /></svg>

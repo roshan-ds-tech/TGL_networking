@@ -5,7 +5,7 @@ import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .config import settings
@@ -76,8 +76,10 @@ def notify(
     body: str,
     related_entity_type: str | None = None,
     related_entity_id: str | None = None,
+    actor_user_id: str | None = None,
 ) -> Notification:
     item = Notification(
+        actor_user_id=actor_user_id,
         recipient_user_id=user_id,
         type=kind,
         title=title,
@@ -233,3 +235,133 @@ async def activate_memberships_for_event(db: AsyncSession, event: Event, complet
         )
         activated += 1
     return {"activated": activated, "already_active": already_active, "completed_at": actual_start}
+
+
+def _aware(value: datetime) -> datetime:
+    return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
+
+
+async def ensure_networking_profile(db: AsyncSession, user_id: str) -> NetworkingProfile | None:
+    """The directory lists NetworkingProfile rows, so anyone with access needs
+    one — including public-form registrants, who never pass through
+    activate_memberships_for_event. Needs a business to hang off; None until
+    the business step of onboarding is done."""
+    profile = await db.scalar(select(NetworkingProfile).where(NetworkingProfile.user_id == user_id))
+    if profile is not None:
+        return profile
+    business = await db.scalar(
+        select(Business).where(Business.user_id == user_id).order_by(Business.created_at.asc()).limit(1)
+    )
+    if business is None:
+        return None
+    profile = NetworkingProfile(
+        user_id=user_id,
+        business_id=business.id,
+        headline=f"{business.business_name} founder",
+        bio=business.description,
+        founder_story=business.founder_story,
+        industry_tags=business.category,
+        business_stage=business.business_stage,
+        city=business.city,
+    )
+    db.add(profile)
+    await db.flush()
+    return profile
+
+
+async def count_registered_access(db: AsyncSession) -> dict:
+    """How many people the Finale opens Networking for: verified accounts whose
+    email is on a registration. Counting event_registrations/memberships would
+    miss anyone who registered through the public form without being logged in
+    (their registration has no account link), though the email match still
+    grants them access."""
+    registrations = await db.scalar(select(func.count()).select_from(Registration)) or 0
+    accounts = await db.scalar(
+        select(func.count(func.distinct(User.id)))
+        .select_from(User)
+        .join(Registration, func.lower(Registration.email) == func.lower(User.email))
+        .where(User.email_verified_at.is_not(None))
+    ) or 0
+    return {"registrations": registrations, "members_with_access": accounts}
+
+
+async def notify_finale_open(db: AsyncSession, event: Event) -> int:
+    """Tell registered accounts Networking is open. Accounts whose membership
+    row was activated already got a notification from
+    activate_memberships_for_event, so they are skipped; this covers the rest
+    (public-form registrants with no membership row)."""
+    users = (
+        await db.execute(
+            select(User)
+            .join(Registration, func.lower(Registration.email) == func.lower(User.email))
+            .where(User.email_verified_at.is_not(None))
+            .distinct()
+        )
+    ).scalars().all()
+    sent = 0
+    for user in users:
+        await ensure_networking_profile(db, user.id)
+        already = await db.scalar(
+            select(Notification.id)
+            .where(Notification.recipient_user_id == user.id, Notification.type == "membership_activated")
+            .limit(1)
+        )
+        if already is not None:
+            continue
+        notify(
+            db,
+            user.id,
+            "membership_activated",
+            "Networking membership is active",
+            "The Grand Finale is complete — your TGL Networking membership is now active for 3 months.",
+            "event",
+            event.id,
+        )
+        sent += 1
+    return sent
+
+
+async def revert_finale(db: AsyncSession, event: Event) -> dict:
+    """Undo activate_memberships_for_event — the inverse of completing the Finale.
+
+    Clears the event's completion (which is what opens Networking for
+    registered emails) and returns every membership that completion activated
+    to PENDING, removing the "membership active" notification it sent so a
+    re-run doesn't leave duplicates. A membership is treated as "activated by
+    the Finale" only if it started exactly when the event completed, so one
+    activated individually at another time is left alone. Networking profiles
+    created at activation are kept: they hold member-edited content and are
+    unreachable while access is closed.
+    """
+    if event.completed_at is None:
+        return {"reverted": 0, "was_completed": False}
+    completed = _aware(event.completed_at)
+
+    rows = await db.execute(
+        select(TGLMembership)
+        .join(EventRegistration, EventRegistration.id == TGLMembership.source_event_registration_id)
+        .where(EventRegistration.event_id == event.id, TGLMembership.status == "ACTIVE")
+    )
+    reverted = 0
+    for membership in rows.scalars().all():
+        if membership.starts_at is None or _aware(membership.starts_at) != completed:
+            continue
+        membership.status = "PENDING"
+        membership.starts_at = None
+        membership.expires_at = None
+        await db.execute(
+            delete(Notification).where(
+                Notification.type == "membership_activated",
+                Notification.related_entity_id == membership.id,
+            )
+        )
+        reverted += 1
+    # Also drop the Finale-open notifications sent to accounts without a
+    # membership row (notify_finale_open), so a redo doesn't duplicate them.
+    await db.execute(
+        delete(Notification).where(
+            Notification.type == "membership_activated", Notification.related_entity_id == event.id
+        )
+    )
+    event.completed_at = None
+    return {"reverted": reverted, "was_completed": True}

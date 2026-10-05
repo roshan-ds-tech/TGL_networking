@@ -10,8 +10,24 @@ export default function UrgencyPopup({ availability, deadline }) {
   const [remaining, setRemaining] = useState(() => splitRemaining(deadline));
 
   useEffect(() => {
-    const timer = setTimeout(() => setVisible(true), SHOW_DELAY_MS);
-    return () => clearTimeout(timer);
+    // Its whole job is to get people to the registration form — so it must
+    // never cover that form (on a phone it sits right over the consent boxes
+    // and the submit button). Skip it if they're already there, and get out
+    // of the way the moment they start filling the form in.
+    const form = () => document.getElementById('register-form');
+    const atForm = () => {
+      const el = form();
+      if (!el) return false;
+      const r = el.getBoundingClientRect();
+      return el.contains(document.activeElement) || (r.top < window.innerHeight && r.bottom > 0);
+    };
+    const timer = setTimeout(() => { if (!atForm()) setVisible(true); }, SHOW_DELAY_MS);
+    const onFocus = (e) => { if (form()?.contains(e.target)) setVisible(false); };
+    document.addEventListener('focusin', onFocus);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('focusin', onFocus);
+    };
   }, []);
 
   useEffect(() => {

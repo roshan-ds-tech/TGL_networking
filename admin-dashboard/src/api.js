@@ -57,6 +57,8 @@ export const api = {
   logout: () => request('/api/auth/logout', { method: 'POST' }),
   me: () => request('/api/auth/me'),
   stats: () => request('/api/admin/stats'),
+  season1: () => request('/api/admin/events/season-1'),
+  undoSeason1: () => request('/api/admin/events/season-1/undo-complete', { method: 'POST' }),
   completeSeason1: () => request('/api/admin/events/season-1/complete', { method: 'POST' }),
   registrations: (params, signal) => {
     const qs = new URLSearchParams();
@@ -79,6 +81,8 @@ export const api = {
     }),
   remove: (id) =>
     request(`/api/admin/registrations/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  removeCustomer: (id) =>
+    request(`/api/admin/customers/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   proofUrl: (id) => `/api/admin/registrations/${encodeURIComponent(id)}/proof`,
 };
 

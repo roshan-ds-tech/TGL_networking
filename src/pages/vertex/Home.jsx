@@ -46,7 +46,7 @@ export default function VertexHome() {
               onSubmit={(e) => { e.preventDefault(); search(); }}
               style={{ display: 'flex', alignItems: 'center', gap: 10, maxWidth: 620, padding: '8px 8px 8px 22px', border: '1px solid rgba(53,26,78,0.16)', borderRadius: 999, background: '#FFFCF5', boxShadow: '0 20px 40px -24px rgba(53,26,78,0.35)', marginBottom: 20 }}
             >
-              <svg width="19" height="19" viewBox="0 0 24 24" style={{ color: 'rgba(43,23,64,0.45)', flexShrink: 0 }}><use href="#i-search" /></svg>
+              <svg width="19" height="19" viewBox="0 0 24 24" style={{ color: 'rgba(43,23,64,0.65)', flexShrink: 0 }}><use href="#i-search" /></svg>
               <input
                 type="text"
                 placeholder="Tell us what your business needs..."
@@ -103,10 +103,10 @@ export default function VertexHome() {
       <main style={{ maxWidth: 1240, margin: '0 auto', padding: '24px 28px 96px' }}>
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap', marginBottom: 28 }}>
           <div>
-            <p style={{ margin: '0 0 10px', fontSize: 11, letterSpacing: '.28em', textTransform: 'uppercase', fontWeight: 700, color: '#C08D2E' }}>Browse</p>
+            <p style={{ margin: '0 0 10px', fontSize: 11, letterSpacing: '.28em', textTransform: 'uppercase', fontWeight: 700, color: '#8F6420' }}>Browse</p>
             <h2 style={{ margin: 0, fontSize: 'clamp(26px,3vw,38px)', fontWeight: 800, letterSpacing: '-0.03em', color: '#2B1740' }}>Explore business solutions</h2>
           </div>
-          <p style={{ margin: 0, maxWidth: 380, fontSize: 14.5, lineHeight: 1.6, color: 'rgba(43,23,64,0.62)' }}>
+          <p style={{ margin: 0, maxWidth: 380, fontSize: 14.5, lineHeight: 1.6, color: 'rgba(43,23,64,0.65)' }}>
             Fourteen service areas covering what growing businesses most often need.
           </p>
         </div>
@@ -123,11 +123,11 @@ export default function VertexHome() {
                 <span style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(192,141,46,0.12)', color: '#A8762F', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <svg width="21" height="21" viewBox="0 0 24 24"><use href={`#${cat.icon}`} /></svg>
                 </span>
-                <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'rgba(43,23,64,0.35)' }}>{cat.code}</span>
+                <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'rgba(43,23,64,0.65)' }}>{cat.code}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 10, width: '100%' }}>
                 <span style={{ fontSize: 15.5, fontWeight: 700, lineHeight: 1.3, color: '#2B1740' }}>{cat.name}</span>
-                <svg width="16" height="16" viewBox="0 0 24 24" style={{ color: '#C08D2E', flexShrink: 0 }}><use href="#i-arrow" /></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" style={{ color: '#8F6420', flexShrink: 0 }}><use href="#i-arrow" /></svg>
               </div>
             </button>
           ))}

@@ -17,13 +17,20 @@ logger = logging.getLogger("tgl")
 _RESEND_URL = "https://api.resend.com/emails"
 
 
+def _mask(email: str) -> str:
+    """'as***@example.com' — enough to trace a delivery problem in logs
+    without writing full addresses into them."""
+    local, _, domain = email.partition("@")
+    return f"{local[:2]}***@{domain}"
+
+
 async def _send(to_email: str, subject: str, html: str, text: str) -> bool:
     """Shared Resend POST. Never raises — a failed send should not break the
     caller's flow (the account/token still exists and can be retried), so the
     caller decides what to do with a False return rather than handling an
     exception."""
     if not settings.resend_api_key:
-        logger.warning("RESEND_API_KEY not set; skipping email (%s) to %s", subject, to_email)
+        logger.warning("RESEND_API_KEY not set; skipping email (%s) to %s", subject, _mask(to_email))
         return False
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -33,11 +40,11 @@ async def _send(to_email: str, subject: str, html: str, text: str) -> bool:
                 json={"from": settings.email_from, "to": [to_email], "subject": subject, "html": html, "text": text},
             )
         if response.status_code >= 400:
-            logger.error("Resend rejected email (%s) to %s: %s %s", subject, to_email, response.status_code, response.text[:200])
+            logger.error("Resend rejected email (%s) to %s: HTTP %s", subject, _mask(to_email), response.status_code)
             return False
         return True
     except httpx.HTTPError:
-        logger.exception("Failed to send email (%s) to %s", subject, to_email)
+        logger.exception("Failed to send email (%s) to %s", subject, _mask(to_email))
         return False
 
 

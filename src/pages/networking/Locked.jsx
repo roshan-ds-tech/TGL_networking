@@ -15,8 +15,8 @@ const SOLID_LINE = '#C08D2E';
 const FAINT_LINE = 'rgba(224,181,88,0.3)';
 
 export function timelineFor(status) {
-  const registered = !!status.event_registration;
-  const confirmed = status.event_registration?.status === 'CONFIRMED';
+  const registered = !!status.event_registration || !!status.has_registration;
+  const confirmed = status.event_registration?.status === 'CONFIRMED' || !!status.registration_verified;
   const m = status.membership;
   const active = m?.status === 'ACTIVE';
 
@@ -37,7 +37,7 @@ export function timelineFor(status) {
     },
     {
       t: 'Grand Finale',
-      d: '5 December 2026 · Bengaluru',
+      d: active ? 'Completed · 5 December 2026' : '5 December 2026 · Bengaluru',
       icon: active ? 'i-check' : 'i-calendar',
       bg: active ? '#C08D2E' : '#35194E',
       color: active ? '#22103A' : '#EFCB77',
@@ -96,7 +96,7 @@ export default function NetworkingLocked({ status }) {
               <span className="tgl-script-word" style={{ display: 'block', marginTop: 4, fontSize: 'clamp(54px,7vw,98px)', lineHeight: 1 }}>coming soon.</span>
             </h1>
             <p style={{ margin: '0 0 36px', maxWidth: 520, fontSize: 17, lineHeight: 1.65, color: 'rgba(246,238,223,0.75)' }}>
-              Your Season 1 registration is confirmed. Networking access will activate after the TGL Grand Finale on 5 December 2026, and runs for 3 months.
+              Your Season 1 registration is on file. Networking opens for all registered participants after the TGL Grand Finale on 5 December 2026, and runs for 3 months.
             </p>
             <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
               <button
@@ -132,13 +132,13 @@ export default function NetworkingLocked({ status }) {
       </section>
 
       <main style={{ maxWidth: 1240, margin: '0 auto', padding: '64px 28px 96px' }}>
-        <p style={{ margin: '0 0 10px', fontSize: 11, letterSpacing: '.28em', textTransform: 'uppercase', fontWeight: 700, color: '#C08D2E' }}>What opens after the Finale</p>
+        <p style={{ margin: '0 0 10px', fontSize: 11, letterSpacing: '.28em', textTransform: 'uppercase', fontWeight: 700, color: '#8F6420' }}>What opens after the Finale</p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14, marginTop: 22 }}>
           {OPENS_AFTER.map((item) => (
             <div key={item.title} style={{ padding: 26, border: '1px solid rgba(53,26,78,0.1)', borderRadius: 18, background: '#FFFCF5' }}>
               <svg width="24" height="24" viewBox="0 0 24 24" style={{ color: '#6B3E96' }}><use href={`#${item.icon}`} /></svg>
               <p style={{ margin: '18px 0 6px', fontSize: 16, fontWeight: 800, color: '#2B1740' }}>{item.title}</p>
-              <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: 'rgba(43,23,64,0.62)' }}>{item.desc}</p>
+              <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: 'rgba(43,23,64,0.65)' }}>{item.desc}</p>
             </div>
           ))}
         </div>

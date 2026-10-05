@@ -5,7 +5,7 @@ import time
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from pydantic import ValidationError
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
@@ -166,63 +166,101 @@ async def create_registration(
 
     filename, mime, size = await save_payment_proof(payment_proof)
 
-    registration = Registration(
-        full_name=data.full_name,
-        business_name=data.business_name,
-        email=str(data.email).lower(),
-        phone=data.phone,
-        category=data.category,
-        employees=data.employees,
-        business_age=data.business_age,
-        city=data.city or None,
-        proof_filename=filename,
-        proof_mime=mime,
-        proof_bytes=size,
-        agreed_terms=data.agreed_terms,
-        media_consent=data.media_consent,
-        submitter_ip_hash=hash_ip(ip),
-        user_id=user.id if user is not None else None,
-        business_id=business.id if business is not None else None,
-    )
-    db.add(registration)
-
-    # Flush (not commit) so the INSERT runs now, inside this transaction, and
-    # re-count in the same transaction before deciding whether to keep it.
-    #
-    # This closes the race the check above leaves open: SQLite — this app's
-    # default and documented deployment target (see the "Postgres for
-    # multi-instance" note in backend/README.md) — takes its single-writer
-    # file lock on the first write in a transaction and holds it until
-    # commit/rollback. A second concurrent request's flush() blocks on that
-    # lock until this transaction finishes, so it always re-counts *after*
-    # this one has either committed or rolled back — never in between. Two
-    # submissions racing for the last slot in a category are therefore
-    # serialised into "one wins, one gets 409", never "both get in". (This
-    # argument is specific to SQLite's single-writer lock and a single
-    # worker process — the same assumption the in-process rate limiter
-    # already makes, see ratelimit.py. A multi-instance Postgres deployment
-    # would need an explicit `SELECT ... FOR UPDATE` or advisory lock here
-    # instead.)
-    await db.flush()
-    filled_after = await db.scalar(
-        select(func.count()).select_from(Registration).where(Registration.category == data.category)
-    )
-    if filled_after > settings.slots_per_category:
-        await db.rollback()
-        # The row never committed, so its proof file would otherwise be an
-        # orphan nobody can reach — remove it rather than leaking disk.
-        delete_proof(filename)
-        raise _conflict(
-            "category",
-            f"Category {data.category} just filled up. Please choose another category.",
+    try:
+        email = str(data.email).lower()
+        if db.bind.dialect.name == "postgresql":
+            # Always email first, then category: one global lock order, so
+            # two transactions can never wait on each other in a cycle.
+            for key in (f"tgl-registration-email:{email}", f"tgl-category-slots:{data.category}"):
+                await db.execute(text("SELECT pg_advisory_xact_lock(hashtext(:key))"), {"key": key})
+        # The same business registering twice from the same email — a retried
+        # slow submission, a second tab, a resubmit after refresh — must not
+        # take a second paid slot. (A founder registering a *different*
+        # business with the same email is still allowed.)
+        duplicate = await db.scalar(
+            select(Registration.id)
+            .where(
+                func.lower(Registration.email) == email,
+                func.lower(func.trim(Registration.business_name)) == data.business_name.strip().lower(),
+            )
+            .limit(1)
         )
+        if duplicate is not None:
+            raise _conflict(
+                "email",
+                "This business is already registered with this email address. "
+                "If you need to change your entry, please contact us.",
+            )
+        registration = Registration(
+            full_name=data.full_name,
+            business_name=data.business_name,
+            email=str(data.email).lower(),
+            phone=data.phone,
+            category=data.category,
+            employees=data.employees,
+            business_age=data.business_age,
+            city=data.city or None,
+            proof_filename=filename,
+            proof_mime=mime,
+            proof_bytes=size,
+            agreed_terms=data.agreed_terms,
+            media_consent=data.media_consent,
+            submitter_ip_hash=hash_ip(ip),
+            user_id=user.id if user is not None else None,
+            business_id=business.id if business is not None else None,
+        )
+        db.add(registration)
+
+        # Flush (not commit) so the INSERT runs now, inside this transaction, and
+        # re-count in the same transaction before deciding whether to keep it.
+        #
+        # This closes the race the check above leaves open: SQLite — this app's
+        # default and documented deployment target (see the "Postgres for
+        # multi-instance" note in backend/README.md) — takes its single-writer
+        # file lock on the first write in a transaction and holds it until
+        # commit/rollback. A second concurrent request's flush() blocks on that
+        # lock until this transaction finishes, so it always re-counts *after*
+        # this one has either committed or rolled back — never in between. Two
+        # submissions racing for the last slot in a category are therefore
+        # serialised into "one wins, one gets 409", never "both get in". (This
+        # argument is specific to SQLite's single-writer lock and a single
+        # worker process — the same assumption the in-process rate limiter
+        # already makes, see ratelimit.py. A multi-instance Postgres deployment
+        # would need an explicit `SELECT ... FOR UPDATE` or advisory lock here
+        # instead.)
+        #
+        # On Postgres (production, Supabase) that lock is taken explicitly: a
+        # transaction-scoped advisory lock per category serialises concurrent
+        # submissions for the same category exactly as SQLite's file lock does,
+        # and is released automatically at commit/rollback. Other categories are
+        # unaffected.
+        # (Taken at the top of this try block, before the duplicate check.)
+        await db.flush()
+        filled_after = await db.scalar(
+            select(func.count()).select_from(Registration).where(Registration.category == data.category)
+        )
+        if filled_after > settings.slots_per_category:
+            await db.rollback()
+            # The row never committed, so its proof file would otherwise be an
+            # orphan nobody can reach — remove it rather than leaking disk.
+            await delete_proof(filename)
+            raise _conflict(
+                "category",
+                f"Category {data.category} just filled up. Please choose another category.",
+            )
 
 
 
-    if user is not None:
-        await link_registration_to_account(db, event=event, user=user, business=business, legacy=registration)
+        if user is not None:
+            await link_registration_to_account(db, event=event, user=user, business=business, legacy=registration)
 
-    await db.commit()
+        await db.commit()
+    except BaseException:
+        # Nothing was committed, so the stored proof would be unreachable —
+        # remove it (idempotent if the capacity check already did).
+        await db.rollback()
+        await delete_proof(filename)
+        raise
 
     # A new row changes the slot counters, so drop the cached snapshot.
     invalidate_availability_cache()

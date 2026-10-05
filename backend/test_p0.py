@@ -21,7 +21,10 @@ import httpx
 TMP = tempfile.mkdtemp(prefix="tgl-p0-")
 os.environ["ENVIRONMENT"] = "development"
 os.environ["SECRET_KEY"] = "test-secret-key-that-is-definitely-long-enough-123456"
-os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{TMP}/test.db".replace("\\", "/")
+# TEST_DATABASE_URL runs the suite against Postgres (the engine production
+# uses); the tables are dropped and recreated, so never point it at real data.
+os.environ["DB_NULL_POOL"] = "true"  # tests drive the app from more than one event loop
+os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL") or f"sqlite+aiosqlite:///{TMP}/test.db".replace("\\", "/")
 os.environ["UPLOAD_DIR"] = f"{TMP}/uploads"
 os.environ["ADMIN_DIST_DIR"] = f"{TMP}/nonexistent"
 # Never let a real key in a developer's backend/.env cause this run to hit
@@ -68,7 +71,7 @@ def new_client() -> TestClient:
 
 def signup(c: TestClient, email: str) -> str:
     """Create an account on client `c`. Returns the dev verification token."""
-    r = c.post("/api/v1/auth/register", json={"email": email, "password": PASSWORD})
+    r = c.post("/api/v1/auth/register", json={"full_name": "Test User", "phone": "9876543210", "email": email, "password": PASSWORD})
     assert r.status_code == 201, r.text
     return r.json()["dev_verification_token"]
 
@@ -158,6 +161,9 @@ def full_member(email: str, name: str = "Test Founder", business: str = "Test Bi
 
 async def seed() -> None:
     async with engine.begin() as c:
+        if c.dialect.name == "postgresql":  # clean slate on a reused Postgres DB
+            await c.exec_driver_sql("DROP SCHEMA public CASCADE")
+            await c.exec_driver_sql("CREATE SCHEMA public")
         await c.run_sync(Base.metadata.create_all)
     async with SessionLocal() as db:
         db.add(Admin(email=ADMIN_EMAIL, password_hash=hash_password(PASSWORD)))
@@ -187,7 +193,7 @@ def main() -> int:
     admin = new_client()
 
     # ---------- signup ----------
-    r = u1.post("/api/v1/auth/register", json={"email": "founder1@example.com", "password": PASSWORD})
+    r = u1.post("/api/v1/auth/register", json={"full_name": "Test User", "phone": "9876543210", "email": "founder1@example.com", "password": PASSWORD})
     check("customer signup succeeds", r.status_code == 201, r.text[:200])
     u1_token = r.json().get("dev_verification_token")
     check("dev verification token issued outside production", bool(u1_token))
@@ -199,7 +205,7 @@ def main() -> int:
     )
     check("signup response omits password hash", "$argon2" not in r.text)
 
-    r = u1.post("/api/v1/auth/register", json={"email": "founder1@example.com", "password": PASSWORD})
+    r = u1.post("/api/v1/auth/register", json={"full_name": "Test User", "phone": "9876543210", "email": "founder1@example.com", "password": PASSWORD})
     check("duplicate signup is rejected", r.status_code == 409, str(r.status_code))
 
     r = u1.post("/api/v1/auth/register", json={"email": "shortpw@example.com", "password": "short"})
@@ -221,6 +227,11 @@ def main() -> int:
     # account lockout on repeated failures (throwaway account)
     u4 = new_client()
     signup(u4, "lockout@example.com")
+    r = u4.get("/api/v1/status")
+    check("signup stores name and phone on the account", r.json()["user"].get("full_name") == "Test User" and r.json()["user"].get("phone") == "9876543210", r.text[:200])
+    check("no registration for this email: networking_access is false", r.json().get("networking_access") is False, r.text[:200])
+    r = u4.get("/api/v1/networking/members")
+    check("account without a registration cannot read the directory", r.status_code == 403, str(r.status_code))
     codes = []
     for i in range(5):
         reset("customer-login:testclient")
@@ -315,7 +326,8 @@ def main() -> int:
     check("status never exposes payment proof internals", "proof_filename" not in r.text and "proof_bytes" not in r.text)
 
     r = u1.get("/api/v1/networking/members")
-    check("authenticated non-member cannot read the directory", r.status_code == 403, str(r.status_code))
+    check("registered email stays locked before the Grand Finale", r.status_code == 403, str(r.status_code))
+    check("status flags has_registration but no networking_access", st.get("has_registration") is True and st.get("networking_access") is False, r.text[:200])
 
     # ---------- admin verification (payment confirm ≠ membership activation) ----------
     r = u1.get("/api/admin/registrations")
@@ -350,7 +362,7 @@ def main() -> int:
     check("membership stays PENDING after payment confirmation", st.get("membership", {}).get("status") == "PENDING", r.text[:300])
 
     r = u1.get("/api/v1/networking/members")
-    check("confirmed payment still cannot read member data", r.status_code == 403, str(r.status_code))
+    check("confirmed payment alone still cannot read member data", r.status_code == 403, str(r.status_code))
 
     r = u1.get("/api/v1/notifications")
     types = [n["type"] for n in r.json()]
@@ -383,9 +395,9 @@ def main() -> int:
         )
 
     r = u3.get("/api/v1/status")
-    check("unconfirmed registration is NOT activated by the finale", (r.json().get("membership") or {}).get("status") == "PENDING", r.text[:300])
+    check("finale opens Networking for a registered email even before payment confirmation", (r.json().get("membership") or {}).get("status") == "ACTIVE" and r.json().get("networking_access") is True, r.text[:300])
     r = u3.get("/api/v1/networking/members")
-    check("unconfirmed user still cannot read member data", r.status_code == 403, str(r.status_code))
+    check("registered (unconfirmed) email can read member data", r.status_code == 200, str(r.status_code))
 
     # idempotency: running completion again must not double-activate
     r = admin.post("/api/admin/events/season-1/complete", headers={"X-CSRF-Token": admin_csrf})
@@ -395,7 +407,7 @@ def main() -> int:
     # late confirmation: verify u3 after the finale, then re-run the bulk activation
     admin.patch(f"/api/admin/registrations/{reg3_id}/verify", json={"verified": True}, headers={"X-CSRF-Token": admin_csrf})
     r = u3.get("/api/v1/status")
-    check("late-confirmed registration still waits as PENDING", (r.json().get("membership") or {}).get("status") == "PENDING", r.text[:300])
+    check("late payment confirmation keeps the membership ACTIVE", (r.json().get("membership") or {}).get("status") == "ACTIVE", r.text[:300])
     r = admin.post("/api/admin/events/season-1/complete", headers={"X-CSRF-Token": admin_csrf})
     res = r.json() if r.status_code == 200 else {}
     check("re-running bulk activation activates the late confirmation", res.get("activated") == 1 and res.get("already_active") == 2, str(res))
@@ -620,13 +632,13 @@ def main() -> int:
 
     asyncio.run(expire_u1_membership())
     r = u1.get("/api/v1/networking/members")
-    check("expired membership cannot read the directory", r.status_code == 403, str(r.status_code))
+    check("registration keeps directory access after membership expiry", r.status_code == 200, str(r.status_code))
     r = u1.post(
         "/api/v1/referrals",
         json={"receiver_user_id": u2_me["id"], "business_need": "Expired member should not get in"},
         headers={"X-CSRF-Token": customer_csrf(u1)},
     )
-    check("expired membership cannot create referrals", r.status_code == 403, str(r.status_code))
+    check("registration keeps referral access after membership expiry", r.status_code == 201, str(r.status_code))
 
     async def restore_u1_membership() -> None:
         from sqlalchemy import update
@@ -638,6 +650,197 @@ def main() -> int:
             await db.commit()
 
     asyncio.run(restore_u1_membership())
+
+    # ---------- admin deletes an account ----------
+    r = admin.get("/api/admin/customers", params={"search": "lockout@example.com"})
+    items = r.json().get("items", [])
+    check("admin Accounts list returns name and phone", bool(items) and items[0].get("full_name") == "Test User" and items[0].get("phone") == "9876543210", r.text[:300])
+    victim_id = items[0]["id"] if items else "missing"
+    r = admin.delete(f"/api/admin/customers/{victim_id}")
+    check("account delete without CSRF is refused", r.status_code == 403, str(r.status_code))
+    r = new_client().delete(f"/api/admin/customers/{victim_id}")
+    check("account delete requires an admin session", r.status_code == 401, str(r.status_code))
+    r = u1.delete(f"/api/admin/customers/{victim_id}", headers={"X-CSRF-Token": customer_csrf(u1)})
+    check("a customer session cannot delete accounts", r.status_code == 401, str(r.status_code))
+    r = admin.delete(f"/api/admin/customers/{victim_id}", headers={"X-CSRF-Token": admin_csrf})
+    check("admin deletes an account", r.status_code == 204, str(r.status_code))
+    r = admin.get("/api/admin/customers", params={"search": "lockout@example.com"})
+    check("deleted account leaves the Accounts list", r.json().get("total") == 0, r.text[:200])
+    r = admin.delete(f"/api/admin/customers/{victim_id}", headers={"X-CSRF-Token": admin_csrf})
+    check("deleting a missing account is 404", r.status_code == 404, str(r.status_code))
+    reset("customer-login:testclient")
+    r = new_client().post("/api/v1/auth/login", json={"email": "lockout@example.com", "password": PASSWORD})
+    check("deleted account can no longer log in", r.status_code == 401, str(r.status_code))
+
+    # ---------- public-form registrant (no membership row) ----------
+    r = register_season1(new_client(), email="walkin@example.com", name="Walk In", business="Walk Biz")
+    check("anonymous public registration succeeds", r.status_code == 201, r.text[:200])
+    walk = new_client()
+    verify_email(walk, signup(walk, "walkin@example.com"))
+    st = walk.get("/api/v1/status").json()
+    check(
+        "finale completed: public-form registrant sees an ACTIVE membership with dates",
+        st["networking_access"] is True and st["membership"]["status"] == "ACTIVE" and st["membership"]["expires_at"] is not None,
+        str(st.get("membership")),
+    )
+    check("public-form registrant flagged as registered", st["has_registration"] is True, str(st.get("has_registration")))
+
+    # ---------- undo the Grand Finale ----------
+    r = admin.get("/api/admin/events/season-1")
+    check("finale state reports completed with access count", r.status_code == 200 and r.json()["event"]["completed_at"] is not None and r.json()["members_with_access"] >= 3, r.text[:300])
+    r = admin.post("/api/admin/events/season-1/undo-complete")
+    check("undo without CSRF is refused", r.status_code == 403, str(r.status_code))
+    r = new_client().post("/api/admin/events/season-1/undo-complete")
+    check("undo requires an admin session", r.status_code == 401, str(r.status_code))
+    r = admin.post("/api/admin/events/season-1/undo-complete", headers={"X-CSRF-Token": admin_csrf})
+    res = r.json() if r.status_code == 200 else {}
+    check("undo reverts the activated memberships", r.status_code == 200 and res.get("reverted") == 3 and res.get("was_completed") is True, r.text[:300])
+    check("undo clears the event completion", res.get("event", {}).get("completed_at") is None, r.text[:300])
+    r = u1.get("/api/v1/networking/members")
+    check("registered member is locked out again after undo", r.status_code == 403, str(r.status_code))
+    st = walk.get("/api/v1/status").json()
+    check("public-form registrant is locked and has no membership after undo", st["networking_access"] is False and st["membership"] is None, str(st.get("membership")))
+    st = u1.get("/api/v1/status").json()
+    check(
+        "undo returns membership to PENDING with no dates",
+        st["membership"]["status"] == "PENDING" and st["membership"]["starts_at"] is None and st["membership"]["expires_at"] is None and st["networking_access"] is False,
+        str(st.get("membership")),
+    )
+    types = [n["type"] for n in u1.get("/api/v1/notifications").json()]
+    check("undo removes the membership-activated notification", "membership_activated" not in types, str(types))
+    r = admin.post("/api/admin/events/season-1/undo-complete", headers={"X-CSRF-Token": admin_csrf})
+    check("undo twice is a harmless no-op", r.status_code == 200 and r.json().get("reverted") == 0 and r.json().get("was_completed") is False, r.text[:200])
+    r = admin.post("/api/admin/events/season-1/complete", headers={"X-CSRF-Token": admin_csrf})
+    check("completing again after undo re-activates everyone", r.status_code == 200 and r.json().get("activated") == 3, r.text[:200])
+    r = u1.get("/api/v1/networking/members")
+    check("member regains access after re-completing", r.status_code == 200, str(r.status_code))
+    types = [n["type"] for n in u1.get("/api/v1/notifications").json()]
+    check("re-completing leaves exactly one activation notification", types.count("membership_activated") == 1, str(types))
+    st = walk.get("/api/v1/status").json()
+    check("public-form registrant is ACTIVE again after re-completing", st["networking_access"] is True and st["membership"]["status"] == "ACTIVE", str(st.get("membership")))
+    wtypes = [n["type"] for n in walk.get("/api/v1/notifications").json()]
+    check("public-form registrant is notified once that Networking is open", wtypes.count("membership_activated") == 1, str(wtypes))
+    admin.post("/api/admin/events/season-1/complete", headers={"X-CSRF-Token": admin_csrf})
+    wtypes = [n["type"] for n in walk.get("/api/v1/notifications").json()]
+    check("completing twice does not duplicate the notification", wtypes.count("membership_activated") == 1, str(wtypes))
+
+    # ---------- registrant badge + directory reach (public-form registrant) ----------
+    r = register_season1(new_client(), email="walkin2@example.com", name="Walk Two", business="Walk Two Biz")
+    check("second anonymous registration succeeds", r.status_code == 201, r.text[:200])
+    w2 = full_member("walkin2@example.com", name="Walk Two", business="Walk Two Biz", category="04", city="Mysuru")
+    st = w2.get("/api/v1/status").json()
+    check(
+        "unpaid registration does NOT carry the TGL Verified badge",
+        st["business"]["tgl_verified"] is False and st["business"]["verified_via_registration"] is False,
+        str(st.get("business")),
+    )
+    w2_reg_id = admin.get("/api/admin/registrations", params={"search": "walkin2@example.com"}).json()["items"][0]["id"]
+    r = admin.patch(f"/api/admin/registrations/{w2_reg_id}/verify", json={"verified": True}, headers={"X-CSRF-Token": admin_csrf})
+    check("admin verifies the walk-in's payment", r.status_code == 200, r.text[:200])
+    st = w2.get("/api/v1/status").json()
+    check(
+        "payment-verified registrant automatically carries the TGL Verified badge",
+        st["business"]["tgl_verified"] is True and st["business"]["verification_status"] == "VERIFIED" and st["business"]["verified_via_registration"] is True,
+        str(st.get("business")),
+    )
+    check("registrant gets a networking profile on arrival", st.get("networking_profile") is not None, str(st.get("networking_profile")))
+    r = w2.post("/api/v1/business/verification/start", headers={"X-CSRF-Token": customer_csrf(w2)})
+    check("registrant 'start verification' stays VERIFIED (no PENDING review)", r.status_code == 200 and r.json()["verification_status"] == "VERIFIED", r.text[:200])
+    w2_id = st["user"]["id"]
+    listing = u1.get("/api/v1/networking/members").json()
+    w2_row = next((m for m in listing if m["user_id"] == w2_id), None)
+    check("public-form registrant appears in the member directory", w2_row is not None, str([m["business_name"] for m in listing]))
+    check("directory shows the registrant's TGL Verified badge", bool(w2_row and w2_row["tgl_verified"]), str(w2_row))
+    check("directory lists each member once", len({m["user_id"] for m in listing}) == len(listing), str(len(listing)))
+    r = u1.get(f"/api/v1/networking/members/{w2_row['member_id'] if w2_row else 'x'}")
+    check("registrant's member page opens", r.status_code == 200 and r.json().get("tgl_verified") is True, r.text[:200])
+    r = u1.post(
+        "/api/v1/referrals",
+        json={"receiver_user_id": w2_id, "business_need": "Packaging partner"},
+        headers={"X-CSRF-Token": customer_csrf(u1)},
+    )
+    check("a member can refer a public-form registrant", r.status_code == 201, r.text[:200])
+    r = u1.post("/api/v1/networking/connections", json={"target_user_id": w2_id}, headers={"X-CSRF-Token": customer_csrf(u1)})
+    check("a member can connect with a public-form registrant", r.status_code == 201, r.text[:200])
+    r = u1.post(
+        "/api/v1/networking/referral-requests",
+        json={"target_user_id": w2_id, "note": "Looking for a packaging supplier intro"},
+        headers={"X-CSRF-Token": customer_csrf(u1)},
+    )
+    check("a member can ask a registrant for a referral", r.status_code == 204, r.text[:200])
+    notes = {n["type"]: n for n in w2.get("/api/v1/notifications").json()}
+    u1_name = u1.get("/api/v1/status").json()["personal_profile"]["full_name"]
+    conn_n, ref_n, req_n = notes.get("connection_request"), notes.get("referral_received"), notes.get("referral_requested")
+    check("connection notification names who sent it", bool(conn_n) and conn_n["actor"]["name"] == u1_name and u1_name in conn_n["title"], str(conn_n)[:300])
+    check("connection notification links to the sender's member page", bool(conn_n) and conn_n["actor"]["member_id"] is not None and conn_n["actor"]["business_name"], str(conn_n)[:300])
+    check("referral notification carries the business need", bool(ref_n) and ref_n["detail"]["business_need"] == "Packaging partner" and ref_n["actor"]["name"] == u1_name, str(ref_n)[:300])
+    check("referral-request notification names the requester and their note", bool(req_n) and req_n["actor"]["name"] == u1_name and req_n["detail"]["note"] == "Looking for a packaging supplier intro", str(req_n)[:300])
+    check("member notifications link to their source entity", all(n and n["related_entity_id"] for n in (conn_n, ref_n, req_n)), "")
+    check("notification actor exposes no email or phone", all("email" not in (n or {}).get("actor", {}) and "phone" not in (n or {}).get("actor", {}) for n in (conn_n, ref_n, req_n)), "")
+    r = admin.get("/api/admin/customers", params={"search": "walkin2@example.com"})
+    check("admin Accounts shows registrant as VERIFIED", r.json()["items"][0]["verification_status"] == "VERIFIED", r.text[:300])
+    r = admin.patch(f"/api/admin/registrations/{w2_reg_id}/verify", json={"verified": False}, headers={"X-CSRF-Token": admin_csrf})
+    st = w2.get("/api/v1/status").json()
+    check("un-verifying the payment removes the badge", r.status_code == 200 and st["business"]["tgl_verified"] is False, str(st.get("business")))
+    admin.patch(f"/api/admin/registrations/{w2_reg_id}/verify", json={"verified": True}, headers={"X-CSRF-Token": admin_csrf})
+
+    # ---------- profile edits: links + founder story, nothing wiped ----------
+    r = save_business(w2, business_name="Walk Two Biz", category="04", city="Mysuru", founder_story="Started in a garage.", website="walktwo.com", instagram="https://instagram.com/walktwo", linkedin="https://linkedin.com/company/walktwo")
+    check("business save accepts founder story and links", r.status_code == 200 and r.json()["founder_story"] == "Started in a garage." and r.json()["website"] == "walktwo.com", r.text[:300])
+    r = w2.put("/api/v1/business", json={"business_name": "Walk Two Biz", "category": "04", "description": "We make handcrafted products for everyday use.", "city": "Mysuru", "employee_band": "1-3", "business_age": "lt6", "business_stage": "Early"}, headers={"X-CSRF-Token": customer_csrf(w2)})
+    check("saving without the optional fields keeps them (no data wipe)", r.status_code == 200 and r.json()["founder_story"] == "Started in a garage." and r.json()["instagram"] == "https://instagram.com/walktwo", r.text[:300])
+    r = save_business(w2, business_name="Walk Two Biz", category="04", city="Mysuru", website="javascript:alert(1)")
+    check("non-web link schemes are rejected", r.status_code == 422, str(r.status_code))
+    r = save_business(w2, business_name="Walk Two Biz", category="04", city="Mysuru", instagram=None)
+    check("an optional link can be cleared explicitly", r.status_code == 200 and r.json()["instagram"] is None, r.text[:200])
+
+    outsider = full_member("outsider@example.com", name="Out Sider", business="Outside Biz")
+    st = outsider.get("/api/v1/status").json()
+    check("non-registrant has no automatic badge", st["business"]["tgl_verified"] is False and st["business"]["verified_via_registration"] is False, str(st.get("business")))
+    outsider_id = st["user"]["id"]
+    r = u1.post("/api/v1/networking/connections", json={"target_user_id": outsider_id}, headers={"X-CSRF-Token": customer_csrf(u1)})
+    check("non-member cannot be a connection target", r.status_code == 400, str(r.status_code))
+    listing = u1.get("/api/v1/networking/members").json()
+    check("non-member is not in the directory", all(m["user_id"] != outsider_id for m in listing), "")
+
+    # ---------- password reset signs out existing sessions ----------
+    async def plant_reset_token(email: str, raw: str) -> None:
+        from sqlalchemy import select as _select
+        from app.models import User, UserVerificationToken
+        from app.services import token_hash
+
+        async with SessionLocal() as db:
+            uid = await db.scalar(_select(User.id).where(User.email == email))
+            db.add(UserVerificationToken(user_id=uid, token_hash=token_hash(raw), purpose="PASSWORD_RESET", expires_at=utcnow() + timedelta(minutes=30)))
+            await db.commit()
+
+    asyncio.run(plant_reset_token("outsider@example.com", "reset-token-one"))
+    asyncio.run(plant_reset_token("outsider@example.com", "reset-token-two"))
+    check("outsider session works before reset", outsider.get("/api/v1/auth/me").status_code == 200)
+    r = new_client().post("/api/v1/auth/reset-password", json={"token": "reset-token-one", "new_password": "BrandNewPass123!"})
+    check("password reset succeeds", r.status_code == 204, r.text[:200])
+    check("password reset signs out existing sessions", outsider.get("/api/v1/auth/me").status_code == 401)
+    r = new_client().post("/api/v1/auth/reset-password", json={"token": "reset-token-two", "new_password": "AnotherPass123!"})
+    check("other outstanding reset links die with the reset", r.status_code == 400, str(r.status_code))
+    reset("customer-login:testclient")
+    r = new_client().post("/api/v1/auth/login", json={"email": "outsider@example.com", "password": "BrandNewPass123!"})
+    check("login works with the new password", r.status_code == 200, r.text[:200])
+
+    # ---------- OTP login ----------
+    otp_user = new_client()
+    signup(otp_user, "otpuser@example.com")  # never verified via the signup code
+    oc = new_client()
+    r = oc.post("/api/v1/auth/otp/request", json={"email": "otpuser@example.com"})
+    code = r.json().get("dev_otp")
+    r = oc.post("/api/v1/auth/otp/verify", json={"email": "otpuser@example.com", "code": code})
+    check("OTP login succeeds", r.status_code == 200, r.text[:200])
+    check("OTP login proves the email (marks it verified)", r.json().get("email_verified_at") is not None, r.text[:200])
+    oc.post("/api/v1/auth/otp/request", json={"email": "otpuser@example.com"})
+    codes = []
+    for i in range(9):
+        reset("otp-verify:testclient")  # simulate attempts spread over many IPs
+        codes.append(new_client().post("/api/v1/auth/otp/verify", json={"email": "otpuser@example.com", "code": f"{i:06d}"}).status_code)
+    check("OTP guessing is capped per account, not just per IP", codes[-1] == 429, str(codes))
     r = u1.get("/api/v1/networking/members")
     check("restored membership regains access", r.status_code == 200, str(r.status_code))
 

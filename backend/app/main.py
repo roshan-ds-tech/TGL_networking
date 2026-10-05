@@ -8,27 +8,33 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
+from sqlalchemy.exc import IntegrityError
+
 from .config import settings
-from .database import Base, engine, sync_schema
+from .database import Base, engine, lock_down_postgres, sync_schema
 from .routers import admin as admin_router
 from .routers import auth as auth_router
 from .routers import customer as customer_router
 from .routers import public as public_router
-from .storage import upload_root
+from .storage import init_storage
 
 logger = logging.getLogger("tgl")
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    upload_root()
-    Path(settings.upload_dir).parent.mkdir(parents=True, exist_ok=True)
+    if settings.is_production and not settings.resend_api_key:
+        # Not fatal (the site still serves), but no signup, login or reset
+        # code can be delivered until it is set.
+        logger.error("RESEND_API_KEY is not set: account emails cannot be sent in production.")
+    await init_storage()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         await conn.run_sync(sync_schema)
+        await conn.run_sync(lock_down_postgres)
     yield
     await engine.dispose()
 
@@ -58,6 +64,41 @@ app.add_middleware(
 )
 
 
+# Member-app routes of the SPA (see src/main.jsx's Router). Everything else
+# that isn't a real file or an API/admin path is a 404.
+_PRODUCT_EXACT = {"/login", "/signup", "/verify-email", "/forgot-password", "/reset-password"}
+_PRODUCT_PREFIXES = ("/app", "/onboarding")
+
+
+def _is_product_path(path: str) -> bool:
+    return path in _PRODUCT_EXACT or any(path == p or path.startswith(p + "/") for p in _PRODUCT_PREFIXES)
+
+
+def _is_private_path(path: str) -> bool:
+    return path.startswith(("/api", "/admin")) or _is_product_path(path)
+
+
+# Largest legitimate request: a payment proof (max_upload_bytes) plus a few
+# form fields. Anything bigger is refused before it is read or parsed.
+_MAX_BODY_BYTES = settings.max_upload_bytes + 512 * 1024
+
+
+@app.middleware("http")
+async def limit_body_size(request: Request, call_next):
+    length = request.headers.get("content-length")
+    if length is not None:
+        try:
+            too_big = int(length) > _MAX_BODY_BYTES
+        except ValueError:
+            return JSONResponse(status_code=400, content={"detail": "Invalid Content-Length."})
+        if too_big:
+            return JSONResponse(
+                status_code=413,
+                content={"detail": f"Request too large. Files must be under {settings.max_upload_bytes // (1024 * 1024)} MB."},
+            )
+    return await call_next(request)
+
+
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
     response = await call_next(request)
@@ -67,19 +108,34 @@ async def security_headers(request: Request, call_next):
     response.headers.setdefault(
         "Permissions-Policy", "geolocation=(), microphone=(), camera=()"
     )
-    # Nothing on this origin belongs in search results — it serves only the
-    # admin dashboard and the registration API. The public marketing site is a
-    # separate origin and is unaffected. Sent as a header rather than via
-    # robots.txt on purpose: robots.txt would stop the page being *crawled*,
-    # which also stops crawlers ever seeing a noindex, so a linked-to admin URL
-    # could still surface. This way they can fetch it and are told not to index.
-    response.headers.setdefault("X-Robots-Tag", "noindex, nofollow")
+    # The API, the admin dashboard and the signed-in member app never belong
+    # in search results; the public marketing pages served from this same
+    # origin do. Sent as a header rather than via robots.txt on purpose:
+    # robots.txt would stop the page being *crawled*, which also stops
+    # crawlers ever seeing a noindex, so a linked-to admin URL could still
+    # surface. This way they can fetch it and are told not to index.
+    if _is_private_path(request.url.path):
+        response.headers.setdefault("X-Robots-Tag", "noindex, nofollow")
     if settings.is_production:
         response.headers.setdefault(
             "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
         )
     # The proof endpoint sets its own stricter CSP; don't clobber it.
-    if "Content-Security-Policy" not in response.headers and request.url.path.startswith(
+    if "Content-Security-Policy" not in response.headers and not request.url.path.startswith(
+        ("/admin", "/api")
+    ):
+        # Public site + member app. Inline style attributes are used
+        # throughout the React tree, hence 'unsafe-inline' for styles only;
+        # scripts are same-origin modules (the JSON-LD block is data, not
+        # executed). Google Fonts is the only third-party origin.
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; script-src 'self'; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; "
+            "connect-src 'self'; object-src 'none'; frame-ancestors 'none'; "
+            "base-uri 'self'; form-action 'self'"
+        )
+    elif "Content-Security-Policy" not in response.headers and request.url.path.startswith(
         "/admin"
     ):
         response.headers["Content-Security-Policy"] = (
@@ -89,6 +145,16 @@ async def security_headers(request: Request, call_next):
             "base-uri 'self'; form-action 'self'"
         )
     return response
+
+
+@app.exception_handler(IntegrityError)
+async def integrity_error_handler(request: Request, exc: IntegrityError):
+    # Two concurrent requests can both pass an "already exists?" check and then
+    # collide on a unique constraint (same signup email, same connection pair).
+    # That is a conflict, not a server fault — and the constraint text must
+    # not reach the client.
+    logger.warning("Integrity conflict on %s %s", request.method, request.url.path)
+    return JSONResponse(status_code=409, content={"detail": "This was already submitted. Please refresh and try again."})
 
 
 @app.exception_handler(Exception)
@@ -134,4 +200,36 @@ else:  # pragma: no cover - only hit before the dashboard is built
                     "cd admin-dashboard && npm install && npm run build"
                 )
             },
+        )
+
+
+# ---- Public site + member app (same origin as the API) ----
+# Registered last, so every /api and /admin route above wins. In local dev the
+# directory doesn't exist and Vite serves the site on its own port instead.
+_site_dist = Path(settings.site_dist_dir).resolve()
+
+if _site_dist.is_dir() and (_site_dist / "index.html").is_file():
+    _site_index = _site_dist / "index.html"
+
+    @app.api_route("/{path:path}", methods=["GET", "HEAD"], include_in_schema=False)
+    async def site(path: str = "") -> Response:
+        if path.startswith(("api/", "admin/")) or path in {"api", "admin"}:
+            return JSONResponse(status_code=404, content={"detail": "Not Found"})
+        candidate = (_site_dist / path).resolve()
+        if path and candidate.is_file() and _site_dist in candidate.parents:
+            # Vite fingerprints everything under /assets, so those are
+            # immutable; other root files (logo, robots.txt…) revalidate daily.
+            cache = (
+                "public, max-age=31536000, immutable"
+                if path.startswith("assets/")
+                else "public, max-age=86400"
+            )
+            return FileResponse(candidate, headers={"Cache-Control": cache})
+        known = path == "" or _is_product_path("/" + path)
+        # Unknown paths still get the app shell (it renders the branded 404
+        # page) but with a real 404 status, so crawlers don't index them.
+        return FileResponse(
+            _site_index,
+            status_code=200 if known else 404,
+            headers={"Cache-Control": "no-cache"},
         )

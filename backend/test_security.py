@@ -21,7 +21,10 @@ import httpx
 TMP = tempfile.mkdtemp(prefix="tgl-test-")
 os.environ["ENVIRONMENT"] = "development"
 os.environ["SECRET_KEY"] = "test-secret-key-that-is-definitely-long-enough-123456"
-os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{TMP}/test.db".replace("\\", "/")
+# TEST_DATABASE_URL runs the suite against Postgres (the engine production
+# uses); the tables are dropped and recreated, so never point it at real data.
+os.environ["DB_NULL_POOL"] = "true"  # tests drive the app from more than one event loop
+os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL") or f"sqlite+aiosqlite:///{TMP}/test.db".replace("\\", "/")
 os.environ["UPLOAD_DIR"] = f"{TMP}/uploads"
 os.environ["ADMIN_DIST_DIR"] = f"{TMP}/nonexistent"
 # Never let a real key in a developer's backend/.env cause this run to hit
@@ -57,6 +60,9 @@ def check(name: str, condition: bool, detail: str = "") -> None:
 
 async def seed() -> None:
     async with engine.begin() as c:
+        if c.dialect.name == "postgresql":  # clean slate on a reused Postgres DB
+            await c.exec_driver_sql("DROP SCHEMA public CASCADE")
+            await c.exec_driver_sql("CREATE SCHEMA public")
         await c.run_sync(Base.metadata.create_all)
     async with SessionLocal() as db:
         db.add(Admin(email=EMAIL, password_hash=hash_password(PASSWORD)))

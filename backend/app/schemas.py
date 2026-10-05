@@ -182,6 +182,7 @@ class CustomerListItem(BaseModel):
     is_active: bool
     created_at: UtcDatetime
     full_name: str | None = None
+    phone: str | None = None
     business_name: str | None = None
     business_id: str | None = None
     verification_status: str | None = None
@@ -244,8 +245,30 @@ class AvailabilityOut(BaseModel):
 
 
 class CustomerSignup(BaseModel):
+    full_name: str = Field(min_length=2, max_length=120)
     email: EmailStr
+    phone: str = Field(min_length=10, max_length=20)
     password: str = Field(min_length=8, max_length=256)
+
+    @field_validator("full_name")
+    @classmethod
+    def _strip_name(cls, v: str) -> str:
+        v = v.strip()
+        if len(v) < 2:
+            raise ValueError("Enter your full name.")
+        return v
+
+    @field_validator("phone")
+    @classmethod
+    def _clean_phone(cls, v: str) -> str:
+        digits = re.sub(r"\D", "", v)
+        if len(digits) == 12 and digits.startswith("91"):
+            digits = digits[2:]
+        elif len(digits) == 11 and digits.startswith("0"):
+            digits = digits[1:]
+        if len(digits) != 10:
+            raise ValueError("Enter a valid 10-digit mobile number.")
+        return digits
 
 
 class CustomerLogin(BaseModel):
@@ -258,6 +281,8 @@ class CustomerOut(BaseModel):
     email: EmailStr
     email_verified_at: UtcDatetime | None
     is_active: bool
+    full_name: str | None = None
+    phone: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -344,6 +369,28 @@ class BusinessIn(BaseModel):
     founder_story: str | None = Field(default=None, max_length=2000)
     business_stage: str = Field(min_length=2, max_length=80)
 
+    @field_validator("website", "instagram", "linkedin")
+    @classmethod
+    def _link(cls, v: str | None) -> str | None:
+        # Rendered as links on profiles, so only web addresses are accepted —
+        # never javascript:, data: or other schemes. A bare "mybiz.com" is fine.
+        if v is None:
+            return None
+        v = v.strip()
+        if not v:
+            return None
+        if re.match(r"^[a-z][a-z0-9+.-]*:", v, re.I) and not re.match(r"^https?://", v, re.I):
+            raise ValueError("Enter a web address starting with https://")
+        if re.search(r"\s", v):
+            raise ValueError("Links can't contain spaces.")
+        return v
+
+    @field_validator("founder_story")
+    @classmethod
+    def _story(cls, v: str | None) -> str | None:
+        v = (v or "").strip()
+        return v or None
+
     @field_validator("category")
     @classmethod
     def _category(cls, v: str) -> str:
@@ -367,6 +414,8 @@ class BusinessOut(BusinessIn):
     tgl_verified_at: UtcDatetime | None
     verification_status: str
     verification_submitted_at: UtcDatetime | None = None
+    # True when the badge comes from a Season 1 registration rather than KYB.
+    verified_via_registration: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -410,6 +459,13 @@ class MyStatusOut(BaseModel):
     event_registration: dict | None = None
     membership: MembershipOut | None = None
     networking_profile: NetworkingProfileOut | None = None
+    # networking_access: Networking is open (registered email + Grand Finale
+    # completed, or an active membership). has_registration: the email is on
+    # file as a Season 1 registrant, so a locked account is "waiting for the
+    # Finale" rather than "needs to subscribe".
+    networking_access: bool = False
+    has_registration: bool = False
+    registration_verified: bool = False
     unread_notifications: int = 0
 
 
@@ -491,6 +547,17 @@ class BusinessNeedOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class NotificationActor(BaseModel):
+    """Who caused a notification — enough to recognise them and open their
+    member page. Only what the directory already shows members."""
+
+    user_id: str
+    name: str
+    business_name: str | None = None
+    city: str | None = None
+    member_id: str | None = None
+
+
 class NotificationOut(BaseModel):
     id: str
     type: str
@@ -500,11 +567,29 @@ class NotificationOut(BaseModel):
     related_entity_id: str | None
     read_at: UtcDatetime | None
     created_at: UtcDatetime
+    actor: NotificationActor | None = None
+    # Type-specific context for the detail view: the connection/referral
+    # request note, the referral's business need and status, the need's title.
+    detail: dict | None = None
 
     model_config = {"from_attributes": True}
+
+
+class FinaleStateOut(BaseModel):
+    event: EventOut
+    registrations: int
+    members_with_access: int
+
+
+class FinaleUndoOut(BaseModel):
+    event: EventOut
+    reverted: int
+    was_completed: bool
 
 
 class FinaleCompleteOut(BaseModel):
     event: EventOut
     activated: int
     already_active: int
+    registrations: int = 0
+    members_with_access: int = 0

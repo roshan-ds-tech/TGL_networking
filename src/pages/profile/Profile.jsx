@@ -1,139 +1,252 @@
 import { CATEGORIES } from '../../data/categories';
 import { api, go } from '../../lib/customerApi';
-import ImageSlot from '../../components/ImageSlot';
 
 const CATEGORY_MAP = new Map(CATEGORIES.map((c) => [c.code, c.name]));
 
-const VERIF_LABELS = {
-  NOT_STARTED: 'Not started',
-  PENDING: 'Pending review',
-  NEEDS_INFO: 'Needs information',
-  VERIFIED: 'Verified',
-  REJECTED: 'Not approved',
+const VERIF_META = {
+  NOT_STARTED: { label: 'Not verified', tone: 'neutral', hint: 'Add a trust badge to your profile.', cta: 'Start verification' },
+  PENDING: { label: 'In review', tone: 'info', hint: 'Our team is reviewing your documents.', cta: 'View status' },
+  NEEDS_INFO: { label: 'Needs information', tone: 'warn', hint: 'One more document is needed.', cta: 'Review request' },
+  VERIFIED: { label: 'Verified', tone: 'success', hint: 'The TGL Verified badge is live on your profile.', cta: 'View details' },
+  REJECTED: { label: 'Not approved', tone: 'danger', hint: 'You can resubmit with updated documents.', cta: 'Resubmit' },
 };
 
 const MEMBERSHIP_META = {
-  ACTIVE: { bg: '#C08D2E', color: '#22103A', label: 'Active' },
-  PENDING: { bg: 'rgba(224,181,88,0.16)', color: '#EFCB77', label: 'Pending' },
-  EXPIRING: { bg: 'rgba(224,181,88,0.16)', color: '#EFCB77', label: 'Expiring' },
-  EXPIRED: { bg: 'rgba(142,59,59,0.14)', color: '#8E3B3B', label: 'Expired' },
+  ACTIVE: { label: 'Active', tone: 'success' },
+  PENDING: { label: 'Pending', tone: 'warn' },
+  EXPIRING: { label: 'Expiring', tone: 'warn' },
+  EXPIRED: { label: 'Expired', tone: 'danger' },
 };
+
+const fmtDate = (iso) => new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+const hostOf = (url) => url.replace(/^https?:\/\/(www\.)?/i, '').replace(/\/$/, '');
+const hrefOf = (url) => (/^https?:\/\//i.test(url) ? url : `https://${url}`);
 
 async function logout() {
   await api.logout().catch(() => {});
   go('/login');
 }
 
+function Icon({ id, size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true"><use href={`#${id}`} /></svg>
+  );
+}
+
+function Pill({ tone = 'neutral', children }) {
+  return <span className={`pf-pill pf-pill--${tone}`}>{children}</span>;
+}
+
+function Card({ title, icon, action, children, className = '' }) {
+  return (
+    <article className={`pf-card ${className}`}>
+      <header className="pf-card-head">
+        <h2 className="pf-card-title">
+          {icon && <Icon id={icon} size={17} />}
+          {title}
+        </h2>
+        {action}
+      </header>
+      {children}
+    </article>
+  );
+}
+
+function EditLink({ to, label = 'Edit' }) {
+  return (
+    <a
+      href={to}
+      className="pf-link"
+      onClick={(e) => { e.preventDefault(); go(to); }}
+    >
+      {label}
+    </a>
+  );
+}
+
+function Row({ label, children }) {
+  return (
+    <div className="pf-row">
+      <dt>{label}</dt>
+      <dd>{children || <span className="pf-empty">Not added</span>}</dd>
+    </div>
+  );
+}
+
+function Strength({ pct, items }) {
+  const R = 30;
+  const C = 2 * Math.PI * R;
+  const next = items.find((i) => !i.done);
+  return (
+    <Card title="Profile strength" icon="i-target">
+      <div className="pf-strength">
+        <div className="pf-ring" role="img" aria-label={`${pct}% complete`}>
+          <svg width="76" height="76" viewBox="0 0 76 76">
+            <circle cx="38" cy="38" r={R} fill="none" stroke="rgba(53,26,78,0.1)" strokeWidth="6" />
+            <circle
+              cx="38" cy="38" r={R} fill="none" stroke="url(#pfGold)" strokeWidth="6" strokeLinecap="round"
+              strokeDasharray={C} strokeDashoffset={C * (1 - pct / 100)} transform="rotate(-90 38 38)"
+            />
+            <defs>
+              <linearGradient id="pfGold" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stopColor="#E0B558" />
+                <stop offset="1" stopColor="#C08D2E" />
+              </linearGradient>
+            </defs>
+          </svg>
+          <span>{pct}%</span>
+        </div>
+        <p className="pf-strength-copy">
+          {next ? <>Next up: <strong>{next.label.toLowerCase()}</strong>. Fuller profiles get more introductions.</> : 'Your profile is complete. Nicely done.'}
+        </p>
+      </div>
+      <ul className="pf-checklist">
+        {items.map((i) => (
+          <li key={i.label} className={i.done ? 'is-done' : ''}>
+            <span className="pf-tick">{i.done && <Icon id="i-check" size={11} />}</span>
+            {i.done || !i.to ? (
+              <span>{i.label}</span>
+            ) : (
+              <a href={i.to} onClick={(e) => { e.preventDefault(); go(i.to); }}>{i.label}</a>
+            )}
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
 export default function Profile({ status }) {
   const p = status.personal_profile;
   const b = status.business;
+  const user = status.user;
   const membershipStatus = status.membership?.status || 'PENDING';
-  const meta = MEMBERSHIP_META[membershipStatus] || MEMBERSHIP_META.PENDING;
-  const verifLabel = VERIF_LABELS[b?.verification_status] || 'Not started';
+  const mMeta = MEMBERSHIP_META[membershipStatus] || MEMBERSHIP_META.PENDING;
+  const verifStatus = b?.verification_status || 'NOT_STARTED';
+  const vMeta = VERIF_META[verifStatus] || VERIF_META.NOT_STARTED;
+  const hasLinks = !!(b?.website || b?.linkedin || b?.instagram);
 
-  const completeness = [!!p, !!b, !!p?.short_bio, !!b?.description].filter(Boolean).length;
-  const pct = Math.round((completeness / 4) * 100);
+  const items = [
+    { label: 'Create your profile', done: !!p, to: '/onboarding/personal' },
+    { label: 'Add your business', done: !!b, to: '/onboarding/business' },
+    { label: 'Write a short bio', done: !!p?.short_bio, to: '/onboarding/personal' },
+    { label: 'Share your founder story', done: !!b?.founder_story, to: '/onboarding/business#founder-story' },
+    { label: 'Link your website or socials', done: hasLinks, to: '/onboarding/business#links' },
+    { label: 'Verify your business', done: verifStatus === 'VERIFIED', to: '/app/profile/verification' },
+  ];
+  const pct = Math.round((items.filter((i) => i.done).length / items.length) * 100);
+
+  const name = p?.full_name || 'Founder';
+  const initials = name.split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+  const location = p?.city || b?.city;
 
   return (
-    <main style={{ maxWidth: 1240, margin: '0 auto', padding: '48px 28px 96px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap', paddingBottom: 34, borderBottom: '1px solid rgba(53,26,78,0.12)', marginBottom: 36 }}>
-        <ImageSlot shape="circle" label="Photo" initial={p?.full_name || 'F'} style={{ width: 96, height: 96 }} fontSize={34} />
-        <div style={{ flex: 1, minWidth: 220 }}>
-          <p style={{ margin: '0 0 6px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.26em', textTransform: 'uppercase', color: '#C08D2E' }}>Your profile</p>
-          <h1 style={{ margin: '0 0 6px', fontSize: 'clamp(28px, 3.2vw, 40px)', fontWeight: 800, letterSpacing: '-0.03em', color: '#2B1740' }}>{p?.full_name || 'Founder'}</h1>
-          <p style={{ margin: 0, fontSize: 14.5, color: 'rgba(43,23,64,0.6)' }}>{p?.role || 'Founder'} · {b?.business_name || 'Your Business'} · {p?.city || b?.city || 'Bengaluru'}</p>
-        </div>
-        <div style={{ minWidth: 220, padding: '20px 22px', border: '1px solid rgba(53,26,78,0.1)', borderRadius: 18, background: '#FFFCF5' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
-            <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.55)' }}>Profile completeness</span>
-            <span style={{ fontSize: 20, fontWeight: 800, color: '#2B1740' }}>{pct}%</span>
+    <main className="pf">
+      <div className="pf-hero">
+        <div className="pf-cover" />
+        <div className="pf-hero-body">
+          <div className="pf-avatar" aria-hidden="true">{initials}</div>
+          <div className="pf-ident">
+            <h1>{name}</h1>
+            <p className="pf-headline">
+              {p?.role || 'Founder'}{b?.business_name ? <> at <strong>{b.business_name}</strong></> : null}
+            </p>
+            <ul className="pf-meta">
+              {location && <li><Icon id="i-pin" size={14} />{location}</li>}
+              {b?.category && <li><Icon id="i-briefcase" size={14} />{CATEGORY_MAP.get(b.category) || b.category}</li>}
+              <li><Icon id="i-mail" size={14} />{user.email}</li>
+            </ul>
+            <div className="pf-badges">
+              <Pill tone={mMeta.tone}>Membership · {mMeta.label}</Pill>
+              <Pill tone={vMeta.tone}>{verifStatus === 'VERIFIED' && <Icon id="i-shield" size={12} />}{vMeta.label}</Pill>
+            </div>
           </div>
-          <div style={{ height: 5, borderRadius: 999, background: 'rgba(53,26,78,0.1)', overflow: 'hidden' }}>
-            <div style={{ width: `${pct}%`, height: '100%', background: 'linear-gradient(90deg,#C08D2E,#EFCB77)' }} />
+          <div className="pf-hero-actions">
+            <button type="button" className="pf-btn pf-btn--primary" onClick={() => go('/onboarding/personal')}>Edit profile</button>
+            <button type="button" className="pf-btn" onClick={() => go('/onboarding/business')}>Edit business</button>
           </div>
-          <p style={{ margin: '10px 0 0', fontSize: 12, color: 'rgba(43,23,64,0.5)' }}>Add a business story to finish. Not required to use Networking.</p>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
-        <div style={{ padding: 26, border: '1px solid rgba(53,26,78,0.1)', borderRadius: 20, background: '#FFFCF5' }}>
-          <p style={{ margin: '0 0 18px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 16, fontWeight: 800, color: '#2B1740' }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" style={{ color: '#6B3E96' }}><use href="#i-user" /></svg>
-            Personal information
-          </p>
-          <p style={{ margin: '0 0 8px', fontSize: 14, color: 'rgba(43,23,64,0.7)' }}>{status.user.email}</p>
-          <p style={{ margin: '0 0 8px', fontSize: 14, color: 'rgba(43,23,64,0.7)' }}>{p?.phone || 'Not specified'}</p>
-          <p style={{ margin: 0, fontSize: 14, color: 'rgba(43,23,64,0.7)' }}>{p?.city || 'Not specified'}</p>
+      <div className="pf-grid">
+        <div className="pf-col">
+          <Card title="About" icon="i-user" action={<EditLink to="/onboarding/personal" />}>
+            {p?.short_bio ? <p className="pf-prose">{p.short_bio}</p> : <p className="pf-empty">Add a short bio so members know who you are.</p>}
+          </Card>
+
+          <Card title="Business" icon="i-briefcase" action={<EditLink to="/onboarding/business" />}>
+            {b?.description && <p className="pf-prose pf-prose--lead">{b.description}</p>}
+            <dl className="pf-rows">
+              <Row label="Business">{b?.business_name}</Row>
+              <Row label="Category">{b ? CATEGORY_MAP.get(b.category) || b.category : null}</Row>
+              <Row label="Stage">{b?.business_stage}</Row>
+              <Row label="Team size">{b?.employee_band ? `${b.employee_band} people` : null}</Row>
+              <Row label="In business">{b?.business_age}</Row>
+            </dl>
+            {b?.founder_story && (
+              <div className="pf-story">
+                <h3>Founder story</h3>
+                <p className="pf-prose">{b.founder_story}</p>
+              </div>
+            )}
+          </Card>
+
+          <Card title="Contact &amp; links" icon="i-link">
+            <dl className="pf-rows">
+              <Row label="Email">
+                {user.email}
+                {user.email_verified_at && <span className="pf-inline-ok"><Icon id="i-check" size={11} /> Verified</span>}
+              </Row>
+              <Row label="Phone">{p?.phone}</Row>
+              <Row label="Website">{b?.website && <a className="pf-link" href={hrefOf(b.website)} target="_blank" rel="noopener noreferrer">{hostOf(b.website)}</a>}</Row>
+              <Row label="LinkedIn">{b?.linkedin && <a className="pf-link" href={hrefOf(b.linkedin)} target="_blank" rel="noopener noreferrer">{hostOf(b.linkedin)}</a>}</Row>
+              <Row label="Instagram">{b?.instagram && <a className="pf-link" href={hrefOf(b.instagram)} target="_blank" rel="noopener noreferrer">{hostOf(b.instagram)}</a>}</Row>
+            </dl>
+          </Card>
         </div>
 
-        <div style={{ padding: 26, border: '1px solid rgba(53,26,78,0.1)', borderRadius: 20, background: '#FFFCF5' }}>
-          <p style={{ margin: '0 0 18px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 16, fontWeight: 800, color: '#2B1740' }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" style={{ color: '#6B3E96' }}><use href="#i-briefcase" /></svg>
-            Business information
-          </p>
-          <p style={{ margin: '0 0 8px', fontSize: 14, color: 'rgba(43,23,64,0.7)' }}>{b?.business_name || 'Not specified'}</p>
-          <p style={{ margin: '0 0 8px', fontSize: 14, color: 'rgba(43,23,64,0.7)' }}>{CATEGORY_MAP.get(b?.category) || b?.category || 'General'}</p>
-          <p style={{ margin: 0, fontSize: 14, color: 'rgba(43,23,64,0.7)' }}>{b?.employee_band ? `${b.employee_band} people` : 'Team size not specified'}</p>
-        </div>
+        <aside className="pf-col">
+          <Strength pct={pct} items={items} />
 
-        <button
-          type="button"
-          onClick={() => go('/app/profile/membership')}
-          className="tgl-dark-card tglp-lift-flat"
-          style={{ textAlign: 'left', padding: 26, border: 'none', borderRadius: 20, cursor: 'pointer' }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-            <p style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 10, fontSize: 16, fontWeight: 800, color: '#FFFBF3' }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" style={{ color: '#E0B558' }}><use href="#i-network" /></svg>
-              Membership
+          <Card title="Membership" icon="i-network" action={<Pill tone={mMeta.tone}>{mMeta.label}</Pill>}>
+            <p className="pf-side-copy">
+              {membershipStatus === 'ACTIVE'
+                ? `Season 1 Networking is active until ${fmtDate(status.membership.expires_at)}.`
+                : 'Networking activates after the Grand Finale on 5 December 2026.'}
             </p>
-            <svg width="16" height="16" viewBox="0 0 24 24" style={{ color: '#E0B558' }}><use href="#i-arrow" /></svg>
-          </div>
-          <span style={{ display: 'inline-block', padding: '6px 12px', borderRadius: 999, background: meta.bg, color: meta.color, fontSize: 10.5, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', marginBottom: 10 }}>
-            {meta.label}
-          </span>
-          <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.5, color: 'rgba(246,238,223,0.7)' }}>
-            {membershipStatus === 'ACTIVE'
-              ? `Active until ${new Date(status.membership.expires_at).toLocaleDateString()}.`
-              : 'Activates after the Grand Finale on 5 December 2026.'}
-          </p>
-        </button>
+            <a className="pf-link pf-link--arrow" href="/app/profile/membership" onClick={(e) => { e.preventDefault(); go('/app/profile/membership'); }}>
+              Membership details <Icon id="i-arrow" size={14} />
+            </a>
+          </Card>
 
-        <button
-          type="button"
-          onClick={() => go('/app/profile/verification')}
-          className="tglp-lift-flat"
-          style={{ textAlign: 'left', padding: 26, border: '1px solid rgba(53,26,78,0.1)', borderRadius: 20, background: '#FFFCF5', cursor: 'pointer' }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-            <p style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 10, fontSize: 16, fontWeight: 800, color: '#2B1740' }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" style={{ color: '#A8762F' }}><use href="#i-shield" /></svg>
-              Business verification
-            </p>
-            <svg width="16" height="16" viewBox="0 0 24 24" style={{ color: '#C08D2E' }}><use href="#i-arrow" /></svg>
-          </div>
-          <p style={{ margin: '0 0 6px', fontSize: 15, fontWeight: 700, color: '#2B1740' }}>{verifLabel}</p>
-          <p style={{ margin: 0, fontSize: 13.5, color: 'rgba(43,23,64,0.58)' }}>Optional · separate from membership</p>
-        </button>
+          <Card title="Verification" icon="i-shield" action={<Pill tone={vMeta.tone}>{vMeta.label}</Pill>}>
+            <p className="pf-side-copy">{vMeta.hint} Optional, and separate from membership.</p>
+            <a className="pf-link pf-link--arrow" href="/app/profile/verification" onClick={(e) => { e.preventDefault(); go('/app/profile/verification'); }}>
+              {vMeta.cta} <Icon id="i-arrow" size={14} />
+            </a>
+          </Card>
 
-        <div style={{ padding: 26, border: '1px solid rgba(53,26,78,0.1)', borderRadius: 20, background: '#FFFCF5' }}>
-          <p style={{ margin: '0 0 18px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 16, fontWeight: 800, color: '#2B1740' }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" style={{ color: '#6B3E96' }}><use href="#i-trophy" /></svg>
-            Achievements
-          </p>
-          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55, color: 'rgba(43,23,64,0.58)' }}>
-            Nothing yet. Achievements are awarded for real contribution in Networking and Events.
-          </p>
-        </div>
-      </div>
+          <Card title="Achievements" icon="i-trophy">
+            <p className="pf-side-copy">Nothing yet. Achievements are earned through real contribution in Networking and Events.</p>
+          </Card>
 
-      <div style={{ marginTop: 16, padding: 26, border: '1px solid rgba(53,26,78,0.1)', borderRadius: 20, background: '#FFFCF5', display: 'flex', flexWrap: 'wrap', gap: '12px 28px', alignItems: 'center' }}>
-        <p style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#2B1740', flex: '1 1 200px' }}>Account settings</p>
-        {/* The design source also lists "Notification preferences" and
-            "Delete account" here. Neither has an endpoint behind it yet, and
-            a settings link that does nothing is worse than its absence. */}
-        <a href="/forgot-password" onClick={(e) => { e.preventDefault(); go('/forgot-password'); }} style={{ fontSize: 13.5, fontWeight: 600 }}>Change password</a>
-        <a href="/login" onClick={(e) => { e.preventDefault(); logout(); }} style={{ fontSize: 13.5, fontWeight: 600 }}>Sign out</a>
+          <Card title="Account" icon="i-lock">
+            {/* Notification preferences and account deletion have no endpoint
+                yet; a control that does nothing is worse than its absence. */}
+            <ul className="pf-account">
+              <li>
+                <a href="/forgot-password" onClick={(e) => { e.preventDefault(); go('/forgot-password'); }}>
+                  <Icon id="i-lock" size={15} /> Change password <Icon id="i-arrow" size={14} />
+                </a>
+              </li>
+              <li>
+                <button type="button" onClick={logout}>
+                  <Icon id="i-back" size={15} /> Sign out
+                </button>
+              </li>
+            </ul>
+          </Card>
+        </aside>
       </div>
     </main>
   );

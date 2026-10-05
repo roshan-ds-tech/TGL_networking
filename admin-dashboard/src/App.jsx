@@ -56,8 +56,23 @@ export default function App() {
   const [toDelete, setToDelete] = useState(null);
   const [finaleResult, setFinaleResult] = useState(null);
   const [finaleBusy, setFinaleBusy] = useState(false);
+  const [finaleDone, setFinaleDone] = useState(false);
+  const [finaleCounts, setFinaleCounts] = useState(null);
 
   const abortRef = useRef(null);
+
+  // Whether the Finale is currently recorded as completed — drives whether the
+  // panel offers "Complete" or "Undo".
+  useEffect(() => {
+    if (!admin) return;
+    api
+      .season1()
+      .then((f) => {
+        setFinaleDone(!!f.event.completed_at);
+        setFinaleCounts({ registrations: f.registrations, members: f.members_with_access });
+      })
+      .catch(() => {});
+  }, [admin]);
 
   useEffect(() => {
     api.me().then(setAdmin).catch(() => setAdmin(null)).finally(() => setBooting(false));
@@ -141,22 +156,26 @@ export default function App() {
     await load();
   }
 
-  async function completeFinale() {
-    if (!window.confirm('Record the Season 1 Grand Finale as completed and activate all eligible pending Networking memberships?')) {
-      return;
-    }
+  async function runFinale(kind) {
+    const undo = kind === 'undo';
+    const message = undo
+      ? 'Undo the Grand Finale? Networking will close again for registered members, and memberships it activated will return to pending.'
+      : 'Record the Season 1 Grand Finale as completed? Networking will open for every account whose email matches a registration, for 3 months.';
+    if (!window.confirm(message)) return;
     setFinaleBusy(true);
     setError('');
     try {
-      const result = await api.completeSeason1();
-      setFinaleResult(result);
+      const result = undo ? await api.undoSeason1() : await api.completeSeason1();
+      setFinaleResult(undo ? { undone: true, ...result } : result);
+      setFinaleDone(!undo);
+      if (!undo) setFinaleCounts({ registrations: result.registrations, members: result.members_with_access });
       await load();
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         setAdmin(null);
         return;
       }
-      setError(err.message || 'Could not complete the Grand Finale activation.');
+      setError(err.message || `Could not ${undo ? 'undo' : 'complete'} the Grand Finale.`);
     } finally {
       setFinaleBusy(false);
     }
@@ -229,19 +248,37 @@ export default function App() {
 
         <section className="finale-admin" aria-label="Grand Finale membership activation">
           <div>
-            <h2 className="finale-admin__title">Grand Finale activation</h2>
+            <h2 className="finale-admin__title">
+              Grand Finale · {finaleDone ? 'Completed' : 'Not completed'}
+            </h2>
             <p className="finale-admin__copy">
-              Records Season 1 completion and activates eligible confirmed Networking memberships for 3 calendar months.
+              {finaleDone
+                ? 'Networking is open, for 3 calendar months, to every account whose email matches a registration. Use Undo to close it again (for testing).'
+                : 'Completing the Finale opens the Networking community, for 3 calendar months, to every account whose email matches a registration.'}
             </p>
-            {finaleResult && (
+            {finaleDone && finaleCounts && (
               <p className="finale-admin__result">
-                Activated {finaleResult.activated}; already active {finaleResult.already_active}.
+                Networking is open to {finaleCounts.members} account{finaleCounts.members === 1 ? '' : 's'} ({finaleCounts.registrations} registration
+                {finaleCounts.registrations === 1 ? '' : 's'} on file).
+              </p>
+            )}
+            {finaleResult?.undone && !finaleDone && (
+              <p className="finale-admin__result">
+                Undone — Networking is closed again
+                {finaleResult.reverted > 0 &&
+                  `; ${finaleResult.reverted} membership${finaleResult.reverted === 1 ? '' : 's'} returned to pending`}
+                .
               </p>
             )}
           </div>
-          <button type="button" className="btn btn--verify" onClick={completeFinale} disabled={finaleBusy}>
-            {finaleBusy ? 'Activating…' : 'Complete Grand Finale'}
-          </button>
+          <div className="finale-admin__actions">
+            <button type="button" className="btn btn--verify" onClick={() => runFinale('complete')} disabled={finaleBusy || finaleDone}>
+              {finaleBusy && !finaleDone ? 'Completing…' : 'Complete Grand Finale'}
+            </button>
+            <button type="button" className="btn btn--danger" onClick={() => runFinale('undo')} disabled={finaleBusy || !finaleDone}>
+              {finaleBusy && finaleDone ? 'Undoing…' : 'Undo Grand Finale'}
+            </button>
+          </div>
         </section>
 
         {stats && stats.by_category.length > 0 && (

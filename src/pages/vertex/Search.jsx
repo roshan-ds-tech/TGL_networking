@@ -39,7 +39,7 @@ export default function VertexSearch() {
         onSubmit={(e) => e.preventDefault()}
         style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 8px 8px 22px', border: '1px solid rgba(53,26,78,0.16)', borderRadius: 999, background: '#FFFCF5', boxShadow: '0 20px 40px -26px rgba(53,26,78,0.35)', marginBottom: 40 }}
       >
-        <svg width="19" height="19" viewBox="0 0 24 24" style={{ color: 'rgba(43,23,64,0.45)', flexShrink: 0 }}><use href="#i-search" /></svg>
+        <svg width="19" height="19" viewBox="0 0 24 24" style={{ color: 'rgba(43,23,64,0.65)', flexShrink: 0 }}><use href="#i-search" /></svg>
         <input
           type="text"
           value={query}
@@ -67,7 +67,7 @@ export default function VertexSearch() {
           </label>
           {VERTEX_FILTER_GROUPS.map((g) => (
             <div key={g.title} style={{ padding: '16px 0', borderTop: '1px solid rgba(53,26,78,0.1)' }}>
-              <p style={{ margin: '0 0 12px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.55)' }}>{g.title}</p>
+              <p style={{ margin: '0 0 12px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.65)' }}>{g.title}</p>
               {g.opts.map((o) => (
                 <label key={o} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 0', fontSize: 13.5, color: '#2B1740', cursor: 'pointer' }}>
                   <input
@@ -86,7 +86,7 @@ export default function VertexSearch() {
         <div>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 22 }}>
             <h1 style={{ margin: 0, fontSize: 'clamp(26px,3vw,36px)', fontWeight: 800, letterSpacing: '-0.03em', color: '#2B1740' }}>Here&apos;s what could help</h1>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, color: 'rgba(43,23,64,0.6)' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, color: 'rgba(43,23,64,0.65)' }}>
               Sort
               <select style={{ padding: '9px 12px', border: '1px solid rgba(53,26,78,0.16)', borderRadius: 10, background: '#FFFCF5', fontSize: 13, color: '#2B1740' }}>
                 <option>Relevance</option>
@@ -95,7 +95,7 @@ export default function VertexSearch() {
             </label>
           </div>
 
-          <p style={{ margin: '0 0 12px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.26em', textTransform: 'uppercase', color: '#C08D2E' }}>Recommended service</p>
+          <p style={{ margin: '0 0 12px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.26em', textTransform: 'uppercase', color: '#8F6420' }}>Recommended service</p>
           <div className="tgl-dark-card tglp-rise-fast" style={{ display: 'flex', alignItems: 'center', gap: 22, padding: '26px 28px', borderRadius: 20, marginBottom: 40, flexWrap: 'wrap' }}>
             <span style={{ width: 54, height: 54, borderRadius: 14, background: 'rgba(224,181,88,0.16)', border: '1px solid rgba(224,181,88,0.4)', color: '#EFCB77', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <svg width="24" height="24" viewBox="0 0 24 24"><use href="#i-megaphone" /></svg>
@@ -109,8 +109,8 @@ export default function VertexSearch() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 14 }}>
-            <p style={{ margin: 0, fontSize: 10.5, fontWeight: 700, letterSpacing: '.26em', textTransform: 'uppercase', color: '#C08D2E' }}>Recommended providers</p>
-            <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, color: 'rgba(43,23,64,0.45)' }}>SAMPLE DATA</span>
+            <p style={{ margin: 0, fontSize: 10.5, fontWeight: 700, letterSpacing: '.26em', textTransform: 'uppercase', color: '#8F6420' }}>Recommended providers</p>
+            <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, color: 'rgba(43,23,64,0.65)' }}>SAMPLE DATA</span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {providers.map((p) => (
@@ -126,7 +126,7 @@ export default function VertexSearch() {
                       </span>
                     )}
                   </div>
-                  <p style={{ margin: '0 0 10px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'rgba(43,23,64,0.55)' }}>
+                  <p style={{ margin: '0 0 10px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'rgba(43,23,64,0.65)' }}>
                     {p.category}
                     <span style={{ width: 3, height: 3, borderRadius: '50%', background: 'rgba(43,23,64,0.35)' }} />
                     <svg width="13" height="13" viewBox="0 0 24 24"><use href="#i-pin" /></svg>

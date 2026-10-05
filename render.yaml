@@ -1,35 +1,50 @@
 # Render Blueprint — https://render.com/docs/blueprint-spec
 #
-# Deploy: push this repo to GitHub, then in Render:
-#   New -> Blueprint -> select the repo -> Render finds this file automatically.
+# One Docker web service serves the public site, the member app, the admin
+# dashboard (/admin) and the API (/api) from a single origin. Data lives in
+# Supabase: Postgres for records, a private Storage bucket for payment proofs —
+# so the service needs no persistent disk.
 #
-# Before the first deploy, edit PUBLIC_ORIGIN below to your public marketing
-# site's real deployed URL (e.g. https://tgl-season1.vercel.app). Until the
-# site is deployed there too, you can leave it pointing at localhost — the
-# admin dashboard itself does not need it; only the public registration form's
-# cross-origin POST does.
+# Deploy: Render dashboard -> New -> Blueprint -> pick this repo. Render will
+# prompt for every `sync: false` value below. See DEPLOY_RENDER.md.
 services:
   - type: web
-    name: tgl-admin-api
+    name: tgl
     runtime: docker
     dockerfilePath: ./Dockerfile
     dockerContext: .
-    plan: starter # cheapest plan with a persistent disk; free tier has no disk
+    # starter: always on. The free plan works too but sleeps after 15 idle
+    # minutes (~1 minute cold start for the next visitor).
+    plan: starter
+    region: singapore # closest Render region to Bengaluru
     healthCheckPath: /api/health
+    autoDeploy: true
     envVars:
       - key: ENVIRONMENT
         value: production
       - key: SECRET_KEY
-        generateValue: true # Render generates and stores a random 44-char value
+        generateValue: true # random value generated and stored by Render
+      # Supabase -> Project Settings -> Database -> Connection string ->
+      # "Session pooler" (IPv4-compatible). Include the password.
+      - key: DATABASE_URL
+        sync: false
+      - key: STORAGE_BACKEND
+        value: supabase
+      - key: SUPABASE_URL # https://<project-ref>.supabase.co
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY # secret — server-side only
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: payment-proofs
+      # The site's public address (custom domain once attached, else the
+      # onrender.com URL). Used in password-reset email links.
       - key: PUBLIC_ORIGIN
-        value: https://CHANGE-ME.example.com
+        sync: false
+      - key: TRUSTED_PROXY_HOPS
+        value: "1" # Render's load balancer
       - key: SESSION_HOURS
         value: "24"
-      - key: RESEND_API_KEY
-        sync: false # set manually in the Render dashboard — never committed
+      - key: RESEND_API_KEY # email codes; required in production
+        sync: false
       - key: EMAIL_FROM
         value: "TGL <tgl@skykeen.in>"
-    disk:
-      name: tgl-data
-      mountPath: /app/var
-      sizeGB: 1

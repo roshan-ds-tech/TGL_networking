@@ -19,7 +19,11 @@ const WHY_ITEMS = [
 export default function Verification({ status, reload }) {
   const [submitting, setSubmitting] = useState(false);
   const verifStatus = status.business?.verification_status || 'NOT_STARTED';
-  const [label, note, bg, color] = VERIF_MAP[verifStatus] || VERIF_MAP.NOT_STARTED;
+  const [label, baseNote, bg, color] = VERIF_MAP[verifStatus] || VERIF_MAP.NOT_STARTED;
+  const viaRegistration = !!status.business?.verified_via_registration;
+  const note = viaRegistration
+    ? 'Granted automatically because your TGL Season 1 registration and payment have been verified by our team. The badge appears on your profile across Vertex and Networking.'
+    : baseNote;
 
   async function start() {
     setSubmitting(true);
@@ -47,7 +51,7 @@ export default function Verification({ status, reload }) {
 
       <div data-grid-2="" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.2fr) minmax(0,1fr)', gap: 48, alignItems: 'start' }}>
         <div>
-          <p style={{ margin: '0 0 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.26em', textTransform: 'uppercase', color: '#C08D2E' }}>Optional</p>
+          <p style={{ margin: '0 0 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.26em', textTransform: 'uppercase', color: '#8F6420' }}>Optional</p>
           <h1 style={{ margin: '0 0 14px', fontSize: 'clamp(30px, 3.4vw, 44px)', fontWeight: 800, letterSpacing: '-0.035em', color: '#2B1740' }}>Verify your business</h1>
           <p style={{ margin: '0 0 32px', fontSize: 16, lineHeight: 1.65, color: 'rgba(43,23,64,0.68)' }}>
             TGL Verified is a trust badge, separate from your membership. You can use Networking fully without it.
@@ -58,7 +62,7 @@ export default function Verification({ status, reload }) {
                 <svg width="20" height="20" viewBox="0 0 24 24" style={{ color: '#A8762F', flexShrink: 0 }}><use href={`#${item.icon}`} /></svg>
                 <div>
                   <p style={{ margin: '0 0 3px', fontSize: 15, fontWeight: 700, color: '#2B1740' }}>{item.title}</p>
-                  <p style={{ margin: 0, fontSize: 13.5, color: 'rgba(43,23,64,0.6)' }}>{item.desc}</p>
+                  <p style={{ margin: 0, fontSize: 13.5, color: 'rgba(43,23,64,0.65)' }}>{item.desc}</p>
                 </div>
               </div>
             ))}

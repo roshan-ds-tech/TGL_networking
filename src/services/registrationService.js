@@ -3,7 +3,7 @@
  * The whole FormData object is posted (not a plain object) so the payment
  * screenshot travels with the rest of the fields as multipart/form-data. */
 
-const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+import { API_BASE } from '../lib/apiBase';
 
 export class SubmissionError extends Error {
   constructor(message, fieldErrors = {}) {

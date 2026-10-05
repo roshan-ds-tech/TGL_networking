@@ -34,7 +34,7 @@ export default function ResetPassword() {
 
   return (
     <main style={{ maxWidth: 520, margin: '0 auto', padding: '80px 28px 96px' }}>
-      <div style={{ background: '#FFFCF5', border: '1px solid rgba(53,26,78,0.1)', borderRadius: 22, padding: '40px 38px', boxShadow: '0 30px 60px -24px rgba(34,16,58,0.22)' }}>
+      <div style={{ background: '#FFFCF5', border: '1px solid rgba(53,26,78,0.1)', borderRadius: 22, padding: 'clamp(26px, 6vw, 40px) clamp(18px, 5vw, 38px)', boxShadow: '0 30px 60px -24px rgba(34,16,58,0.22)' }}>
         {!token ? (
           <>
             <h1 style={{ margin: '0 0 10px', fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em', color: '#2B1740' }}>Invalid link</h1>
@@ -56,7 +56,7 @@ export default function ResetPassword() {
           </>
         ) : (
           <>
-            <p style={{ margin: '0 0 6px', fontSize: 10.5, letterSpacing: '.26em', textTransform: 'uppercase', fontWeight: 700, color: '#C08D2E' }}>Account recovery</p>
+            <p style={{ margin: '0 0 6px', fontSize: 10.5, letterSpacing: '.26em', textTransform: 'uppercase', fontWeight: 700, color: '#8F6420' }}>Account recovery</p>
             <h1 style={{ margin: '0 0 10px', fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em', color: '#2B1740' }}>Choose a new password</h1>
             <form onSubmit={submit} noValidate style={{ display: 'grid', gap: 18, marginTop: 12 }}>
               <Field label="New Password">

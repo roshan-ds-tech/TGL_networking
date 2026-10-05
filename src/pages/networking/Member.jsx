@@ -7,8 +7,8 @@ import ImageSlot from '../../components/ImageSlot';
 import NetTabs from './NetTabs';
 
 const CATEGORY_MAP = new Map(CATEGORIES.map((c) => [c.code, c.name]));
-const CAPTION = { margin: '0 0 12px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.26em', textTransform: 'uppercase', color: '#C08D2E' };
-const METRIC_LABEL = { margin: '0 0 10px', fontSize: 10, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.5)' };
+const CAPTION = { margin: '0 0 12px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.26em', textTransform: 'uppercase', color: '#8F6420' };
+const METRIC_LABEL = { margin: '0 0 10px', fontSize: 10, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.65)' };
 const METRIC_VALUE = { margin: 0, fontSize: 24, fontWeight: 800, color: '#2B1740' };
 
 export default function Member({ id }) {
@@ -169,7 +169,7 @@ export default function Member({ id }) {
                   <svg width="13" height="13" viewBox="0 0 24 24"><use href="#i-chart" /></svg>
                   Growth Points
                 </p>
-                <p style={{ ...METRIC_VALUE, color: '#C08D2E' }}>{member.growth_points || 0}</p>
+                <p style={{ ...METRIC_VALUE, color: '#8F6420' }}>{member.growth_points || 0}</p>
               </div>
               <div style={{ padding: 20, background: '#FFFCF5' }}>
                 <p style={METRIC_LABEL}>Referrals given</p>
@@ -180,7 +180,7 @@ export default function Member({ id }) {
                 <p style={METRIC_VALUE}>{member.referrals_received || 0}</p>
               </div>
             </div>
-            <p style={{ margin: '0 0 44px', fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, color: 'rgba(43,23,64,0.45)' }}>
+            <p style={{ margin: '0 0 44px', fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, color: 'rgba(43,23,64,0.65)' }}>
               Metrics populate from live activity. Trust Score formula is defined by TGL.
             </p>
 
@@ -230,7 +230,7 @@ export default function Member({ id }) {
             <div style={{ padding: '30px 0', borderTop: '1px solid rgba(53,26,78,0.12)' }}>
               <p style={{ ...CAPTION, marginBottom: 14 }}>Interests</p>
               {interests.length === 0 ? (
-                <p style={{ margin: 0, fontSize: 14, color: 'rgba(43,23,64,0.55)' }}>None listed yet.</p>
+                <p style={{ margin: 0, fontSize: 14, color: 'rgba(43,23,64,0.65)' }}>None listed yet.</p>
               ) : (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   {interests.map((t) => (
@@ -243,8 +243,8 @@ export default function Member({ id }) {
             <div style={{ padding: '30px 0 0', borderTop: '1px solid rgba(53,26,78,0.12)' }}>
               <p style={{ ...CAPTION, marginBottom: 14 }}>Achievements</p>
               <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '20px 22px', border: '1px dashed rgba(53,26,78,0.2)', borderRadius: 16 }}>
-                <svg width="22" height="22" viewBox="0 0 24 24" style={{ color: 'rgba(43,23,64,0.35)' }}><use href="#i-trophy" /></svg>
-                <p style={{ margin: 0, fontSize: 14, color: 'rgba(43,23,64,0.55)' }}>No achievements yet. They appear here as they&apos;re earned.</p>
+                <svg width="22" height="22" viewBox="0 0 24 24" style={{ color: 'rgba(43,23,64,0.65)' }}><use href="#i-trophy" /></svg>
+                <p style={{ margin: 0, fontSize: 14, color: 'rgba(43,23,64,0.65)' }}>No achievements yet. They appear here as they&apos;re earned.</p>
               </div>
             </div>
           </div>

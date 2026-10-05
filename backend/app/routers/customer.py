@@ -18,6 +18,7 @@ from ..models import (
     NetworkingProfile,
     Notification,
     PersonalProfile,
+    Registration,
     ReferralRequest,
     TGLMembership,
     User,
@@ -42,6 +43,7 @@ from ..schemas import (
     MembershipOut,
     MyStatusOut,
     NetworkingProfileOut,
+    NotificationActor,
     NotificationOut,
     OtpRequestIn,
     OtpRequestOut,
@@ -61,7 +63,15 @@ from ..security import (
     burn_timing,
     create_customer_session_token,
     get_current_user,
+    get_optional_user,
     get_user_by_email,
+    finale_window,
+    active_member_clause,
+    has_networking_access,
+    has_registration,
+    is_active_member,
+    has_verified_registration,
+    verified_registrant_ids,
     hash_password,
     new_csrf_token,
     require_active_networking_member,
@@ -70,7 +80,7 @@ from ..security import (
     verify_password,
 )
 from ..email_service import send_login_otp_email, send_password_reset_email, send_verification_email
-from ..services import get_or_create_season_1, new_reset_token, new_verification_token, notify, token_hash
+from ..services import ensure_networking_profile, get_or_create_season_1, new_reset_token, new_verification_token, notify, token_hash
 
 router = APIRouter(prefix="/api/v1", tags=["customer"])
 
@@ -110,6 +120,27 @@ def _membership_out(m: TGLMembership | None) -> MembershipOut | None:
     )
 
 
+async def _who(db: AsyncSession, user_id: str) -> str:
+    """'Asha Rao (Asha Bakes)' — how a member is named in notification text."""
+    profile = await db.get(PersonalProfile, user_id)
+    business = await _primary_business(db, user_id)
+    name = profile.full_name if profile else (await db.get(User, user_id)).full_name or "A member"
+    return f"{name} ({business.business_name})" if business else name
+
+
+def _business_out(business: Business | None, paid_registrant: bool) -> BusinessOut | None:
+    """Registrants whose payment an admin has verified carry the TGL Verified
+    badge automatically. It is derived (not written to the row) so it follows
+    the registration: un-verify or delete it and the badge goes, while a badge
+    earned through the separate KYB review is untouched."""
+    if business is None:
+        return None
+    out = BusinessOut.model_validate(business)
+    if paid_registrant and not out.tgl_verified:
+        out = out.model_copy(update={"tgl_verified": True, "verification_status": "VERIFIED", "verified_via_registration": True})
+    return out
+
+
 async def _primary_business(db: AsyncSession, user_id: str) -> Business | None:
     result = await db.execute(
         select(Business).where(Business.user_id == user_id).order_by(Business.created_at.asc()).limit(1)
@@ -147,7 +178,12 @@ async def register(
     email = str(payload.email).lower().strip()
     if await get_user_by_email(db, email) is not None:
         raise HTTPException(status.HTTP_409_CONFLICT, "An account with this email already exists.")
-    user = User(email=email, password_hash=hash_password(payload.password))
+    user = User(
+        email=email,
+        password_hash=hash_password(payload.password),
+        full_name=payload.full_name,
+        phone=payload.phone,
+    )
     db.add(user)
     await db.flush()
     raw = new_verification_token()
@@ -210,6 +246,16 @@ async def logout(
     response.delete_cookie(CUSTOMER_CSRF_COOKIE, path="/", samesite="strict")
     response.status_code = status.HTTP_204_NO_CONTENT
     return response
+
+
+@router.get("/auth/session")
+async def session(user: User | None = Depends(get_optional_user)) -> dict:
+    """Is anyone signed in? Always 200 — public pages ask this on every visit,
+    and for an anonymous visitor (the normal case) "no" is an answer, not an
+    error. Protected endpoints keep returning 401."""
+    if user is None:
+        return {"authenticated": False}
+    return {"authenticated": True, "user": CustomerOut.model_validate(user).model_dump(mode="json")}
 
 
 @router.get("/auth/me", response_model=CustomerOut)
@@ -302,8 +348,11 @@ async def verify_login_otp(
     ip = client_ip(request)
     enforce(f"otp-verify:{ip}", settings.login_max_attempts, settings.login_window_seconds, "Too many attempts. Please try again later.")
     email = str(payload.email).lower().strip()
+    # Per-account cap as well as per-IP: a 6-digit code must not be guessable
+    # by spreading attempts across many IPs.
+    enforce(f"otp-verify-email:{email}", 8, 600, "Too many attempts. Please request a new code and try again.")
     user = await get_user_by_email(db, email)
-    if user is None:
+    if user is None or not user.is_active:
         burn_timing()
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired code.")
     hashed = token_hash(payload.code.strip())
@@ -320,8 +369,14 @@ async def verify_login_otp(
     if row is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired code.")
     row.used_at = utcnow()
+    # The code arrived in this inbox, so the address is proven.
+    user.email_verified_at = user.email_verified_at or utcnow()
+    user.failed_attempts = 0
+    user.locked_until = None
     await db.commit()
+    await db.refresh(user)
     reset(f"otp-verify:{ip}")
+    reset(f"otp-verify-email:{email}")
     _set_customer_cookies(response, create_customer_session_token(user), new_csrf_token())
     return user
 
@@ -372,7 +427,20 @@ async def reset_password(
     user.password_hash = hash_password(payload.new_password)
     user.failed_attempts = 0
     user.locked_until = None
-    row.used_at = utcnow()
+    # Sign out every existing session — including one an attacker may hold
+    # (e.g. someone who pre-registered this email before its owner did).
+    user.token_version += 1
+    now = utcnow()
+    row.used_at = now
+    others = await db.execute(
+        select(UserVerificationToken).where(
+            UserVerificationToken.user_id == user.id,
+            UserVerificationToken.purpose == "PASSWORD_RESET",
+            UserVerificationToken.used_at.is_(None),
+        )
+    )
+    for other in others.scalars().all():
+        other.used_at = now
     await db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -388,19 +456,51 @@ async def status_me(
     reg = await _current_registration(db, user.id)
     membership = await _current_membership(db, user.id)
     networking_profile = await db.scalar(select(NetworkingProfile).where(NetworkingProfile.user_id == user.id))
+    registered = await has_registration(db, user)
+    paid = bool(
+        registered
+        and await db.scalar(
+            select(Registration.id)
+            .where(func.lower(Registration.email) == user.email.lower(), Registration.verified.is_(True))
+            .limit(1)
+        )
+    )
+    # Once the Finale is completed, a registered email's membership is the
+    # Finale window itself — even when the registration came through the public
+    # form and so has no membership row of its own.
+    out_membership = _membership_out(membership)
+    window = await finale_window(db) if registered else None
+    if window is not None and (out_membership is None or out_membership.status != "ACTIVE"):
+        out_membership = MembershipOut(
+            id=window[0].id,
+            status="ACTIVE",
+            membership_type="NETWORKING",
+            pathway="EVENT_REGISTRATION",
+            starts_at=window[1],
+            expires_at=window[2],
+        )
+    access = await has_networking_access(db, user)
+    if access and networking_profile is None:
+        # Public-form registrants have no profile row until they first arrive
+        # with access; without one they would be missing from the directory.
+        networking_profile = await ensure_networking_profile(db, user.id)
+        await db.commit()
     unread = await db.scalar(
         select(func.count()).select_from(Notification).where(Notification.recipient_user_id == user.id, Notification.read_at.is_(None))
     ) or 0
     return MyStatusOut(
         user=user,
         personal_profile=profile,
-        business=business,
+        business=_business_out(business, paid),
         event=event,
         event_registration=None
         if reg is None
         else {"id": reg.id, "status": reg.status, "payment_status": reg.payment_status, "submitted_at": reg.submitted_at, "confirmed_at": reg.confirmed_at},
-        membership=_membership_out(membership),
+        membership=out_membership,
         networking_profile=networking_profile,
+        networking_access=access,
+        has_registration=registered,
+        registration_verified=paid,
         unread_notifications=unread,
     )
 
@@ -417,7 +517,9 @@ async def upsert_personal_profile(
         profile = PersonalProfile(user_id=user.id, **payload.model_dump())
         db.add(profile)
     else:
-        for key, value in payload.model_dump().items():
+        # exclude_unset: a field the form didn't send (e.g. profile_photo_url)
+        # keeps its value instead of being reset to the schema default.
+        for key, value in payload.model_dump(exclude_unset=True).items():
             setattr(profile, key, value)
         profile.completed_at = profile.completed_at or utcnow()
     await db.commit()
@@ -431,17 +533,17 @@ async def upsert_business(
     user: User = Depends(require_verified_user),
     __: None = Depends(require_customer_csrf),
     db: AsyncSession = Depends(get_db),
-) -> Business:
+) -> BusinessOut:
     business = await _primary_business(db, user.id)
     if business is None:
         business = Business(user_id=user.id, **payload.model_dump())
         db.add(business)
     else:
-        for key, value in payload.model_dump().items():
+        for key, value in payload.model_dump(exclude_unset=True).items():
             setattr(business, key, value)
     await db.commit()
     await db.refresh(business)
-    return business
+    return _business_out(business, await has_verified_registration(db, user))
 
 
 @router.get("/networking/members", response_model=list[MemberListItem])
@@ -453,7 +555,7 @@ async def member_directory(
     _: User = Depends(require_active_networking_member),
     db: AsyncSession = Depends(get_db),
 ) -> list[MemberListItem]:
-    filters = [TGLMembership.status == "ACTIVE", TGLMembership.expires_at > utcnow()]
+    filters = [await active_member_clause(db, NetworkingProfile.user_id)]
     if category:
         filters.append(Business.category == category)
     if city:
@@ -467,11 +569,12 @@ async def member_directory(
         select(NetworkingProfile, Business, PersonalProfile)
         .join(Business, Business.id == NetworkingProfile.business_id)
         .join(PersonalProfile, PersonalProfile.user_id == NetworkingProfile.user_id)
-        .join(TGLMembership, TGLMembership.user_id == NetworkingProfile.user_id)
         .where(*filters)
         .order_by(Business.business_name.asc())
         .limit(50)
     )
+    found = rows.all()
+    registrants = await verified_registrant_ids(db, {p.user_id for p, _, _ in found})
     return [
         MemberListItem(
             member_id=p.id,
@@ -481,11 +584,11 @@ async def member_directory(
             category=b.category,
             city=p.city or b.city,
             headline=p.headline,
-            tgl_verified=b.tgl_verified,
+            tgl_verified=b.tgl_verified or p.user_id in registrants,
             open_to_mentoring=p.open_to_mentoring,
             trust_score=p.trust_score,
         )
-        for p, b, profile in rows.all()
+        for p, b, profile in found
     ]
 
 
@@ -500,8 +603,7 @@ async def member_detail(
             select(NetworkingProfile, Business, PersonalProfile)
             .join(Business, Business.id == NetworkingProfile.business_id)
             .join(PersonalProfile, PersonalProfile.user_id == NetworkingProfile.user_id)
-            .join(TGLMembership, TGLMembership.user_id == NetworkingProfile.user_id)
-            .where(NetworkingProfile.id == member_id, TGLMembership.status == "ACTIVE", TGLMembership.expires_at > utcnow())
+            .where(NetworkingProfile.id == member_id, await active_member_clause(db, NetworkingProfile.user_id))
         )
     ).first()
     if row is None:
@@ -517,7 +619,7 @@ async def member_detail(
         category=b.category,
         city=p.city or b.city,
         headline=p.headline,
-        tgl_verified=b.tgl_verified,
+        tgl_verified=b.tgl_verified or bool(await verified_registrant_ids(db, {p.user_id})),
         open_to_mentoring=p.open_to_mentoring,
         business_description=b.description,
         founder_story=p.founder_story,
@@ -589,20 +691,21 @@ async def create_referral(
     receiver = await db.get(User, payload.receiver_user_id)
     if receiver is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Receiver not found")
-    active = await db.scalar(
-        select(func.count())
-        .select_from(TGLMembership)
-        .where(
-            TGLMembership.user_id == receiver.id,
-            TGLMembership.status == "ACTIVE",
-            TGLMembership.expires_at > utcnow(),
-        )
-    )
-    if not active:
+    if not await is_active_member(db, receiver.id):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Receiver is not an active Networking member.")
     ref = BusinessReferral(giver_user_id=user.id, receiver_user_id=payload.receiver_user_id, business_need=payload.business_need, note=payload.note)
     db.add(ref)
-    notify(db, payload.receiver_user_id, "referral_received", "New referral received", payload.business_need, "business_referral", ref.id)
+    await db.flush()  # assigns ref.id, so the notification can link to it
+    notify(
+        db,
+        payload.receiver_user_id,
+        "referral_received",
+        f"{await _who(db, user.id)} sent you a referral",
+        f"Business need: {payload.business_need}",
+        "business_referral",
+        ref.id,
+        actor_user_id=user.id,
+    )
     await db.commit()
     await db.refresh(ref)
     return ref
@@ -637,9 +740,13 @@ async def transition_referral(
     elif next_status == "DECLINED":
         ref.declined_at = stamp
     recipient = ref.giver_user_id if user.id == ref.receiver_user_id else ref.receiver_user_id
-    notify(db, recipient, "referral_status_changed", "Referral status updated", f"Referral status changed to {next_status}.", "business_referral", ref.id)
+    who = await _who(db, user.id)
+    label = next_status.replace("_", " ").lower()
     if next_status == "ACCEPTED":
-        notify(db, ref.giver_user_id, "referral_accepted", "Referral accepted", "Your referral was accepted.", "business_referral", ref.id)
+        # One notification, not a generic "status changed" plus "accepted".
+        notify(db, ref.giver_user_id, "referral_accepted", f"{who} accepted your referral", f"Business need: {ref.business_need}", "business_referral", ref.id, actor_user_id=user.id)
+    else:
+        notify(db, recipient, "referral_status_changed", f"{who} marked a referral as {label}", f"Business need: {ref.business_need}", "business_referral", ref.id, actor_user_id=user.id)
     await db.commit()
     await db.refresh(ref)
     return ref
@@ -718,9 +825,16 @@ async def help_need(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Need not found")
     if need.user_id == user.id:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "You cannot offer help on your own need.")
-    helper_business = await _primary_business(db, user.id)
-    helper_name = helper_business.business_name if helper_business else "A member"
-    notify(db, need.user_id, "need_help_offered", "Someone can help with your need", f"{helper_name} can help with: {need.title}", "business_need", need.id)
+    notify(
+        db,
+        need.user_id,
+        "need_help_offered",
+        f"{await _who(db, user.id)} can help with your need",
+        f"Your need: {need.title}",
+        "business_need",
+        need.id,
+        actor_user_id=user.id,
+    )
     await db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -743,14 +857,7 @@ async def create_connection(
 ) -> Connection:
     if payload.target_user_id == user.id:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "You cannot connect with yourself.")
-    active = await db.scalar(
-        select(func.count()).select_from(TGLMembership).where(
-            TGLMembership.user_id == payload.target_user_id,
-            TGLMembership.status == "ACTIVE",
-            TGLMembership.expires_at > utcnow(),
-        )
-    )
-    if not active:
+    if not await is_active_member(db, payload.target_user_id):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Target is not an active Networking member.")
     existing = await db.scalar(
         select(func.count()).select_from(Connection).where(
@@ -761,7 +868,17 @@ async def create_connection(
         raise HTTPException(status.HTTP_409_CONFLICT, "You already sent a connection request to this member.")
     conn = Connection(requester_user_id=user.id, target_user_id=payload.target_user_id, note=payload.note)
     db.add(conn)
-    notify(db, payload.target_user_id, "connection_request", "New connection request", payload.note or "Someone wants to connect with you.", "connection", conn.id)
+    await db.flush()
+    notify(
+        db,
+        payload.target_user_id,
+        "connection_request",
+        f"{await _who(db, user.id)} wants to connect",
+        payload.note or "No message was added.",
+        "connection",
+        conn.id,
+        actor_user_id=user.id,
+    )
     await db.commit()
     await db.refresh(conn)
     return conn
@@ -776,18 +893,21 @@ async def create_referral_request(
 ) -> Response:
     if payload.target_user_id == user.id:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "You cannot request a referral from yourself.")
-    active = await db.scalar(
-        select(func.count()).select_from(TGLMembership).where(
-            TGLMembership.user_id == payload.target_user_id,
-            TGLMembership.status == "ACTIVE",
-            TGLMembership.expires_at > utcnow(),
-        )
-    )
-    if not active:
+    if not await is_active_member(db, payload.target_user_id):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Target is not an active Networking member.")
     req = ReferralRequest(requester_user_id=user.id, target_user_id=payload.target_user_id, note=payload.note)
     db.add(req)
-    notify(db, payload.target_user_id, "referral_requested", "Referral requested", payload.note or "A member requested a referral from you.", "referral_request", req.id)
+    await db.flush()
+    notify(
+        db,
+        payload.target_user_id,
+        "referral_requested",
+        f"{await _who(db, user.id)} is asking you for a referral",
+        payload.note or "No details were added.",
+        "referral_request",
+        req.id,
+        actor_user_id=user.id,
+    )
     await db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -797,10 +917,15 @@ async def start_verification(
     user: User = Depends(require_verified_user),
     __: None = Depends(require_customer_csrf),
     db: AsyncSession = Depends(get_db),
-) -> Business:
+) -> BusinessOut:
     business = await _primary_business(db, user.id)
     if business is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Complete your business profile first.")
+    if await has_verified_registration(db, user):
+        # Already verified by virtue of a payment-verified Season 1
+        # registration — nothing to submit, and a PENDING row would only
+        # confuse the admin.
+        return _business_out(business, True)
     if business.verification_status in ("NOT_STARTED", "REJECTED"):
         business.verification_status = "PENDING"
         business.verification_submitted_at = utcnow()
@@ -813,11 +938,78 @@ async def start_verification(
 async def list_notifications(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> list[Notification]:
+) -> list[NotificationOut]:
     rows = await db.execute(
         select(Notification).where(Notification.recipient_user_id == user.id).order_by(Notification.created_at.desc()).limit(100)
     )
-    return rows.scalars().all()
+    items = rows.scalars().all()
+
+    # Context per notification, from the entity it points at. Every lookup is
+    # scoped to entities the recipient is a party to, so a notification can
+    # never be used to read someone else's connection or referral.
+    details: dict[str, dict] = {}
+    actors: dict[str, str] = {}
+    for n in items:
+        if n.actor_user_id:
+            actors[n.id] = n.actor_user_id
+        if not n.related_entity_id:
+            continue
+        if n.related_entity_type == "connection":
+            c = await db.get(Connection, n.related_entity_id)
+            if c and c.target_user_id == user.id:
+                details[n.id] = {"note": c.note}
+                actors.setdefault(n.id, c.requester_user_id)
+        elif n.related_entity_type == "referral_request":
+            r = await db.get(ReferralRequest, n.related_entity_id)
+            if r and r.target_user_id == user.id:
+                details[n.id] = {"note": r.note}
+                actors.setdefault(n.id, r.requester_user_id)
+        elif n.related_entity_type == "business_referral":
+            r = await db.get(BusinessReferral, n.related_entity_id)
+            if r and user.id in {r.giver_user_id, r.receiver_user_id}:
+                details[n.id] = {
+                    "business_need": r.business_need,
+                    "note": r.note,
+                    "status": r.status,
+                    "you_are": "receiver" if r.receiver_user_id == user.id else "giver",
+                }
+                actors.setdefault(n.id, r.giver_user_id if r.receiver_user_id == user.id else r.receiver_user_id)
+        elif n.related_entity_type == "business_need":
+            need = await db.get(BusinessNeed, n.related_entity_id)
+            if need and need.user_id == user.id:
+                details[n.id] = {"need_title": need.title, "need_description": need.description, "need_status": need.status}
+
+    actor_out: dict[str, NotificationActor] = {}
+    for uid in set(actors.values()):
+        u = await db.get(User, uid)
+        if u is None:
+            continue  # account deleted since
+        profile = await db.get(PersonalProfile, uid)
+        business = await _primary_business(db, uid)
+        np = await db.scalar(select(NetworkingProfile).where(NetworkingProfile.user_id == uid))
+        actor_out[uid] = NotificationActor(
+            user_id=uid,
+            name=(profile.full_name if profile else None) or u.full_name or "A TGL member",
+            business_name=business.business_name if business else None,
+            city=(profile.city if profile else None) or (business.city if business else None),
+            member_id=np.id if np else None,
+        )
+
+    return [
+        NotificationOut(
+            id=n.id,
+            type=n.type,
+            title=n.title,
+            body=n.body,
+            related_entity_type=n.related_entity_type,
+            related_entity_id=n.related_entity_id,
+            read_at=n.read_at,
+            created_at=n.created_at,
+            actor=actor_out.get(actors.get(n.id, "")),
+            detail=details.get(n.id),
+        )
+        for n in items
+    ]
 
 
 @router.post("/notifications/{notification_id}/read", response_model=NotificationOut)

@@ -40,7 +40,7 @@ function SelectChip({ label, value, options, onChange }) {
       </button>
       {open && (
         <div style={{ position: 'absolute', zIndex: 20, top: 'calc(100% + 8px)', left: 0, minWidth: 220, maxHeight: 280, overflowY: 'auto', padding: 8, border: '1px solid rgba(53,26,78,0.14)', borderRadius: 16, background: '#FFFCF5', boxShadow: '0 26px 52px -26px rgba(53,26,78,0.4)' }}>
-          <button type="button" className="tglp-row" onClick={() => { onChange(''); setOpen(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', border: 'none', borderRadius: 10, background: 'transparent', font: 'inherit', fontSize: 13.5, color: 'rgba(43,23,64,0.6)', cursor: 'pointer' }}>
+          <button type="button" className="tglp-row" onClick={() => { onChange(''); setOpen(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', border: 'none', borderRadius: 10, background: 'transparent', font: 'inherit', fontSize: 13.5, color: 'rgba(43,23,64,0.65)', cursor: 'pointer' }}>
             All
           </button>
           {options.map((o) => (
@@ -133,7 +133,7 @@ export default function Directory() {
       <main style={{ maxWidth: 1240, margin: '0 auto', padding: '48px 28px 96px' }}>
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap', marginBottom: 26 }}>
           <div>
-            <p style={{ margin: '0 0 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.26em', textTransform: 'uppercase', color: '#C08D2E' }}>Directory</p>
+            <p style={{ margin: '0 0 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.26em', textTransform: 'uppercase', color: '#8F6420' }}>Directory</p>
             <h1 style={{ margin: 0, fontSize: 'clamp(30px,3.4vw,44px)', fontWeight: 800, letterSpacing: '-0.035em', color: '#2B1740' }}>Find Members</h1>
           </div>
           <div style={{ display: 'flex', padding: 4, border: '1px solid rgba(53,26,78,0.14)', borderRadius: 999, background: '#FFFCF5' }}>
@@ -153,7 +153,7 @@ export default function Directory() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '6px 6px 6px 20px', border: '1px solid rgba(53,26,78,0.16)', borderRadius: 999, background: '#FFFCF5', marginBottom: 16 }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" style={{ color: 'rgba(43,23,64,0.45)', flexShrink: 0 }}><use href="#i-search" /></svg>
+          <svg width="18" height="18" viewBox="0 0 24 24" style={{ color: 'rgba(43,23,64,0.65)', flexShrink: 0 }}><use href="#i-search" /></svg>
           <input
             type="text"
             placeholder="Search businesses, founders or expertise..."
@@ -179,7 +179,7 @@ export default function Directory() {
           </button>
         </div>
 
-        <p style={{ margin: '0 0 14px', fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, color: 'rgba(43,23,64,0.45)' }}>
+        <p style={{ margin: '0 0 14px', fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, color: 'rgba(43,23,64,0.65)' }}>
           {visible.length} MEMBER{visible.length === 1 ? '' : 'S'}
         </p>
 
@@ -200,11 +200,11 @@ export default function Directory() {
                       <p style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#2B1740' }}>{m.founder_name}</p>
                       {m.tgl_verified && <svg width="15" height="15" viewBox="0 0 24 24" style={{ color: '#A8762F' }}><use href="#i-shield" /></svg>}
                     </div>
-                    <p style={{ margin: '2px 0 0', fontSize: 12.5, color: 'rgba(43,23,64,0.58)' }}>{m.business_name}</p>
+                    <p style={{ margin: '2px 0 0', fontSize: 12.5, color: 'rgba(43,23,64,0.65)' }}>{m.business_name}</p>
                   </div>
                 </div>
                 <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: '#6B3E96' }}>{CATEGORY_MAP.get(m.category) || m.category}</p>
-                <p style={{ margin: '0 0 6px', display: 'flex', alignItems: 'center', gap: 5, fontSize: 12.5, color: 'rgba(43,23,64,0.55)' }}>
+                <p style={{ margin: '0 0 6px', display: 'flex', alignItems: 'center', gap: 5, fontSize: 12.5, color: 'rgba(43,23,64,0.65)' }}>
                   <svg width="13" height="13" viewBox="0 0 24 24"><use href="#i-pin" /></svg>
                   {m.city || 'Bengaluru'}
                 </p>
@@ -223,10 +223,10 @@ export default function Directory() {
                     <p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#2B1740' }}>{m.founder_name}</p>
                     {m.tgl_verified && <svg width="14" height="14" viewBox="0 0 24 24" style={{ color: '#A8762F' }}><use href="#i-shield" /></svg>}
                   </div>
-                  <p style={{ margin: '2px 0 0', fontSize: 12.5, color: 'rgba(43,23,64,0.58)' }}>{m.business_name}</p>
+                  <p style={{ margin: '2px 0 0', fontSize: 12.5, color: 'rgba(43,23,64,0.65)' }}>{m.business_name}</p>
                 </div>
-                <p style={{ flex: '1 1 200px', margin: 0, fontSize: 13, color: 'rgba(43,23,64,0.62)' }}>{CATEGORY_MAP.get(m.category) || m.category}</p>
-                <p style={{ flex: '0 0 110px', margin: 0, fontSize: 13, color: 'rgba(43,23,64,0.62)' }}>{m.city || 'Bengaluru'}</p>
+                <p style={{ flex: '1 1 200px', margin: 0, fontSize: 13, color: 'rgba(43,23,64,0.65)' }}>{CATEGORY_MAP.get(m.category) || m.category}</p>
+                <p style={{ flex: '0 0 110px', margin: 0, fontSize: 13, color: 'rgba(43,23,64,0.65)' }}>{m.city || 'Bengaluru'}</p>
                 <Actions m={m} compact />
               </div>
             ))}

@@ -6,18 +6,22 @@ function cell(label, value, gold) {
 
 export default function Events({ status }) {
   const reg = status.event_registration;
-  const paid = reg?.payment_status === 'VERIFIED';
+  const registered = !!reg || !!status.has_registration;
+  const paid = reg?.payment_status === 'CONFIRMED' || !!status.registration_verified;
+  const confirmed = reg?.status === 'CONFIRMED' || paid;
+  const m = status.membership;
+  const networkingOpen = !!status.networking_access;
 
   const cells = [
-    cell('Grand Finale', '5 Dec 2026'),
-    cell('Registration', reg ? (reg.status === 'CONFIRMED' ? 'Confirmed' : 'In review') : 'Not started', !!reg),
-    cell('Payment', reg ? (paid ? 'Confirmed' : 'Awaiting') : '—', paid),
-    cell('Evaluation', 'Upcoming'),
+    cell('Grand Finale', networkingOpen ? 'Completed' : '5 Dec 2026', networkingOpen),
+    cell('Registration', registered ? (confirmed ? 'Confirmed' : 'In review') : 'Not started', registered),
+    cell('Payment', registered ? (paid ? 'Confirmed' : 'Awaiting') : '—', paid),
+    cell('Networking', networkingOpen ? 'Open' : 'After Finale', networkingOpen),
   ];
 
   return (
     <main style={{ maxWidth: 1240, margin: '0 auto', padding: '48px 28px 96px' }}>
-      <p style={{ margin: '0 0 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.26em', textTransform: 'uppercase', color: '#C08D2E' }}>TGL Events</p>
+      <p style={{ margin: '0 0 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.26em', textTransform: 'uppercase', color: '#8F6420' }}>TGL Events</p>
       <h1 style={{ margin: '0 0 30px', fontSize: 'clamp(30px,3.4vw,44px)', fontWeight: 800, letterSpacing: '-0.035em', color: '#2B1740' }}>My registrations</h1>
 
       <div className="tglp-framed" style={{ maxWidth: 760 }}>
@@ -36,9 +40,18 @@ export default function Events({ status }) {
             ))}
           </div>
 
-          {reg ? (
+          {registered ? (
             <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.6, color: 'rgba(246,238,223,0.72)' }}>
-              Your Season 1 entry is <strong style={{ color: '#FFFBF3' }}>{reg.status.toLowerCase()}</strong>. Networking membership activates after the Grand Finale and runs for three months.
+              {networkingOpen ? (
+                <>
+                  The Grand Finale is complete and your Networking membership is <strong style={{ color: '#FFFBF3' }}>active</strong>
+                  {m?.expires_at ? ` until ${new Date(m.expires_at).toLocaleDateString()}` : ''}.
+                </>
+              ) : (
+                <>
+                  Your Season 1 entry is <strong style={{ color: '#FFFBF3' }}>{(reg?.status || 'registered').toLowerCase()}</strong>. Networking membership activates after the Grand Finale and runs for three months.
+                </>
+              )}
             </p>
           ) : (
             <>
@@ -56,7 +69,7 @@ export default function Events({ status }) {
             </>
           )}
 
-          {reg && (
+          {registered && (
             <a
               href="/"
               className="tglp-gold"
@@ -69,7 +82,7 @@ export default function Events({ status }) {
         </div>
       </div>
 
-      <p style={{ margin: '40px 0 0', fontSize: 13, color: 'rgba(43,23,64,0.5)' }}>
+      <p style={{ margin: '40px 0 0', fontSize: 13, color: 'rgba(43,23,64,0.65)' }}>
         Full Events listing, Season 1 detail and the in-app registration flow are still to come.
       </p>
     </main>

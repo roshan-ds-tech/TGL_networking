@@ -25,7 +25,7 @@ export default function Login({ onSuccess }) {
   }
 
   return (
-    <div className="login">
+    <main className="login">
       <form className="login__card" onSubmit={handleSubmit}>
         <p className="login__eyebrow">The Growth League</p>
         <h1 className="login__title">Admin sign in</h1>
@@ -68,6 +68,6 @@ export default function Login({ onSuccess }) {
           {busy ? 'Signing in…' : 'Sign in'}
         </button>
       </form>
-    </div>
+    </main>
   );
 }

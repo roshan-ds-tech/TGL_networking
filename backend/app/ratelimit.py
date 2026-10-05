@@ -12,6 +12,8 @@ from collections import deque
 
 from fastapi import HTTPException, Request, status
 
+from .config import settings
+
 # key -> (window_seconds, timestamps). The window is stored per key because the
 # sweep below has to prune each bucket against its own window.
 _buckets: dict[str, tuple[int, deque[float]]] = {}
@@ -20,10 +22,21 @@ _last_sweep = 0.0
 
 
 def client_ip(request: Request) -> str:
-    """Client IP, honouring one layer of trusted proxy."""
+    """The client's IP, as seen by our own trusted proxy layer.
+
+    X-Forwarded-For is a list each proxy *appends* to, and its leftmost
+    entries are whatever the client chose to send — so trusting the first
+    entry would let anyone dodge every rate limit by sending a random value.
+    With N trusted proxies in front (Render's load balancer: 1), the client's
+    real address is the Nth entry from the right. TRUSTED_PROXY_HOPS=0 (local
+    dev, direct exposure) ignores the header entirely.
+    """
+    hops = settings.trusted_proxy_hops
     forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
+    if hops > 0 and forwarded:
+        chain = [p.strip() for p in forwarded.split(",") if p.strip()]
+        if chain:
+            return chain[-hops] if len(chain) >= hops else chain[0]
     return request.client.host if request.client else "unknown"
 
 

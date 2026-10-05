@@ -5,7 +5,6 @@ import logging
 import math
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from fastapi.responses import FileResponse
 from sqlalchemy import Integer, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,10 +21,13 @@ from ..schemas import (
     StatsOut,
     VerifyRequest,
     FinaleCompleteOut,
+    FinaleStateOut,
+    FinaleUndoOut,
+    EventOut,
 )
-from ..security import get_current_admin, require_csrf
-from ..services import activate_memberships_for_event, confirm_event_registration, get_or_create_season_1
-from ..storage import delete_proof, resolve_proof
+from ..security import get_current_admin, verified_registrant_ids, require_csrf
+from ..services import activate_memberships_for_event, confirm_event_registration, count_registered_access, get_or_create_season_1, notify_finale_open, revert_finale
+from ..storage import delete_proof, read_proof
 from .public import invalidate_availability_cache
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -117,7 +119,13 @@ async def list_customers(
     filters = []
     if search:
         needle = f"%{search.strip().lower()}%"
-        filters.append(func.lower(User.email).like(needle))
+        filters.append(
+            or_(
+                func.lower(User.email).like(needle),
+                func.lower(func.coalesce(User.full_name, "")).like(needle),
+                func.coalesce(User.phone, "").like(needle),
+            )
+        )
 
     total = await db.scalar(select(func.count()).select_from(User).where(*filters)) or 0
 
@@ -143,6 +151,13 @@ async def list_customers(
         for b in business_rows.scalars().all():
             businesses.setdefault(b.user_id, b)
 
+    registrants = await verified_registrant_ids(db, user_ids)
+
+    def _verification(uid: str) -> str | None:
+        if uid in registrants:
+            return "VERIFIED"  # automatic for payment-verified registrants
+        return businesses[uid].verification_status if uid in businesses else None
+
     items = [
         CustomerListItem(
             id=u.id,
@@ -150,10 +165,11 @@ async def list_customers(
             email_verified_at=u.email_verified_at,
             is_active=u.is_active,
             created_at=u.created_at,
-            full_name=profiles[u.id].full_name if u.id in profiles else None,
+            full_name=profiles[u.id].full_name if u.id in profiles else u.full_name,
+            phone=profiles[u.id].phone if u.id in profiles else u.phone,
             business_name=businesses[u.id].business_name if u.id in businesses else None,
             business_id=businesses[u.id].id if u.id in businesses else None,
-            verification_status=businesses[u.id].verification_status if u.id in businesses else None,
+            verification_status=_verification(u.id),
             personal_profile_complete=u.id in profiles,
             business_profile_complete=u.id in businesses,
         )
@@ -167,6 +183,57 @@ async def list_customers(
         page_size=page_size,
         pages=max(1, math.ceil(total / page_size)),
     )
+
+
+@router.get("/events/season-1", response_model=FinaleStateOut)
+async def season_1_state(
+    _: Admin = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> FinaleStateOut:
+    event = await get_or_create_season_1(db)
+    counts = await count_registered_access(db)
+    await db.commit()
+    return FinaleStateOut(event=event, **counts)
+
+
+@router.post("/events/season-1/undo-complete", response_model=FinaleUndoOut)
+async def undo_complete_season_1(
+    admin: Admin = Depends(get_current_admin),
+    __: None = Depends(require_csrf),
+    db: AsyncSession = Depends(get_db),
+) -> FinaleUndoOut:
+    """Reverse "Complete Grand Finale" (development aid): Networking closes
+    again and finale-activated memberships return to PENDING."""
+    event = await get_or_create_season_1(db)
+    result = await revert_finale(db, event)
+    await db.commit()
+    await db.refresh(event)
+    logger.warning("Season 1 Grand Finale UNDONE by %s reverted=%s", admin.email, result["reverted"])
+    return FinaleUndoOut(event=event, reverted=result["reverted"], was_completed=result["was_completed"])
+
+
+@router.delete("/customers/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_customer(
+    user_id: str,
+    admin: Admin = Depends(get_current_admin),
+    __: None = Depends(require_csrf),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Permanently delete a product-app account.
+
+    Its profile, business, tokens, referrals, connections, needs and
+    notifications go with it (ON DELETE CASCADE). Season 1 registration rows
+    are deliberately kept — they hold payment proof and are managed from the
+    Registrations view; they merely lose their link to the account.
+    """
+    user = await db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Account not found")
+    email = user.email
+    await db.delete(user)
+    await db.commit()
+    logger.warning("Account deleted: id=%s email=%s by=%s", user_id, email, admin.email)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 _VERIFICATION_STATUSES = {"NOT_STARTED", "PENDING", "NEEDS_INFO", "VERIFIED", "REJECTED"}
@@ -200,7 +267,8 @@ async def update_business_verification(
         email_verified_at=user.email_verified_at,
         is_active=user.is_active,
         created_at=user.created_at,
-        full_name=profile.full_name if profile else None,
+        full_name=profile.full_name if profile else user.full_name,
+        phone=profile.phone if profile else user.phone,
         business_name=business.business_name,
         business_id=business.id,
         verification_status=business.verification_status,
@@ -283,6 +351,7 @@ async def complete_season_1(
 ) -> FinaleCompleteOut:
     event = await get_or_create_season_1(db)
     result = await activate_memberships_for_event(db, event, utcnow())
+    await notify_finale_open(db, event)
     await db.commit()
     await db.refresh(event)
     logger.warning(
@@ -291,7 +360,10 @@ async def complete_season_1(
         result["activated"],
         result["already_active"],
     )
-    return FinaleCompleteOut(event=event, activated=result["activated"], already_active=result["already_active"])
+    counts = await count_registered_access(db)
+    return FinaleCompleteOut(
+        event=event, activated=result["activated"], already_active=result["already_active"], **counts
+    )
 
 
 @router.delete("/registrations/{registration_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -319,7 +391,7 @@ async def delete_registration(
 
     # Only after the row is durably gone — if the commit fails we must not have
     # destroyed the evidence for a registration that still exists.
-    removed = delete_proof(proof_filename)
+    removed = await delete_proof(proof_filename)
 
     logger.warning(
         "Registration deleted: id=%s business=%r by=%s proof_removed=%s",
@@ -344,9 +416,9 @@ async def get_proof(
     if reg is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Registration not found")
 
-    path = resolve_proof(reg.proof_filename)
-    return FileResponse(
-        path,
+    data = await read_proof(reg.proof_filename)
+    return Response(
+        content=data,
         media_type=reg.proof_mime,
         headers={
             # Render inline in the dashboard, but never let the browser guess a

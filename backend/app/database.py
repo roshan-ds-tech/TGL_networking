@@ -11,13 +11,56 @@ from collections.abc import AsyncGenerator
 
 from pathlib import Path
 
+import ssl
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
 from sqlalchemy import event, inspect
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.pool import NullPool
 
 from .config import settings
 
-is_sqlite = settings.database_url.startswith("sqlite")
+
+def _normalise_url(raw: str) -> tuple[str, dict]:
+    """Accept a Postgres URL exactly as Supabase/Render hand it out.
+
+    * postgres:// and postgresql:// become postgresql+asyncpg:// (the async
+      driver this app uses).
+    * libpq-only query params (sslmode, ...) are not understood by asyncpg;
+      sslmode is translated into an SSL context instead and the rest dropped.
+    """
+    if raw.startswith("sqlite"):
+        return raw, {}
+    for prefix in ("postgres://", "postgresql://"):
+        if raw.startswith(prefix):
+            raw = "postgresql+asyncpg://" + raw[len(prefix):]
+    parts = urlsplit(raw)
+    query = dict(parse_qsl(parts.query))
+    sslmode = query.pop("sslmode", None)
+    for libpq_only in ("channel_binding", "gssencmode", "target_session_attrs"):
+        query.pop(libpq_only, None)
+    connect_args: dict = {
+        # Supabase's pooler (Supavisor, transaction mode) cannot keep
+        # server-side prepared statements between transactions; disabling the
+        # statement caches makes the same URL work on the pooler, the session
+        # pooler and a direct connection alike.
+        "statement_cache_size": 0,
+        "prepared_statement_cache_size": 0,
+    }
+    host = parts.hostname or ""
+    if sslmode in {"require", "verify-ca", "verify-full"} or host.endswith((".supabase.co", ".supabase.com")):
+        ctx = ssl.create_default_context()
+        if sslmode == "require":
+            # libpq "require" encrypts without verifying the certificate.
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+        connect_args["ssl"] = ctx
+    return urlunsplit(parts._replace(query=urlencode(query))), connect_args
+
+
+DATABASE_URL, _CONNECT_ARGS = _normalise_url(settings.database_url)
+is_sqlite = DATABASE_URL.startswith("sqlite")
 
 if is_sqlite:
     # SQLite will not create missing parent directories for the database file,
@@ -26,12 +69,21 @@ if is_sqlite:
     if _db_path and _db_path != ":memory:":
         Path(_db_path).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
 
+if settings.db_null_pool:
+    _pool_args: dict = {"poolclass": NullPool}
+elif is_sqlite:
+    _pool_args = {}  # SQLite's async driver ignores pool sizing
+else:
+    # Kept small on purpose: a hosted Postgres (Supabase) caps connections
+    # per project, and one web instance doesn't need more than this.
+    _pool_args = {"pool_size": 5, "max_overflow": 5, "pool_recycle": 1800}
+
 engine = create_async_engine(
-    settings.database_url,
+    DATABASE_URL,
     echo=False,
     pool_pre_ping=True,
-    # SQLite's async driver ignores pool sizing; Postgres benefits from it.
-    **({} if is_sqlite else {"pool_size": 10, "max_overflow": 20}),
+    connect_args=_CONNECT_ARGS,
+    **_pool_args,
 )
 
 if is_sqlite:
@@ -90,6 +142,13 @@ _ADDED_COLUMNS: dict[str, dict[str, str | None]] = {
         # this table. Every token that predates the split was a signup code.
         "purpose": "'EMAIL_VERIFY'",
     },
+    "notifications": {
+        "actor_user_id": None,
+    },
+    "users": {
+        "full_name": None,
+        "phone": None,
+    },
     "businesses": {
         # KYB submission workflow, added after the tgl_verified badge it sets.
         # Businesses that predate it have, correctly, not started it.
@@ -123,6 +182,31 @@ def sync_schema(sync_conn) -> None:
             sync_conn.exec_driver_sql(ddl)
 
 
+def lock_down_postgres(sync_conn) -> None:
+    """Close Supabase's auto-generated Data API over every app table.
+
+    Supabase exposes tables in `public` through PostgREST/GraphQL to anyone
+    holding the project's *public* anon key. This app never uses that API: the
+    backend connects as the table owner, which bypasses RLS. So every table
+    gets RLS enabled with NO policies (deny-all for anon/authenticated), and
+    those roles lose their table grants as a second layer. Idempotent; runs
+    every boot so tables added later are covered too. A no-op on SQLite and on
+    a plain Postgres without Supabase's roles.
+    """
+    if sync_conn.dialect.name != "postgresql":
+        return
+    api_roles = [
+        r for (r,) in sync_conn.exec_driver_sql(
+            "SELECT rolname FROM pg_roles WHERE rolname IN ('anon', 'authenticated')"
+        )
+    ]
+    for table in Base.metadata.tables:
+        # Names come from our own model metadata, never from request data.
+        sync_conn.exec_driver_sql(f'ALTER TABLE public."{table}" ENABLE ROW LEVEL SECURITY')
+        for role in api_roles:
+            sync_conn.exec_driver_sql(f'REVOKE ALL ON TABLE public."{table}" FROM {role}')
+
+
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with SessionLocal() as session:
         yield session
@@ -146,13 +230,17 @@ def init_db_sync() -> None:
     # before the rest of the app has been imported (as the WSGI entrypoint
     # does), and every request then fails with "no such table".
     from . import models  # noqa: F401
-    from .storage import upload_root
+    from .storage import init_storage
 
     async def _create() -> None:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
             await conn.run_sync(sync_schema)
+            await conn.run_sync(lock_down_postgres)
         await engine.dispose()
 
-    upload_root()
-    asyncio.run(_create())
+    async def _boot() -> None:
+        await init_storage()
+        await _create()
+
+    asyncio.run(_boot())

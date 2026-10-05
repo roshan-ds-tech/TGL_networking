@@ -23,11 +23,12 @@ from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerifyMismatchError
 from fastapi import Cookie, Depends, Header, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 
 from .config import settings
 from .database import get_db
-from .models import Admin, TGLMembership, User, utcnow
+from .services import SEASON_1_SLUG, add_calendar_months
+from .models import Admin, Event, Registration, TGLMembership, User, utcnow
 
 SESSION_COOKIE = "tgl_session"
 CSRF_COOKIE = "tgl_csrf"
@@ -206,23 +207,113 @@ async def require_customer_csrf(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="CSRF token invalid")
 
 
-async def require_active_networking_member(
-    user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> User:
+async def has_registration(db: AsyncSession, user: User) -> bool:
+    """The account's verified email matches a row in the registrations table.
+    The email is the link — which is why the login page tells people to use
+    the one they registered with. Unverified emails never match, so nobody can
+    claim another person's registration just by typing their address."""
+    if user.email_verified_at is None:
+        return False
+    found = await db.scalar(
+        select(Registration.id).where(func.lower(Registration.email) == user.email.lower()).limit(1)
+    )
+    return found is not None
+
+
+async def finale_window(db: AsyncSession) -> tuple[Event, datetime, datetime] | None:
+    """(event, starts, expires) while the completed-Finale membership window is
+    open; None before the Finale is completed or after the window closes."""
+    event = await db.scalar(select(Event).where(Event.slug == SEASON_1_SLUG))
+    if event is None or event.completed_at is None:
+        return None
+    started = event.completed_at
+    if started.tzinfo is None:
+        started = started.replace(tzinfo=timezone.utc)
+    expires = add_calendar_months(started, event.membership_duration_months)
+    return (event, started, expires) if utcnow() < expires else None
+
+
+async def has_networking_access(db: AsyncSession, user: User) -> bool:
+    """Networking opens for a registered email once an admin completes the
+    Grand Finale, and stays open for the event's membership window (3 months).
+    An individually activated membership also grants access."""
+    if await has_registration(db, user) and await finale_window(db) is not None:
+        return True
     now = utcnow()
-    result = await db.execute(
-        select(TGLMembership).where(
+    active = await db.scalar(
+        select(TGLMembership.id).where(
             TGLMembership.user_id == user.id,
             TGLMembership.membership_type == "NETWORKING",
             TGLMembership.status == "ACTIVE",
             TGLMembership.starts_at.is_not(None),
             TGLMembership.expires_at.is_not(None),
             TGLMembership.expires_at > now,
+        ).limit(1)
+    )
+    return active is not None
+
+
+async def active_member_clause(db: AsyncSession, user_id_col):
+    """SQL condition: `user_id_col` belongs to someone with Networking access.
+
+    The set-based twin of has_networking_access, for queries over *other*
+    members (directory, member pages, referral/connection targets) — they must
+    use the same rule, or a public-form registrant could get in but never
+    appear in, or be reachable from, the community.
+    """
+    membership_ids = select(TGLMembership.user_id).where(
+        TGLMembership.membership_type == "NETWORKING",
+        TGLMembership.status == "ACTIVE",
+        TGLMembership.starts_at.is_not(None),
+        TGLMembership.expires_at > utcnow(),
+    )
+    clause = user_id_col.in_(membership_ids)
+    if await finale_window(db) is not None:
+        registrant_ids = (
+            select(User.id)
+            .join(Registration, func.lower(Registration.email) == func.lower(User.email))
+            .where(User.email_verified_at.is_not(None))
+        )
+        clause = or_(clause, user_id_col.in_(registrant_ids))
+    return clause
+
+
+async def verified_registrant_ids(db: AsyncSession, user_ids: list[str] | set[str]) -> set[str]:
+    """Which of these accounts hold a registration whose payment an admin has
+    verified. Those — and only those — carry the TGL Verified badge
+    automatically; an unpaid or unreviewed registration does not."""
+    if not user_ids:
+        return set()
+    rows = await db.execute(
+        select(User.id)
+        .join(Registration, func.lower(Registration.email) == func.lower(User.email))
+        .where(
+            User.id.in_(list(user_ids)),
+            User.email_verified_at.is_not(None),
+            Registration.verified.is_(True),
         )
     )
-    if result.scalar_one_or_none() is None:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Active Networking membership required")
+    return set(rows.scalars().all())
+
+
+async def has_verified_registration(db: AsyncSession, user: User) -> bool:
+    return user.id in await verified_registrant_ids(db, {user.id})
+
+
+async def is_active_member(db: AsyncSession, user_id: str) -> bool:
+    clause = await active_member_clause(db, User.id)
+    return await db.scalar(select(User.id).where(User.id == user_id, clause).limit(1)) is not None
+
+
+async def require_active_networking_member(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    if not await has_networking_access(db, user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Networking opens after the Grand Finale for registered participants.",
+        )
     return user
 
 

@@ -16,12 +16,12 @@ const FEATURES = [
 function pill(on) {
   return {
     background: on ? '#FFFCF5' : 'transparent',
-    color: on ? '#2B1740' : 'rgba(43,23,64,0.55)',
+    color: on ? '#2B1740' : 'rgba(43,23,64,0.7)',
     boxShadow: on ? '0 4px 12px -6px rgba(53,26,78,0.35)' : 'none',
   };
 }
 
-const LABEL = { display: 'block', fontSize: 10.5, fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.55)', marginBottom: 8 };
+const LABEL = { display: 'block', fontSize: 10.5, fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.65)', marginBottom: 8 };
 
 function OtpBoxes({ value, onChange }) {
   const refs = useRef([]);
@@ -84,8 +84,8 @@ export default function Login() {
   // Already signed in (bookmark, Back button, typed URL) — skip the form.
   useEffect(() => {
     let cancelled = false;
-    api.me()
-      .then(() => { if (!cancelled) go(destination(), { replace: true }); })
+    api.session()
+      .then((s) => { if (!cancelled && s?.authenticated) go(destination(), { replace: true }); })
       .catch(() => {});
     return () => { cancelled = true; };
   }, []);
@@ -124,11 +124,10 @@ export default function Login() {
     setError('');
     setSubmitting(true);
     try {
-      const result = await api.otpRequest(email.trim());
+      await api.otpRequest(email.trim());
       setOtpRequested(true);
       setOtpCooldown(30);
       const id = setInterval(() => setOtpCooldown((s) => { if (s <= 1) { clearInterval(id); return 0; } return s - 1; }), 1000);
-      if (result?.dev_otp) setOtp(result.dev_otp);
     } catch (err) {
       setError(err.message || 'Could not send a code. Please try again.');
     } finally {
@@ -179,7 +178,7 @@ export default function Login() {
               </span>
               <div>
                 <p style={{ margin: 0, fontSize: 14.5, fontWeight: 700, color: '#2B1740' }}>{f.title}</p>
-                <p style={{ margin: '2px 0 0', fontSize: 13, color: 'rgba(43,23,64,0.6)' }}>{f.desc}</p>
+                <p style={{ margin: '2px 0 0', fontSize: 13, color: 'rgba(43,23,64,0.65)' }}>{f.desc}</p>
               </div>
             </div>
           ))}
@@ -187,9 +186,12 @@ export default function Login() {
       </div>
 
       <div className="tgl-auth-frame tglp-rise-2">
-        <div style={{ position: 'relative', background: '#FFFCF5', border: '1px solid rgba(53,26,78,0.1)', borderRadius: 22, padding: '40px 38px', boxShadow: '0 30px 60px -24px rgba(34,16,58,0.28)' }}>
-          <p style={{ margin: '0 0 6px', fontSize: 10.5, letterSpacing: '.26em', textTransform: 'uppercase', fontWeight: 700, color: '#C08D2E' }}>Sign in</p>
-          <h2 style={{ margin: '0 0 26px', fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em', color: '#2B1740' }}>Continue to your account</h2>
+        <div style={{ position: 'relative', background: '#FFFCF5', border: '1px solid rgba(53,26,78,0.1)', borderRadius: 22, padding: 'clamp(26px, 6vw, 40px) clamp(18px, 5vw, 38px)', boxShadow: '0 30px 60px -24px rgba(34,16,58,0.28)' }}>
+          <p style={{ margin: '0 0 6px', fontSize: 10.5, letterSpacing: '.26em', textTransform: 'uppercase', fontWeight: 700, color: '#8F6420' }}>Sign in</p>
+          <h2 style={{ margin: '0 0 18px', fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em', color: '#2B1740' }}>Continue to your account</h2>
+          <p role="note" style={{ margin: '0 0 24px', padding: '12px 14px', border: '1px solid rgba(192,141,46,0.4)', borderRadius: 12, background: 'rgba(224,181,88,0.12)', fontSize: 13.5, lineHeight: 1.5, color: '#2B1740' }}>
+            <strong>Important:</strong> use the same email and credentials you used for your event registration to get access to the Networking community.
+          </p>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', padding: 4, border: '1px solid rgba(53,26,78,0.12)', borderRadius: 999, background: '#F6EEDF', marginBottom: 24 }}>
             {[['password', 'Password'], ['otp', 'One-time code']].map(([key, label]) => (
@@ -197,7 +199,7 @@ export default function Login() {
                 key={key}
                 type="button"
                 onClick={() => switchMode(key)}
-                style={{ padding: 11, border: 'none', borderRadius: 999, fontSize: 11, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', cursor: 'pointer', whiteSpace: 'nowrap', ...pill(mode === key) }}
+                style={{ padding: '11px 8px', border: 'none', borderRadius: 999, fontSize: 'clamp(10px, 2.9vw, 11px)', lineHeight: 1.2, fontWeight: 700, letterSpacing: 'clamp(0.06em, 0.5vw, 0.14em)', textTransform: 'uppercase', cursor: 'pointer', minWidth: 0, ...pill(mode === key) }}
               >
                 {label}
               </button>
@@ -221,7 +223,7 @@ export default function Login() {
 
             {isPassword ? (
               <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '4px 12px', marginBottom: 8 }}>
                   <label htmlFor="login-password" style={{ ...LABEL, marginBottom: 0 }}>Password</label>
                   <a href="/forgot-password" onClick={(e) => { e.preventDefault(); go('/forgot-password'); }} style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>
                     Forgot password?
@@ -243,7 +245,7 @@ export default function Login() {
               <>
                 <span style={LABEL}>6-digit code</span>
                 <OtpBoxes value={otp} onChange={setOtp} />
-                <p style={{ margin: '0 0 24px', fontSize: 12.5, color: 'rgba(43,23,64,0.55)' }}>
+                <p style={{ margin: '0 0 24px', fontSize: 12.5, color: 'rgba(43,23,64,0.65)' }}>
                   Code sent to your email.{' '}
                   <button
                     type="button"
@@ -256,7 +258,7 @@ export default function Login() {
                 </p>
               </>
             ) : (
-              <p style={{ margin: '0 0 26px', fontSize: 12.5, color: 'rgba(43,23,64,0.55)' }}>
+              <p style={{ margin: '0 0 26px', fontSize: 12.5, color: 'rgba(43,23,64,0.65)' }}>
                 We&apos;ll email you a six-digit code instead of asking for a password.
               </p>
             )}
@@ -274,7 +276,7 @@ export default function Login() {
             </button>
           </form>
 
-          <p style={{ margin: '24px 0 0', paddingTop: 22, borderTop: '1px solid rgba(53,26,78,0.1)', textAlign: 'center', fontSize: 13.5, color: 'rgba(43,23,64,0.6)' }}>
+          <p style={{ margin: '24px 0 0', paddingTop: 22, borderTop: '1px solid rgba(53,26,78,0.1)', textAlign: 'center', fontSize: 13.5, color: 'rgba(43,23,64,0.65)' }}>
             New to TGL?{' '}
             <a href="/signup" onClick={(e) => { e.preventDefault(); go('/signup'); }} style={{ fontWeight: 700 }}>Create an account</a>
           </p>

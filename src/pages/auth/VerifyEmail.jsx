@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, go } from '../../lib/customerApi';
 import { Button, Card, Eyebrow, Field, HeroMeta } from '../../components/AppShell';
 
-export default function VerifyEmail() {
+export default function VerifyEmail({ reload }) {
   const [token, setToken] = useState('');
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
@@ -19,19 +19,16 @@ export default function VerifyEmail() {
   }, [resendCooldown]);
 
   useEffect(() => {
-    // A dev-only code stashed by Signup right before landing here. Consumed
-    // once so a later real signup doesn't leak a stale code into this screen.
-    const stashed = sessionStorage.getItem('tgl_dev_otp');
-    if (stashed) {
-      setToken(stashed);
-      sessionStorage.removeItem('tgl_dev_otp');
-    }
+    sessionStorage.removeItem('tgl_dev_otp'); // never pre-fill the code; it must come from the inbox
     api.me()
-      .then((user) => {
-        if (user.email_verified_at) go('/onboarding/personal');
-        else setEmail(user.email);
+      .then(async (user) => {
+        if (user.email_verified_at) {
+          await reload?.();
+          go('/onboarding/personal', { replace: true });
+        } else setEmail(user.email);
       })
       .catch(() => go('/login')); // no session at all — this screen only makes sense mid-signup
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on arrival
   }, []);
 
   async function logout() {
@@ -52,7 +49,10 @@ export default function VerifyEmail() {
     setSubmitting(true);
     try {
       await api.verifyEmail(token.trim());
-      go('/onboarding/personal');
+      // Refresh the shared account status first: the onboarding gate reads
+      // it, and a stale "unverified" copy would bounce straight back here.
+      await reload?.();
+      go('/onboarding/personal', { replace: true });
     } catch (err) {
       setError(err.message || 'Invalid or expired verification code.');
     } finally {
@@ -87,7 +87,7 @@ export default function VerifyEmail() {
         <p style={{ margin: '22px 0 0', fontSize: 17, lineHeight: 1.65, color: 'rgba(43,23,64,0.7)' }}>
           One quick step keeps the League trustworthy — every member is a real, reachable founder.
         </p>
-        <p style={{ margin: '12px 0 0', fontSize: 15, lineHeight: 1.7, color: 'rgba(43,23,64,0.62)' }}>
+        <p style={{ margin: '12px 0 0', fontSize: 15, lineHeight: 1.7, color: 'rgba(43,23,64,0.65)' }}>
           Enter the 6-digit code emailed to you at signup to unlock your founder profile and Season 1 registration.
         </p>
         <HeroMeta />
@@ -96,7 +96,7 @@ export default function VerifyEmail() {
       <div className="tgl-auth-frame">
         <Card>
           <div style={{ textAlign: 'center', marginBottom: 22 }}>
-            <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(192,141,46,0.12)', border: '1px solid rgba(192,141,46,0.35)', color: '#C08D2E', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+            <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(192,141,46,0.12)', border: '1px solid rgba(192,141,46,0.35)', color: '#8F6420', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
               <svg width="24" height="24" viewBox="0 0 24 24"><use href="#i-mail" /></svg>
             </div>
             <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.6, color: 'var(--tgl-text-muted)' }}>

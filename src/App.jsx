@@ -126,8 +126,8 @@ export default function App() {
   // below can pre-fill and lock itself from the account's saved profile.
   useEffect(() => {
     let cancelled = false;
-    api.status()
-      .then((s) => { if (!cancelled) setAuthStatus(s); })
+    api.optionalStatus()
+      .then((s) => { if (!cancelled && s) setAuthStatus(s); })
       .catch(() => {}) // not logged in — keep the anonymous UI
       .finally(() => { if (!cancelled) setAuthChecked(true); });
     return () => { cancelled = true; };

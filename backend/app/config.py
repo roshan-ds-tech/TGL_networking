@@ -9,7 +9,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEV_SECRET_SENTINEL = "dev-only-change-me"
@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     # storage; safe to leave on (the default) anywhere with a normal local disk.
     sqlite_wal: bool = True
 
+    # Open a fresh DB connection per checkout instead of pooling. For test
+    # harnesses that run the app across several event loops; production keeps
+    # the pool.
+    db_null_pool: bool = False
+
     # Screenshots live here, deliberately OUTSIDE any statically served directory.
     upload_dir: str = "./var/uploads"
 
@@ -45,6 +50,21 @@ class Settings(BaseSettings):
 
     # Built admin SPA; served same-origin by this app so cookies stay SameSite=Strict.
     admin_dist_dir: str = "./static/admin"
+
+    # Built public site + member app (the repo-root `npm run build` output).
+    # When the directory exists this app serves it too, so the whole product
+    # is one origin: session cookies stay SameSite=Strict and no CORS is
+    # involved. Absent in local dev, where Vite serves the site instead.
+    site_dist_dir: str = "./static/site"
+
+    # Payment-proof storage: "local" (upload_dir on disk) or "supabase" (a
+    # private Supabase Storage bucket — production on Render, which has no
+    # persistent disk by default).
+    storage_backend: str = "local"
+    supabase_url: str = ""
+    # Server-side only. Never exposed to the browser or committed.
+    supabase_service_role_key: str = ""
+    supabase_storage_bucket: str = "payment-proofs"
 
     # Must be >= the 24h email-verification token lifetime (see services.py /
     # customer.py register()) — otherwise a user's session can expire before
@@ -63,6 +83,11 @@ class Settings(BaseSettings):
     registration_closes_at: datetime = datetime(
         2026, 11, 20, 23, 59, 59, tzinfo=timezone(timedelta(hours=5, minutes=30))
     )
+
+    # How many reverse proxies sit in front of the app and append to
+    # X-Forwarded-For (Render: 1). 0 ignores the header — the right setting
+    # when nothing trusted is in front, since the header is client-supplied.
+    trusted_proxy_hops: int = 0
 
     # Brute-force controls
     login_max_attempts: int = 5
@@ -120,6 +145,15 @@ class Settings(BaseSettings):
                     "print(secrets.token_urlsafe(48))\""
                 )
         return v or secrets.token_urlsafe(48)
+
+    @model_validator(mode="after")
+    def _validate_storage(self) -> "Settings":
+        self.storage_backend = self.storage_backend.lower().strip()
+        if self.storage_backend not in {"local", "supabase"}:
+            raise ValueError('STORAGE_BACKEND must be "local" or "supabase".')
+        if self.storage_backend == "supabase" and not (self.supabase_url and self.supabase_service_role_key):
+            raise ValueError("STORAGE_BACKEND=supabase needs SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.")
+        return self
 
 
 @lru_cache

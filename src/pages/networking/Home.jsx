@@ -46,7 +46,7 @@ export default function NetworkingHome({ status }) {
             <Eyebrow>TGL&apos;s private business community</Eyebrow>
             <h1 style={{ margin: '0 0 16px', fontSize: 'clamp(32px,4vw,52px)', lineHeight: 1.04, letterSpacing: '-0.035em', fontWeight: 800, color: '#2B1740' }}>
               Build relationships that move business{' '}
-              <span style={{ fontFamily: "'Kaushan Script', cursive", fontWeight: 500, color: '#C08D2E', letterSpacing: 0 }}>forward.</span>
+              <span style={{ fontFamily: "'Kaushan Script', cursive", fontWeight: 500, color: '#8F6420', letterSpacing: 0 }}>forward.</span>
             </h1>
             <p style={{ margin: 0, maxWidth: 520, fontSize: 16, lineHeight: 1.65, color: 'rgba(43,23,64,0.68)' }}>
               Discover members, exchange referrals and build meaningful business relationships within the TGL ecosystem.
@@ -68,7 +68,7 @@ export default function NetworkingHome({ status }) {
             <p style={{ margin: '0 0 14px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.22em', textTransform: 'uppercase', color: '#E0B558' }}>Membership</p>
             <p style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 800, color: '#FFFBF3' }}>Active</p>
             <p style={{ margin: 0, fontSize: 13, color: 'rgba(246,238,223,0.65)' }}>
-              Season 1 · until {new Date(status.membership.expires_at).toLocaleDateString()}
+              {status.membership?.expires_at ? `Season 1 · until ${new Date(status.membership.expires_at).toLocaleDateString()}` : 'Season 1 registrant'}
             </p>
           </div>
           <div style={{ padding: 24, border: '1px solid rgba(53,26,78,0.1)', borderRadius: 18, background: '#FFFCF5' }}>
@@ -82,15 +82,15 @@ export default function NetworkingHome({ status }) {
                 <span key={n} style={{ height: 4, borderRadius: 2, background: n <= tier.filled ? '#6B3E96' : 'rgba(107,62,150,0.15)' }} />
               ))}
             </div>
-            <p style={{ margin: 0, fontSize: 12, color: 'rgba(43,23,64,0.5)' }}>Reflects relationship history. Not a rating.</p>
+            <p style={{ margin: 0, fontSize: 12, color: 'rgba(43,23,64,0.65)' }}>Reflects relationship history. Not a rating.</p>
           </div>
           <div style={{ padding: 24, border: '1px solid rgba(53,26,78,0.1)', borderRadius: 18, background: '#FFFCF5' }}>
             <p style={{ margin: '0 0 14px', display: 'flex', alignItems: 'center', gap: 8, fontSize: 10.5, fontWeight: 700, letterSpacing: '.22em', textTransform: 'uppercase', color: '#A8762F' }}>
               <svg width="14" height="14" viewBox="0 0 24 24"><use href="#i-chart" /></svg>
               Growth Points
             </p>
-            <p style={{ margin: '0 0 4px', fontSize: 30, fontWeight: 800, color: '#C08D2E', fontVariantNumeric: 'tabular-nums' }}>{status.networking_profile?.growth_points || 0}</p>
-            <p style={{ margin: 0, fontSize: 12, color: 'rgba(43,23,64,0.5)' }}>Earned through referrals and closed business.</p>
+            <p style={{ margin: '0 0 4px', fontSize: 30, fontWeight: 800, color: '#8F6420', fontVariantNumeric: 'tabular-nums' }}>{status.networking_profile?.growth_points || 0}</p>
+            <p style={{ margin: 0, fontSize: 12, color: 'rgba(43,23,64,0.65)' }}>Earned through referrals and closed business.</p>
           </div>
           <div style={{ padding: 24, border: '1px solid rgba(53,26,78,0.1)', borderRadius: 18, background: '#FFFCF5' }}>
             <p style={{ margin: '0 0 14px', display: 'flex', alignItems: 'center', gap: 8, fontSize: 10.5, fontWeight: 700, letterSpacing: '.22em', textTransform: 'uppercase', color: '#35194E' }}>
@@ -98,13 +98,13 @@ export default function NetworkingHome({ status }) {
               Membership level
             </p>
             <p style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 800, color: '#2B1740' }}>Season 1 Member</p>
-            <p style={{ margin: 0, fontSize: 12, color: 'rgba(43,23,64,0.5)' }}>Complimentary · 3 months</p>
+            <p style={{ margin: 0, fontSize: 12, color: 'rgba(43,23,64,0.65)' }}>Complimentary · 3 months</p>
           </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, marginBottom: 22 }}>
           <div>
-            <p style={{ margin: '0 0 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.26em', textTransform: 'uppercase', color: '#C08D2E' }}>Curated for you</p>
+            <p style={{ margin: '0 0 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.26em', textTransform: 'uppercase', color: '#8F6420' }}>Curated for you</p>
             <h2 style={{ margin: 0, fontSize: 'clamp(24px,2.6vw,32px)', fontWeight: 800, letterSpacing: '-0.03em', color: '#2B1740' }}>Who should you meet?</h2>
           </div>
           <a href="/app/networking/members" onClick={(e) => { e.preventDefault(); go('/app/networking/members'); }} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
@@ -128,7 +128,7 @@ export default function NetworkingHome({ status }) {
                       <p style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#2B1740' }}>{m.founder_name}</p>
                       {m.tgl_verified && <svg width="16" height="16" viewBox="0 0 24 24" style={{ color: '#A8762F' }}><use href="#i-shield" /></svg>}
                     </div>
-                    <p style={{ margin: '0 0 12px', fontSize: 13, color: 'rgba(43,23,64,0.58)' }}>{m.business_name}</p>
+                    <p style={{ margin: '0 0 12px', fontSize: 13, color: 'rgba(43,23,64,0.65)' }}>{m.business_name}</p>
                     <p style={{ margin: '0 0 18px', fontSize: 14, lineHeight: 1.55, color: 'rgba(43,23,64,0.72)' }}>{m.headline || 'No headline yet.'}</p>
                     <div style={{ display: 'flex', gap: 8 }}>
                       <button type="button" className="tglp-ghost" onClick={() => go(`/app/networking/members/${m.member_id}`)} style={{ flex: 1, padding: 12, border: '1px solid rgba(53,26,78,0.3)', borderRadius: 999, background: 'transparent', color: '#35194E', fontSize: 10.5, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', cursor: 'pointer', whiteSpace: 'nowrap' }}>
@@ -167,7 +167,7 @@ export default function NetworkingHome({ status }) {
                     <div key={n.id} className="tglp-row-slide" style={{ display: 'flex', alignItems: 'center', gap: 18, padding: '20px 8px', borderBottom: '1px solid rgba(53,26,78,0.1)' }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <p style={{ margin: '0 0 4px', fontSize: 15.5, fontWeight: 700, color: '#2B1740' }}>{n.title}</p>
-                        <p style={{ margin: 0, fontSize: 12.5, color: 'rgba(43,23,64,0.55)' }}>
+                        <p style={{ margin: 0, fontSize: 12.5, color: 'rgba(43,23,64,0.65)' }}>
                           {n.poster_name} · {CATEGORY_MAP.get(n.category) || n.category} · {timeAgo(n.created_at)}
                         </p>
                       </div>
@@ -194,7 +194,7 @@ export default function NetworkingHome({ status }) {
             <div style={{ padding: '8px 24px', border: '1px solid rgba(53,26,78,0.1)', borderRadius: 18, background: '#FFFCF5' }}>
               {pipeline.map((p) => (
                 <div key={p.label} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '13px 0', borderBottom: '1px solid rgba(53,26,78,0.07)' }}>
-                  <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'rgba(43,23,64,0.4)' }}>{p.n}</span>
+                  <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'rgba(43,23,64,0.65)' }}>{p.n}</span>
                   <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: '#2B1740' }}>{p.label}</span>
                   <span style={{ fontSize: 17, fontWeight: 800, color: '#6B3E96', fontVariantNumeric: 'tabular-nums' }}>{p.count}</span>
                 </div>

@@ -13,6 +13,7 @@ import Business from './pages/onboarding/Business';
 import VertexHome from './pages/vertex/Home';
 import VertexSearch from './pages/vertex/Search';
 import VertexProvider from './pages/vertex/Provider';
+import Subscription from './pages/networking/Subscription';
 import NetworkingLocked from './pages/networking/Locked';
 import NetworkingHome from './pages/networking/Home';
 import Directory from './pages/networking/Directory';
@@ -59,7 +60,9 @@ function useStatus(path) {
     if (!silent) setLoading(true);
     setError('');
     try {
-      const next = await api.status();
+      // Signed-out visitors on /login, /signup… are expected: ask the
+      // always-200 session probe there instead of eating a 401.
+      const next = guardedNow ? await api.status() : await api.optionalStatus();
       if (id === seq.current) setStatus(next);
     } catch (err) {
       if (id !== seq.current) return;
@@ -104,7 +107,7 @@ function AuthedProduct({ path, status, loading, error, reload }) {
       <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ textAlign: 'center' }}>
           <img src={logo} alt="The Growth League" style={{ height: 48, width: 'auto', marginBottom: 16 }} />
-          <p style={{ color: '#C08D2E', fontSize: 15, fontWeight: 700 }}>Loading member portal…</p>
+          <p style={{ color: '#8F6420', fontSize: 15, fontWeight: 700 }}>Loading member portal…</p>
         </div>
       </div>
     );
@@ -146,18 +149,21 @@ function AuthedProduct({ path, status, loading, error, reload }) {
   if (pendingStep) return <Redirect to={pendingStep} />;
   if (path.startsWith('/onboarding')) return <Redirect to="/app/vertex" />;
 
-  const active = status.membership?.status === 'ACTIVE';
+  const active = !!status.networking_access;
+  // Registered but Networking not open yet → waiting for the Finale; anyone
+  // else is offered a subscription.
+  const locked = status.has_registration ? <NetworkingLocked status={status} /> : <Subscription />;
 
   if (path === '/app/vertex') return <VertexHome />;
   if (path === '/app/vertex/search') return <VertexSearch />;
   if (providerId) return <VertexProvider id={providerId} />;
   if (path === '/app/events') return <Events status={status} />;
-  if (path === '/app/networking') return active ? <NetworkingHome status={status} /> : <NetworkingLocked status={status} />;
-  if (path === '/app/networking/members') return active ? <Directory /> : <NetworkingLocked status={status} />;
-  if (memberId) return active ? <Member id={memberId} /> : <NetworkingLocked status={status} />;
-  if (path === '/app/referrals/new') return active ? <Referrals status={status} openGiveOnMount /> : <NetworkingLocked status={status} />;
-  if (path === '/app/networking/referrals' || path === '/app/referrals') return active ? <Referrals status={status} /> : <NetworkingLocked status={status} />;
-  if (path === '/app/networking/needs' || path === '/app/needs') return active ? <Needs status={status} /> : <NetworkingLocked status={status} />;
+  if (path === '/app/networking') return active ? <NetworkingHome status={status} /> : locked;
+  if (path === '/app/networking/members') return active ? <Directory /> : locked;
+  if (memberId) return active ? <Member id={memberId} /> : locked;
+  if (path === '/app/referrals/new') return active ? <Referrals status={status} openGiveOnMount /> : locked;
+  if (path === '/app/networking/referrals' || path === '/app/referrals') return active ? <Referrals status={status} /> : locked;
+  if (path === '/app/networking/needs' || path === '/app/needs') return active ? <Needs status={status} /> : locked;
   if (path === '/app/notifications') return <Notifications reload={reload} />;
   if (path === '/app/profile/membership') return <Membership status={status} />;
   if (path === '/app/profile/verification') return <Verification status={status} reload={reload} />;
@@ -185,7 +191,7 @@ export default function ProductApp() {
   if (PRE_AUTH_ROUTES[path]) {
     content = PRE_AUTH_ROUTES[path]();
   } else if (path === '/verify-email') {
-    content = <VerifyEmail />;
+    content = <VerifyEmail reload={reload} />;
   } else {
     content = <AuthedProduct path={path} status={status} loading={loading} error={error} reload={reload} />;
   }

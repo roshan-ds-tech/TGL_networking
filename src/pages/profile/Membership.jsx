@@ -27,7 +27,7 @@ export default function Membership({ status }) {
 
       <div data-grid-2="" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 48, alignItems: 'start' }}>
         <div>
-          <p style={{ margin: '0 0 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.26em', textTransform: 'uppercase', color: '#C08D2E' }}>TGL Membership</p>
+          <p style={{ margin: '0 0 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.26em', textTransform: 'uppercase', color: '#8F6420' }}>TGL Membership</p>
           <h1 style={{ margin: '0 0 14px', fontSize: 'clamp(30px, 3.4vw, 44px)', fontWeight: 800, letterSpacing: '-0.035em', color: '#2B1740' }}>Season 1 Networking</h1>
           <p style={{ margin: '0 0 30px', fontSize: 16, lineHeight: 1.65, color: 'rgba(43,23,64,0.68)' }}>
             {active
@@ -36,22 +36,24 @@ export default function Membership({ status }) {
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 1, background: 'rgba(53,26,78,0.1)', border: '1px solid rgba(53,26,78,0.1)', borderRadius: 18, overflow: 'hidden', marginBottom: 26 }}>
             <div style={{ padding: 18, background: '#FFFCF5' }}>
-              <p style={{ margin: '0 0 6px', fontSize: 10, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.5)' }}>Type</p>
-              <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#2B1740' }}>Complimentary · 3 months</p>
+              <p style={{ margin: '0 0 6px', fontSize: 10, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.65)' }}>Type</p>
+              <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#2B1740' }}>{status.has_registration ? 'Season 1 registrant' : 'Subscription'} · 3 months</p>
             </div>
             <div style={{ padding: 18, background: '#FFFCF5' }}>
-              <p style={{ margin: '0 0 6px', fontSize: 10, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.5)' }}>Activation</p>
+              <p style={{ margin: '0 0 6px', fontSize: 10, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.65)' }}>Activation</p>
               <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#2B1740' }}>{active ? new Date(m.starts_at).toLocaleDateString() : 'After Grand Finale'}</p>
             </div>
             <div style={{ padding: 18, background: '#FFFCF5' }}>
-              <p style={{ margin: '0 0 6px', fontSize: 10, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.5)' }}>Expiry</p>
+              <p style={{ margin: '0 0 6px', fontSize: 10, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.65)' }}>Expiry</p>
               <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#2B1740' }}>{active ? new Date(m.expires_at).toLocaleDateString() : '3 months after activation'}</p>
             </div>
           </div>
           <div style={{ display: 'flex', gap: 14, padding: '18px 20px', borderRadius: 16, background: 'rgba(107,62,150,0.07)' }}>
             <svg width="20" height="20" viewBox="0 0 24 24" style={{ color: '#6B3E96', flexShrink: 0, marginTop: 1 }}><use href="#i-bulb" /></svg>
             <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.6, color: '#35194E' }}>
-              Payment confirms your Season 1 registration. It doesn&apos;t activate Networking — that happens after the Grand Finale on 5 December 2026.
+              {active
+                ? 'The Grand Finale is complete. Your Networking membership is active for the dates shown.'
+                : 'Payment confirms your Season 1 registration. It doesn\u2019t activate Networking — that happens after the Grand Finale on 5 December 2026.'}
             </p>
           </div>
         </div>

@@ -46,7 +46,8 @@ export default function Personal({ initial, reload }) {
       // Refresh the shared status first — the onboarding gate reads it, and a
       // stale copy would bounce the user straight back to this step.
       await reload?.();
-      go('/onboarding/business');
+      // Editing from the profile page goes back there; onboarding moves on.
+      go(initial ? '/app/profile' : '/onboarding/business');
     } catch (err) {
       setError(err.message || 'Could not save your profile.');
     } finally {
@@ -57,13 +58,13 @@ export default function Personal({ initial, reload }) {
   return (
     <WizardShell step={2}>
       <h1 style={{ margin: '0 0 8px', fontSize: 30, fontWeight: 800, letterSpacing: '-0.025em', color: '#2B1740' }}>About you</h1>
-      <p style={{ margin: '0 0 30px', fontSize: 15, color: 'rgba(43,23,64,0.62)' }}>A light profile so members know who they&apos;re talking to.</p>
+      <p style={{ margin: '0 0 30px', fontSize: 15, color: 'rgba(43,23,64,0.65)' }}>A light profile so members know who they&apos;re talking to.</p>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 26 }}>
         <ImageSlot shape="circle" label="Photo" initial={form.full_name} style={{ width: 84, height: 84 }} fontSize={30} />
         <div>
           <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700, color: '#2B1740' }}>Profile photo</p>
-          <p style={{ margin: 0, fontSize: 12.5, color: 'rgba(43,23,64,0.55)' }}>Shown from your initial for now — photo uploads are coming soon.</p>
+          <p style={{ margin: 0, fontSize: 12.5, color: 'rgba(43,23,64,0.65)' }}>Shown from your initial for now — photo uploads are coming soon.</p>
         </div>
       </div>
 
@@ -105,7 +106,7 @@ export default function Personal({ initial, reload }) {
             disabled={submitting}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 12, padding: '16px 30px', border: 'none', borderRadius: 999, background: 'linear-gradient(135deg,#E0B558,#C08D2E)', color: '#22103A', fontWeight: 700, fontSize: 13, letterSpacing: '.12em', textTransform: 'uppercase', cursor: 'pointer', whiteSpace: 'nowrap' }}
           >
-            {submitting ? 'Saving…' : 'Continue'}
+            {submitting ? 'Saving…' : initial ? 'Save changes' : 'Continue'}
             {!submitting && <svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-arrow" /></svg>}
           </button>
         </div>

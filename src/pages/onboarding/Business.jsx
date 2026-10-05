@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CATEGORIES } from '../../data/categories';
 import { api, go } from '../../lib/customerApi';
 import { Field, showToast } from '../../components/AppShell';
@@ -10,11 +10,27 @@ const GHOST_BTN = { padding: '16px 24px', border: '1px solid rgba(53,26,78,0.3)'
 
 export default function Business({ initial, reload }) {
   const [form, setForm] = useState(() => {
-    const empty = { business_name: '', category: '', description: '', city: '', employee_band: '', business_age: '', business_stage: '', website: '' };
+    const empty = {
+      business_name: '', category: '', description: '', city: '', employee_band: '', business_age: '', business_stage: '',
+      founder_story: '', website: '', linkedin: '', instagram: '',
+    };
     return Object.fromEntries(Object.keys(empty).map((k) => [k, initial?.[k] ?? '']));
   });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  // Editing an existing business (from the profile page) returns there;
+  // first-time onboarding continues into the product.
+  const editing = !!initial;
+
+  // Profile checklist links land on a specific section (#founder-story,
+  // #links) — bring it into view and focus its first field.
+  useEffect(() => {
+    const id = window.location.hash.slice(1);
+    const el = id && document.getElementById(id);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.querySelector('input, textarea')?.focus({ preventScroll: true });
+  }, []);
 
   function set(key, value) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -27,8 +43,13 @@ export default function Business({ initial, reload }) {
     try {
       await api.saveBusiness(Object.fromEntries(Object.entries(form).map(([k, v]) => [k, v || null])));
       await reload?.();
-      go('/app/vertex');
-      showToast('Profile saved. Register for Season 1 from Events.');
+      if (editing) {
+        go('/app/profile');
+        showToast('Business details saved.');
+      } else {
+        go('/app/vertex');
+        showToast('Profile saved. Register for Season 1 from Events.');
+      }
     } catch (err) {
       setError(err.message || 'Could not save your business details.');
     } finally {
@@ -39,7 +60,7 @@ export default function Business({ initial, reload }) {
   return (
     <WizardShell step={3}>
       <h1 style={{ margin: '0 0 8px', fontSize: 30, fontWeight: 800, letterSpacing: '-0.025em', color: '#2B1740' }}>Your business</h1>
-      <p style={{ margin: '0 0 30px', fontSize: 15, color: 'rgba(43,23,64,0.62)' }}>
+      <p style={{ margin: '0 0 30px', fontSize: 15, color: 'rgba(43,23,64,0.65)' }}>
         Used across Vertex, Networking and your Season 1 registration — you won&apos;t be asked twice.
       </p>
 
@@ -93,18 +114,33 @@ export default function Business({ initial, reload }) {
           <textarea className="tgl-input" rows={3} style={{ resize: 'vertical' }} placeholder="Describe your products or services." value={form.description} onChange={(e) => set('description', e.target.value)} required />
         </Field>
 
-        <div style={{ marginTop: 18 }}>
-          <Field label="Website or social link" optional>
-            <input className="tgl-input" type="url" placeholder="https://" value={form.website} onChange={(e) => set('website', e.target.value)} />
+        <div id="founder-story" style={{ marginTop: 18 }}>
+          <Field label="Founder story" optional>
+            <textarea className="tgl-input" rows={4} maxLength={2000} style={{ resize: 'vertical' }} placeholder="Why you started, what you've learned, where you're headed." value={form.founder_story} onChange={(e) => set('founder_story', e.target.value)} />
           </Field>
+        </div>
+
+        <div id="links" style={{ marginTop: 18 }}>
+          <p style={{ margin: '0 0 10px', fontSize: 12, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.65)' }}>Website &amp; socials · optional</p>
+          <div className="tgl-portal-grid-2">
+            <Field label="Website">
+              <input className="tgl-input" inputMode="url" autoComplete="url" placeholder="yourbusiness.com" value={form.website} onChange={(e) => set('website', e.target.value)} maxLength={300} />
+            </Field>
+            <Field label="LinkedIn">
+              <input className="tgl-input" inputMode="url" placeholder="linkedin.com/company/…" value={form.linkedin} onChange={(e) => set('linkedin', e.target.value)} maxLength={300} />
+            </Field>
+            <Field label="Instagram">
+              <input className="tgl-input" inputMode="url" placeholder="instagram.com/…" value={form.instagram} onChange={(e) => set('instagram', e.target.value)} maxLength={300} />
+            </Field>
+          </div>
         </div>
 
         {error && <div className="tgl-alert-error" role="alert" style={{ marginTop: 18 }}><span>{error}</span></div>}
 
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 30 }}>
-          <button type="button" className="tglp-ghost" onClick={() => go('/onboarding/personal')} style={GHOST_BTN}>Back</button>
+          <button type="button" className="tglp-ghost" onClick={() => go(editing ? '/app/profile' : '/onboarding/personal')} style={GHOST_BTN}>{editing ? 'Cancel' : 'Back'}</button>
           <button type="submit" className="tglp-gold" disabled={submitting} style={GOLD_BTN}>
-            {submitting ? 'Saving…' : 'Save & Continue'}
+            {submitting ? 'Saving…' : editing ? 'Save changes' : 'Save & Continue'}
             {!submitting && <svg width="17" height="17" viewBox="0 0 24 24"><use href="#i-arrow" /></svg>}
           </button>
         </div>

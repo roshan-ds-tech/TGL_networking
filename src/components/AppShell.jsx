@@ -119,7 +119,7 @@ function ModalHost() {
             <>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 22 }}>
                 <div>
-                  <p style={{ margin: '0 0 6px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.26em', textTransform: 'uppercase', color: '#C08D2E' }}>Enquiry to</p>
+                  <p style={{ margin: '0 0 6px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.26em', textTransform: 'uppercase', color: '#8F6420' }}>Enquiry to</p>
                   <h3 style={{ margin: 0, fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em', color: '#2B1740' }}>{modal.target}</h3>
                 </div>
                 <CloseBtn onClick={close} />
@@ -156,7 +156,7 @@ function ModalHost() {
 
         {modal.type === 'connect' && (
           <>
-            <p style={{ margin: '0 0 6px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.26em', textTransform: 'uppercase', color: '#C08D2E' }}>Connect</p>
+            <p style={{ margin: '0 0 6px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.26em', textTransform: 'uppercase', color: '#8F6420' }}>Connect</p>
             <h3 style={{ margin: '0 0 18px', fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em', color: '#2B1740' }}>Send a request to {modal.target}</h3>
             <Field label="Add a note" optional>
               <textarea className="tgl-input" rows={3} style={{ resize: 'vertical' }} placeholder="Why you'd like to connect." value={note} onChange={(e) => setNote(e.target.value)} />

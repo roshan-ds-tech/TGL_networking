@@ -1,4 +1,6 @@
-const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+import { API_BASE } from './apiBase';
+
+const REQUEST_TIMEOUT_MS = 20000;
 
 export class ApiError extends Error {
   constructor(message, status, payload) {
@@ -24,17 +26,38 @@ async function request(path, options = {}) {
     const csrf = csrfToken();
     if (csrf) headers['X-CSRF-Token'] = decodeURIComponent(csrf);
   }
-  const res = await fetch(`${API_BASE}${path}`, {
-    credentials: 'include',
-    ...options,
-    headers,
-  });
+  let res;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      credentials: 'include',
+      // A hung request must not leave a button spinning forever.
+      signal: options.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      ...options,
+      headers,
+    });
+  } catch (err) {
+    if (err?.name === 'AbortError' && options.signal?.aborted) throw err; // caller cancelled
+    const timedOut = err?.name === 'TimeoutError' || err?.name === 'AbortError';
+    throw new ApiError(
+      timedOut
+        ? 'The server is taking too long to respond. Please try again.'
+        : "Can't reach TGL right now. Check your connection and try again.",
+      0,
+      null,
+    );
+  }
   if (res.status === 204) return null;
   const text = await res.text();
-  const payload = text ? JSON.parse(text) : null;
+  let payload = null;
+  try {
+    payload = text ? JSON.parse(text) : null;
+  } catch {
+    // Not JSON — e.g. a proxy error page while the server restarts.
+    payload = null;
+  }
   if (!res.ok) {
     const detail = payload?.detail;
-    let message = 'Request failed.';
+    let message = res.status >= 500 ? 'Something went wrong on our side. Please try again in a moment.' : 'Request failed.';
     if (typeof detail === 'string') {
       message = detail;
     } else if (Array.isArray(detail) && detail.length) {
@@ -47,10 +70,14 @@ async function request(path, options = {}) {
 }
 
 export const api = {
-  signup: (email, password) => request('/api/v1/auth/register', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  signup: (details) => request('/api/v1/auth/register', { method: 'POST', body: JSON.stringify(details) }),
   login: (email, password) => request('/api/v1/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
   logout: () => request('/api/v1/auth/logout', { method: 'POST' }),
   me: () => request('/api/v1/auth/me'),
+  // 200 either way: { authenticated, user? }. For pages that work signed out.
+  session: () => request('/api/v1/auth/session'),
+  // Full status when signed in, null when not — without a 401 round trip.
+  optionalStatus: async () => ((await api.session())?.authenticated ? api.status() : null),
   verifyEmail: (token) => {
     const fd = new FormData();
     fd.set('token', token);

@@ -38,7 +38,7 @@ export default function ForgotPassword() {
         <svg width="16" height="16" viewBox="0 0 24 24"><use href="#i-back" /></svg>
         Back to sign in
       </button>
-      <div style={{ background: '#FFFCF5', border: '1px solid rgba(53,26,78,0.1)', borderRadius: 22, padding: '40px 38px', boxShadow: '0 30px 60px -24px rgba(34,16,58,0.22)' }}>
+      <div style={{ background: '#FFFCF5', border: '1px solid rgba(53,26,78,0.1)', borderRadius: 22, padding: 'clamp(26px, 6vw, 40px) clamp(18px, 5vw, 38px)', boxShadow: '0 30px 60px -24px rgba(34,16,58,0.22)' }}>
         {sent ? (
           <>
             <span style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(192,141,46,0.14)', color: '#A8762F', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
@@ -52,7 +52,7 @@ export default function ForgotPassword() {
           </>
         ) : (
           <>
-            <p style={{ margin: '0 0 6px', fontSize: 10.5, letterSpacing: '.26em', textTransform: 'uppercase', fontWeight: 700, color: '#C08D2E' }}>Account recovery</p>
+            <p style={{ margin: '0 0 6px', fontSize: 10.5, letterSpacing: '.26em', textTransform: 'uppercase', fontWeight: 700, color: '#8F6420' }}>Account recovery</p>
             <h1 style={{ margin: '0 0 10px', fontSize: 26, fontWeight: 800, letterSpacing: '-0.02em', color: '#2B1740' }}>Reset your password</h1>
             <p style={{ margin: '0 0 26px', fontSize: 15, lineHeight: 1.6, color: 'rgba(43,23,64,0.65)' }}>
               Enter the email you registered with and we&apos;ll send a reset link.

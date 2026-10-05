@@ -65,6 +65,24 @@ Covers auth, CSRF, SQL injection, path traversal, upload spoofing, user
 enumeration, session invalidation and rate limiting. Uses a throwaway DB.
 
 ```bash
+.venv/bin/python test_p0.py          # accounts, onboarding, networking, finale, notifications
+(cd .. && npm run build) && .venv/bin/python test_production.py
+                                     # production shape: same-origin site serving, 404s,
+                                     # headers, XFF spoofing, Supabase Storage (local fake),
+                                     # duplicate/concurrent submissions, 130-request load run
+```
+
+Every suite also runs against Postgres — the engine production (Supabase)
+uses, and the one that exposes concurrency bugs SQLite hides. Point
+`TEST_DATABASE_URL` at a **throwaway** database (its tables are dropped):
+
+```bash
+TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:5432/tgl_test .venv/bin/python test_production.py
+```
+
+Deployment: see `../DEPLOY_RENDER.md` (Render + Supabase).
+
+```bash
 .venv/Scripts/python.exe -m pip install werkzeug
 .venv/Scripts/python.exe test_wsgi_bridge.py
 ```

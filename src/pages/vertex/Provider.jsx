@@ -67,21 +67,21 @@ export default function VertexProvider({ id }) {
       <main style={{ maxWidth: 1240, margin: '0 auto', padding: '52px 28px 96px' }}>
         <div data-grid-2="" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.6fr) minmax(0,1fr)', gap: 56, alignItems: 'start' }}>
           <div>
-            <p style={{ margin: '0 0 12px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.26em', textTransform: 'uppercase', color: '#C08D2E' }}>About</p>
+            <p style={{ margin: '0 0 12px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.26em', textTransform: 'uppercase', color: '#8F6420' }}>About</p>
             <p style={{ margin: '0 0 40px', fontSize: 17, lineHeight: 1.7, color: 'rgba(43,23,64,0.78)' }}>{provider.blurb}</p>
 
             <div data-grid-2="" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, padding: '32px 0', borderTop: '1px solid rgba(53,26,78,0.12)', borderBottom: '1px solid rgba(53,26,78,0.12)', marginBottom: 40 }}>
               <div>
-                <p style={{ margin: '0 0 14px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.26em', textTransform: 'uppercase', color: '#C08D2E' }}>Services</p>
+                <p style={{ margin: '0 0 14px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.26em', textTransform: 'uppercase', color: '#8F6420' }}>Services</p>
                 {PROVIDER_SERVICES.map((sv) => (
                   <p key={sv} style={{ margin: 0, padding: '9px 0', display: 'flex', alignItems: 'center', gap: 10, fontSize: 15, fontWeight: 600, color: '#2B1740', borderBottom: '1px solid rgba(53,26,78,0.07)' }}>
-                    <svg width="15" height="15" viewBox="0 0 24 24" style={{ color: '#C08D2E' }}><use href="#i-check" /></svg>
+                    <svg width="15" height="15" viewBox="0 0 24 24" style={{ color: '#8F6420' }}><use href="#i-check" /></svg>
                     {sv}
                   </p>
                 ))}
               </div>
               <div>
-                <p style={{ margin: '0 0 14px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.26em', textTransform: 'uppercase', color: '#C08D2E' }}>Specializations</p>
+                <p style={{ margin: '0 0 14px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.26em', textTransform: 'uppercase', color: '#8F6420' }}>Specializations</p>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   {PROVIDER_SPECS.map((sp) => (
                     <span key={sp} style={{ padding: '8px 14px', border: '1px solid rgba(53,26,78,0.14)', borderRadius: 999, fontSize: 13, fontWeight: 600, color: '#35194E', background: '#FFFCF5' }}>{sp}</span>
@@ -90,11 +90,11 @@ export default function VertexProvider({ id }) {
               </div>
             </div>
 
-            <p style={{ margin: '0 0 18px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.26em', textTransform: 'uppercase', color: '#C08D2E' }}>Business information</p>
+            <p style={{ margin: '0 0 18px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.26em', textTransform: 'uppercase', color: '#8F6420' }}>Business information</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 1, background: 'rgba(53,26,78,0.1)', border: '1px solid rgba(53,26,78,0.1)', borderRadius: 18, overflow: 'hidden', marginBottom: 40 }}>
               {FACTS.map(([label, value]) => (
                 <div key={label} style={{ padding: 20, background: '#FFFCF5' }}>
-                  <p style={{ margin: '0 0 6px', fontSize: 10.5, letterSpacing: '.18em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.5)' }}>{label}</p>
+                  <p style={{ margin: '0 0 6px', fontSize: 10.5, letterSpacing: '.18em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.65)' }}>{label}</p>
                   <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: label === 'Website' ? '#6B3E96' : '#2B1740' }}>{value}</p>
                 </div>
               ))}
@@ -104,7 +104,7 @@ export default function VertexProvider({ id }) {
           <aside data-sticky-col="" style={{ position: 'sticky', top: 110 }}>
             <div id="provider-enquiry" className="tglp-framed">
               <div style={{ background: '#FFFCF5', border: '1px solid rgba(53,26,78,0.1)', borderRadius: 20, padding: 30, boxShadow: '0 30px 60px -30px rgba(34,16,58,0.3)' }}>
-                <p style={{ margin: '0 0 6px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.26em', textTransform: 'uppercase', color: '#C08D2E' }}>Enquiry</p>
+                <p style={{ margin: '0 0 6px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.26em', textTransform: 'uppercase', color: '#8F6420' }}>Enquiry</p>
                 <h3 style={{ margin: '0 0 20px', fontSize: 21, fontWeight: 800, letterSpacing: '-0.02em', color: '#2B1740' }}>What do you need help with?</h3>
                 <textarea
                   className="tgl-input"
@@ -137,7 +137,7 @@ export default function VertexProvider({ id }) {
                   Submit Enquiry
                   <svg width="15" height="15" viewBox="0 0 24 24"><use href="#i-send" /></svg>
                 </button>
-                <p style={{ margin: '14px 0 0', fontSize: 12, lineHeight: 1.5, color: 'rgba(43,23,64,0.5)' }}>
+                <p style={{ margin: '14px 0 0', fontSize: 12, lineHeight: 1.5, color: 'rgba(43,23,64,0.65)' }}>
                   Goes straight to the provider. TGL doesn&apos;t sell your details.
                 </p>
               </div>

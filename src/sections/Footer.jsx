@@ -148,7 +148,7 @@ export default function Footer({ onOpenModule, authUser, authChecked }) {
                       Swap in an <a> like the Instagram one above once the
                       client provides the real link. */}
                   <span
-                    aria-disabled="true"
+                    role="img"
                     aria-label="LinkedIn — link coming soon"
                     title="LinkedIn — coming soon"
                     style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '34px', height: '34px', borderRadius: '999px', border: '1px solid rgba(224,181,88,0.16)', color: 'rgba(246,238,223,0.32)', cursor: 'not-allowed' }}

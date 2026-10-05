@@ -215,7 +215,7 @@
 }
 
 .tgl-input::placeholder {
-  color: rgba(43, 23, 64, 0.42);
+  color: rgba(43, 23, 64, 0.65);
 }
 
 .tgl-input:focus {
@@ -255,7 +255,7 @@ textarea.tgl-input {
   font-weight: 700;
   letter-spacing: .16em;
   text-transform: uppercase;
-  color: rgba(43, 23, 64, 0.55);
+  color: rgba(43, 23, 64, 0.65);
   margin-bottom: 8px;
 }
 
@@ -264,7 +264,7 @@ textarea.tgl-input {
   font-weight: 500;
   letter-spacing: normal;
   text-transform: none;
-  color: var(--tgl-text-faint);
+  color: rgba(43, 23, 64, 0.65);
   margin-left: 6px;
 }
 
@@ -303,7 +303,7 @@ textarea.tgl-input {
   font-weight: 700;
   background: rgba(53, 26, 78, 0.06);
   border: 1px solid rgba(53, 26, 78, 0.18);
-  color: rgba(43, 23, 64, 0.6);
+  color: rgba(43, 23, 64, 0.65);
   transition: all 0.25s ease;
 }
 
@@ -325,7 +325,7 @@ textarea.tgl-input {
   font-weight: 700;
   letter-spacing: .1em;
   text-transform: uppercase;
-  color: rgba(43, 23, 64, 0.6);
+  color: rgba(43, 23, 64, 0.65);
 }
 
 .tgl-step-item.active .tgl-step-title {
@@ -558,7 +558,7 @@ textarea.tgl-input {
   font-size: 11px;
   letter-spacing: .22em;
   text-transform: uppercase;
-  color: rgba(43, 23, 64, 0.5);
+  color: rgba(43, 23, 64, 0.65);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -574,7 +574,7 @@ textarea.tgl-input {
 .tgl-hero-meta-sub {
   margin: 2px 0 0;
   font-size: 12.5px;
-  color: rgba(43, 23, 64, 0.6);
+  color: rgba(43, 23, 64, 0.65);
   white-space: nowrap;
 }
 
@@ -599,7 +599,7 @@ textarea.tgl-input {
   letter-spacing: .42em;
   text-transform: uppercase;
   font-weight: 600;
-  color: rgba(43, 23, 64, 0.45);
+  color: rgba(43, 23, 64, 0.65);
   margin: 0 0 12px;
 }
 
@@ -615,7 +615,7 @@ textarea.tgl-input {
   margin-top: 12px;
   font-size: 15px;
   line-height: 1.7;
-  color: rgba(43, 23, 64, 0.62);
+  color: rgba(43, 23, 64, 0.65);
 }
 
 /* Offset gold frame behind the form card (hero panel treatment) */
@@ -929,4 +929,99 @@ textarea.tgl-input {
     padding-left: 18px !important;
     padding-right: 18px !important;
   }
+}
+
+/* =========================================================
+   Profile dashboard (pages/profile/Profile.jsx)
+   Identity header + two-column body: details on the left, status/actions on
+   the right. Cards share one surface, radius and heading style.
+   ========================================================= */
+.pf { max-width: 1240px; margin: 0 auto; padding: 32px 28px 96px; }
+
+.pf-hero { border: 1px solid rgba(53,26,78,0.1); border-radius: 22px; background: #FFFCF5; overflow: hidden; box-shadow: 0 1px 2px rgba(53,26,78,0.04), 0 18px 40px -28px rgba(53,26,78,0.25); }
+.pf-cover { height: 132px; background:
+  radial-gradient(120% 140% at 85% -20%, rgba(224,181,88,0.38), transparent 55%),
+  linear-gradient(120deg, #22103A 0%, #35194E 60%, #4A2A6B 100%); }
+.pf-hero-body { display: flex; align-items: flex-end; gap: 24px; flex-wrap: wrap; padding: 0 32px 28px; }
+.pf-avatar { width: 112px; height: 112px; margin-top: -56px; flex-shrink: 0; display: grid; place-items: center; border-radius: 50%; border: 5px solid #FFFCF5; background: linear-gradient(140deg, #EFCB77, #C08D2E); color: #22103A; font-size: 38px; font-weight: 800; letter-spacing: -0.02em; box-shadow: 0 8px 24px -8px rgba(34,16,58,0.45); }
+.pf-ident { flex: 1; min-width: 240px; padding-top: 18px; }
+.pf-ident h1 { margin: 0; font-size: clamp(26px, 3vw, 34px); font-weight: 800; letter-spacing: -0.03em; color: #2B1740; }
+.pf-headline { margin: 4px 0 0; font-size: 15.5px; color: rgba(43,23,64,0.68); }
+.pf-headline strong { color: #2B1740; font-weight: 700; }
+.pf-meta { display: flex; flex-wrap: wrap; gap: 6px 20px; margin: 12px 0 0; padding: 0; list-style: none; font-size: 13.5px; color: rgba(43, 23, 64, 0.65); }
+.pf-meta li { display: flex; align-items: center; gap: 6px; }
+.pf-meta svg { color: #A8762F; }
+.pf-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.pf-hero-actions { display: flex; gap: 10px; padding-top: 18px; }
+
+.pf-btn { padding: 10px 18px; border-radius: 999px; border: 1px solid rgba(53,26,78,0.18); background: #FFFCF5; color: #2B1740; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; transition: border-color .2s, background .2s, transform .2s; }
+.pf-btn:hover { border-color: rgba(192,141,46,0.6); background: #FBF3E1; }
+.pf-btn--primary { border-color: transparent; background: linear-gradient(135deg, #EFCB77, #C08D2E); color: #22103A; }
+.pf-btn--primary:hover { background: linear-gradient(135deg, #F3D589, #CC9A38); transform: translateY(-1px); }
+
+.pf-pill { display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; border-radius: 999px; font-size: 11.5px; font-weight: 700; letter-spacing: .02em; white-space: nowrap; }
+.pf-pill--neutral { background: rgba(53,26,78,0.07); color: #35194E; }
+.pf-pill--info { background: rgba(107,62,150,0.12); color: #6B3E96; }
+.pf-pill--warn { background: rgba(192,141,46,0.16); color: #8A5A18; }
+.pf-pill--success { background: rgba(46,125,82,0.13); color: #226443; }
+.pf-pill--danger { background: rgba(142,59,59,0.12); color: #8E3B3B; }
+
+.pf-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; margin-top: 20px; align-items: start; }
+.pf-col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+
+.pf-card { padding: 24px 26px; border: 1px solid rgba(53,26,78,0.1); border-radius: 18px; background: #FFFCF5; }
+.pf-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.pf-card-title { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 15.5px; font-weight: 800; letter-spacing: -0.01em; color: #2B1740; }
+.pf-card-title svg { color: #6B3E96; }
+
+.pf-link { font-size: 13px; font-weight: 700; color: #8A5A18; text-decoration: none; border-bottom: 1px solid transparent; transition: border-color .2s; }
+.pf-link:hover { border-bottom-color: currentColor; }
+.pf-link--arrow { display: inline-flex; align-items: center; gap: 6px; }
+
+.pf-prose { margin: 0; font-size: 14.5px; line-height: 1.7; color: rgba(43,23,64,0.78); white-space: pre-line; }
+.pf-prose--lead { margin-bottom: 18px; }
+.pf-empty { font-size: 14px; color: rgba(43, 23, 64, 0.65); margin: 0; }
+.pf-side-copy { margin: 0 0 14px; font-size: 13.5px; line-height: 1.6; color: rgba(43, 23, 64, 0.65); }
+
+.pf-rows { margin: 0; }
+.pf-row { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 16px; padding: 12px 0; border-top: 1px solid rgba(53,26,78,0.08); font-size: 14px; }
+.pf-row:first-child { border-top: 1px solid rgba(53,26,78,0.08); }
+.pf-row dt { color: rgba(43, 23, 64, 0.65); font-weight: 600; }
+.pf-row dd { margin: 0; color: #2B1740; font-weight: 600; overflow-wrap: anywhere; }
+.pf-inline-ok { display: inline-flex; align-items: center; gap: 4px; margin-left: 10px; padding: 2px 8px; border-radius: 999px; background: rgba(46,125,82,0.13); color: #226443; font-size: 11px; font-weight: 700; }
+.pf-story { margin-top: 18px; padding: 18px 20px; border-radius: 14px; background: rgba(107,62,150,0.06); }
+.pf-story h3 { margin: 0 0 8px; font-size: 11px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: #6B3E96; }
+
+.pf-strength { display: flex; align-items: center; gap: 16px; }
+.pf-ring { position: relative; width: 76px; height: 76px; flex-shrink: 0; }
+.pf-ring span { position: absolute; inset: 0; display: grid; place-items: center; font-size: 17px; font-weight: 800; color: #2B1740; }
+.pf-strength-copy { margin: 0; font-size: 13px; line-height: 1.55; color: rgba(43, 23, 64, 0.65); }
+.pf-strength-copy strong { color: #2B1740; }
+.pf-checklist { margin: 18px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.pf-checklist li { display: flex; align-items: center; gap: 10px; padding: 7px 0; font-size: 13.5px; color: #2B1740; font-weight: 600; }
+.pf-checklist li a { color: inherit; text-decoration: none; }
+.pf-checklist li a:hover { color: #8A5A18; text-decoration: underline; }
+.pf-checklist li.is-done { color: rgba(43, 23, 64, 0.65); font-weight: 500; }
+.pf-tick { width: 18px; height: 18px; flex-shrink: 0; display: grid; place-items: center; border-radius: 50%; border: 1.5px solid rgba(53,26,78,0.22); color: #FFFCF5; }
+.pf-checklist li.is-done .pf-tick { background: #C08D2E; border-color: #C08D2E; }
+
+.pf-account { margin: 0; padding: 0; list-style: none; }
+.pf-account li + li { border-top: 1px solid rgba(53,26,78,0.08); }
+.pf-account a, .pf-account button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px 0; border: 0; background: none; font: inherit; font-size: 13.5px; font-weight: 600; color: #2B1740; text-decoration: none; cursor: pointer; text-align: left; }
+.pf-account a svg:last-child { margin-left: auto; color: rgba(43, 23, 64, 0.65); }
+.pf-account svg { color: rgba(43, 23, 64, 0.65); }
+.pf-account a:hover, .pf-account button:hover { color: #8A5A18; }
+
+@media (max-width: 960px) {
+  .pf-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) {
+  .pf { padding: 20px 16px 72px; }
+  .pf-hero-body { padding: 0 20px 22px; }
+  .pf-cover { height: 96px; }
+  .pf-avatar { width: 92px; height: 92px; margin-top: -46px; font-size: 32px; }
+  .pf-hero-actions { width: 100%; }
+  .pf-btn { flex: 1; }
+  .pf-card { padding: 20px; }
+  .pf-row { grid-template-columns: 1fr; gap: 2px; }
 }

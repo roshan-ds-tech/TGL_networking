@@ -16,7 +16,7 @@ const INTRO_OPTIONS = [
   'Share contact details only',
 ];
 
-const LABEL = { display: 'block', fontSize: 10.5, fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.55)', marginBottom: 8 };
+const LABEL = { display: 'block', fontSize: 10.5, fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.65)', marginBottom: 8 };
 
 function stageIndex(status) {
   const i = STAGES.indexOf(status);
@@ -201,7 +201,7 @@ export default function Referrals({ status, openGiveOnMount }) {
       <main style={{ maxWidth: 1240, margin: '0 auto', padding: '48px 28px 96px' }}>
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap', marginBottom: 34 }}>
           <div>
-            <p style={{ margin: '0 0 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.26em', textTransform: 'uppercase', color: '#C08D2E' }}>Referrals</p>
+            <p style={{ margin: '0 0 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.26em', textTransform: 'uppercase', color: '#8F6420' }}>Referrals</p>
             <h1 style={{ margin: 0, fontSize: 'clamp(30px, 3.4vw, 44px)', fontWeight: 800, letterSpacing: '-0.035em', color: '#2B1740' }}>Introductions that close business</h1>
           </div>
           {!giveOpen && (
@@ -234,9 +234,9 @@ export default function Referrals({ status, openGiveOnMount }) {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0,1fr))', border: '1px solid rgba(53,26,78,0.1)', borderRadius: 20, background: '#FFFCF5', overflow: 'hidden', marginBottom: 34 }}>
           {pipeline.map((pl, i) => (
             <div key={pl.label} style={{ padding: '20px 18px', borderRight: i < pipeline.length - 1 ? '1px solid rgba(53,26,78,0.08)' : 'none' }}>
-              <p style={{ margin: '0 0 10px', fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, color: 'rgba(43,23,64,0.4)' }}>{pl.n}</p>
+              <p style={{ margin: '0 0 10px', fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, color: 'rgba(43,23,64,0.65)' }}>{pl.n}</p>
               <p style={{ margin: '0 0 4px', fontSize: 28, fontWeight: 800, color: '#2B1740', fontVariantNumeric: 'tabular-nums' }}>{pl.count}</p>
-              <p style={{ margin: 0, fontSize: 11, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.58)' }}>{pl.label}</p>
+              <p style={{ margin: 0, fontSize: 11, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.65)' }}>{pl.label}</p>
             </div>
           ))}
         </div>
@@ -273,7 +273,7 @@ export default function Referrals({ status, openGiveOnMount }) {
                 <div key={r.id} data-grid-2="" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.4fr) minmax(0,1fr) auto', gap: 28, alignItems: 'center', padding: '24px 26px', border: '1px solid rgba(53,26,78,0.1)', borderRadius: 20, background: '#FFFCF5' }}>
                   <div style={{ minWidth: 0 }}>
                     <p style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 800, color: '#2B1740' }}>{otherName || 'TGL Member'}</p>
-                    <p style={{ margin: '0 0 8px', fontSize: 12.5, color: 'rgba(43,23,64,0.55)' }}>{otherBusiness || ''} · {shortDate(r.created_at)}</p>
+                    <p style={{ margin: '0 0 8px', fontSize: 12.5, color: 'rgba(43,23,64,0.65)' }}>{otherBusiness || ''} · {shortDate(r.created_at)}</p>
                     <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, color: 'rgba(43,23,64,0.75)' }}>{r.business_need}</p>
                   </div>
                   <div>
@@ -294,7 +294,7 @@ export default function Referrals({ status, openGiveOnMount }) {
                       {action.label}
                     </button>
                   ) : (
-                    <span style={{ fontSize: 11, color: 'rgba(43,23,64,0.45)', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: 11, color: 'rgba(43,23,64,0.65)', whiteSpace: 'nowrap' }}>
                       {r.status === 'GIVEN' ? 'Awaiting response' : r.status.replace(/_/g, ' ').toLowerCase()}
                     </span>
                   )}
