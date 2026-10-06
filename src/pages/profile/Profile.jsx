@@ -1,8 +1,9 @@
 import { CATEGORIES } from '../../data/categories';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, go } from '../../lib/customerApi';
 import { showToast } from '../../components/AppShell';
-import { PHOTO_TYPES, photoError, shrinkPhoto } from '../../lib/photo';
+import PhotoCropper from '../../components/PhotoCropper';
+import { PHOTO_TYPES, photoError } from '../../lib/photo';
 
 const CATEGORY_MAP = new Map(CATEGORIES.map((c) => [c.code, c.name]));
 
@@ -121,9 +122,24 @@ function Strength({ pct, items }) {
 
 export default function Profile({ status, reload }) {
   const photoInput = useRef(null);
+  const menuRef = useRef(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [cropFile, setCropFile] = useState(null);
   const [photoBusy, setPhotoBusy] = useState(false);
 
-  async function pickPhoto(ev) {
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = (e) => { if (!menuRef.current?.contains(e.target)) setMenuOpen(false); };
+    const esc = (e) => { if (e.key === 'Escape') setMenuOpen(false); };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', esc);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', esc);
+    };
+  }, [menuOpen]);
+
+  function pickPhoto(ev) {
     const file = ev.target.files?.[0];
     ev.target.value = '';
     if (!file) return;
@@ -132,19 +148,23 @@ export default function Profile({ status, reload }) {
       showToast(problem);
       return;
     }
-    setPhotoBusy(true);
+    setCropFile(file); // opens the circular cropper; upload happens on Save
+  }
+
+  async function savePhoto(blob) {
     try {
-      await api.uploadPhoto(await shrinkPhoto(file));
+      await api.uploadPhoto(blob);
       await reload?.();
+      setCropFile(null);
       showToast('Profile photo updated.');
     } catch (err) {
       showToast(err?.message || 'Could not upload the photo.');
-    } finally {
-      setPhotoBusy(false);
+      throw err; // keeps the cropper open
     }
   }
 
   async function removePhoto() {
+    setMenuOpen(false);
     setPhotoBusy(true);
     try {
       await api.removePhoto();
@@ -186,12 +206,32 @@ export default function Profile({ status, reload }) {
       <div className="pf-hero">
         <div className="pf-cover" />
         <div className="pf-hero-body">
-          <div className="pf-avatar" aria-hidden="true" style={user.photo_url ? { overflow: 'hidden', padding: 0 } : undefined}>
-            {user.photo_url ? (
-              <img src={user.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%', display: 'block' }} />
-            ) : (
-              initials
+          <div className="pf-avatar-wrap" ref={menuRef}>
+            <div className="pf-avatar" aria-hidden="true">
+              {user.photo_url ? <img src={user.photo_url} alt="" /> : initials}
+            </div>
+            <button
+              type="button"
+              className="pf-avatar-edit"
+              aria-label="Edit profile photo"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              disabled={photoBusy}
+              onClick={() => setMenuOpen((v) => !v)}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+              </svg>
+            </button>
+            {menuOpen && (
+              <div className="pf-menu" role="menu">
+                <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); photoInput.current?.click(); }}>
+                  {user.photo_url ? 'Upload new photo' : 'Upload photo'}
+                </button>
+                {user.photo_url && <button type="button" role="menuitem" className="is-danger" onClick={removePhoto}>Remove photo</button>}
+              </div>
             )}
+            <input ref={photoInput} type="file" accept={PHOTO_TYPES.join(',')} onChange={pickPhoto} hidden />
           </div>
           <div className="pf-ident">
             <h1>{name}</h1>
@@ -211,13 +251,6 @@ export default function Profile({ status, reload }) {
           <div className="pf-hero-actions">
             <button type="button" className="pf-btn pf-btn--primary" onClick={() => go('/onboarding/personal')}>Edit profile</button>
             <button type="button" className="pf-btn" onClick={() => go('/onboarding/business')}>Edit business</button>
-            <button type="button" className="pf-btn" disabled={photoBusy} onClick={() => photoInput.current?.click()}>
-              {photoBusy ? 'Saving…' : user.photo_url ? 'Change photo' : 'Add photo'}
-            </button>
-            {user.photo_url && (
-              <button type="button" className="pf-btn" disabled={photoBusy} onClick={removePhoto}>Remove photo</button>
-            )}
-            <input ref={photoInput} type="file" accept={PHOTO_TYPES.join(',')} onChange={pickPhoto} hidden />
           </div>
         </div>
       </div>
@@ -302,6 +335,7 @@ export default function Profile({ status, reload }) {
           </Card>
         </aside>
       </div>
+      {cropFile && <PhotoCropper file={cropFile} onCancel={() => setCropFile(null)} onSave={savePhoto} />}
     </main>
   );
 }
