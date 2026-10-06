@@ -32,7 +32,7 @@ from .database import _CONNECT_ARGS, DATABASE_URL
 
 # Latest revision in migrations/versions. test_production.py asserts this
 # matches Alembic's head, so it can't silently drift.
-HEAD = "0003"
+HEAD = "0004"
 BASELINE = "0001"
 BASELINE_TABLES = {
     "admins", "events", "users", "business_referrals", "businesses", "connections", "notifications",

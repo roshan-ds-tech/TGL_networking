@@ -122,6 +122,14 @@ class Settings(BaseSettings):
     email_from: str = "TGL <tgl@skykeen.in>"
     resend_api_url: str = "https://api.resend.com/emails"
 
+    # Read-only copy of event registrations from the legacy system (the
+    # PythonAnywhere backend that tgl.skykeen.in posts to). Unset = disabled.
+    # Use a dedicated admin account there; it is only used to read the list.
+    legacy_registrations_url: str = ""
+    legacy_admin_email: str = ""
+    legacy_admin_password: str = ""
+    legacy_sync_seconds: int = 300
+
     @property
     def is_production(self) -> bool:
         return self.environment.lower() in {"production", "prod"}

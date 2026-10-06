@@ -196,6 +196,24 @@ Deploy from `main` (Render auto-deploys each push to it — `autoDeploy: true`).
 `.env` files, `backend/var/` (local database and uploads) and build output
 are git-ignored; only `*.example` files with empty values are committed.
 
+## Event registrations from tgl.skykeen.in (PythonAnywhere)
+
+Season 1 registrations are taken by tgl.skykeen.in, whose backend runs on
+PythonAnywhere. This app mirrors them (read-only, every 5 minutes, and right
+away when a member's email isn't matched yet) so Networking access and the
+TGL Verified badge work for those registrants. PythonAnywhere stays the
+source of truth: verify payments and delete entries **there**; mirrored rows
+are marked "via tgl.skykeen.in" in this admin and can't be changed here.
+
+1. Create a dedicated admin on PythonAnywhere for the sync (a *Bash console*
+   there, in the backend folder): `python create_admin.py` — e.g.
+   `sync@skykeen.in` with a long random password.
+2. Render → Environment: set `LEGACY_ADMIN_EMAIL` and `LEGACY_ADMIN_PASSWORD`
+   to that account (`LEGACY_REGISTRATIONS_URL` is already in `render.yaml`).
+   Save — Render redeploys and the first sync runs at startup.
+3. Check: this app's admin → Registrations now lists them, and the slot
+   counters on the site match PythonAnywhere's.
+
 ## Keeping the free services awake (UptimeRobot)
 
 Render Free sleeps after 15 idle minutes (first visitor then waits for the

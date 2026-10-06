@@ -57,6 +57,7 @@ export default function App() {
   const [finaleResult, setFinaleResult] = useState(null);
   const [finaleBusy, setFinaleBusy] = useState(false);
   const [finaleDone, setFinaleDone] = useState(false);
+  const [legacyAdminUrl, setLegacyAdminUrl] = useState(null);
   const [finaleCounts, setFinaleCounts] = useState(null);
 
   const abortRef = useRef(null);
@@ -112,6 +113,7 @@ export default function App() {
       setRows(list.items);
       setTotal(list.total);
       setPages(list.pages);
+      setLegacyAdminUrl(list.legacy_admin_url || null);
       setStats(s);
     } catch (err) {
       if (err.name === 'AbortError') return;
@@ -406,6 +408,11 @@ export default function App() {
                   <td>
                     <span className="cell__primary">{r.business_name}</span>
                     <span className="cell__sub">{r.full_name}</span>
+                    {r.source !== 'local' && (
+                      <span className="cell__sub" title="Registered on tgl.skykeen.in — mirrored here from the PythonAnywhere admin">
+                        via tgl.skykeen.in
+                      </span>
+                    )}
                   </td>
                   <td>
                     <a className="cell__link" href={`mailto:${r.email}`}>
@@ -422,15 +429,26 @@ export default function App() {
                   <td>{r.city || '—'}</td>
                   <td className="cell__mono">{formatDate(r.created_at)}</td>
                   <td>
-                    <button
-                      type="button"
-                      className="btn btn--link"
-                      onClick={() => setProof(r)}
-                    >
-                      View proof
-                    </button>
+                    {r.source === 'local' ? (
+                      <button
+                        type="button"
+                        className="btn btn--link"
+                        onClick={() => setProof(r)}
+                      >
+                        View proof
+                      </button>
+                    ) : (
+                      <a className="btn btn--link" href={legacyAdminUrl || '#'} target="_blank" rel="noopener noreferrer" title="The payment proof is stored in the PythonAnywhere admin">
+                        View in PythonAnywhere ↗
+                      </a>
+                    )}
                   </td>
                   <td>
+                    {r.source !== 'local' ? (
+                      <span className={r.verified ? 'btn btn--verified' : 'cell__sub'} style={{ cursor: 'default' }} title="Verify this payment in the PythonAnywhere admin; it syncs here within minutes">
+                        {r.verified ? '✓ Verified' : 'Pending (verify in PythonAnywhere)'}
+                      </span>
+                    ) : (
                     <button
                       type="button"
                       className={`btn ${r.verified ? 'btn--verified' : 'btn--verify'}`}
@@ -444,8 +462,10 @@ export default function App() {
                     >
                       {pendingId === r.id ? '…' : r.verified ? '✓ Verified' : 'Verify'}
                     </button>
+                    )}
                   </td>
                   <td>
+                    {r.source === 'local' && (
                     <button
                       type="button"
                       className="btn btn--icon"
@@ -464,6 +484,7 @@ export default function App() {
                         />
                       </svg>
                     </button>
+                    )}
                   </td>
                 </tr>
               ))}

@@ -55,5 +55,15 @@ services:
         value: "24"
       - key: RESEND_API_KEY # email codes; required in production
         sync: false
+      # Read-only mirror of the event registrations taken by tgl.skykeen.in
+      # (its PythonAnywhere backend). Networking access and the TGL Verified
+      # badge depend on them. Use a DEDICATED admin account created there
+      # just for this; it only reads the registrations list.
+      - key: LEGACY_REGISTRATIONS_URL
+        value: https://roshands.pythonanywhere.com
+      - key: LEGACY_ADMIN_EMAIL
+        sync: false
+      - key: LEGACY_ADMIN_PASSWORD # secret
+        sync: false
       - key: EMAIL_FROM
         value: "TGL <tgl@skykeen.in>"

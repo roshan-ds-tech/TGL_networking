@@ -83,7 +83,7 @@ from ..security import (
     require_verified_user,
     verify_password_async,
 )
-from .. import outbox
+from .. import legacy_sync, outbox
 from ..email_service import login_otp_email, password_reset_email, verification_email
 from ..services import ensure_networking_profile, get_or_create_season_1, season_1, new_reset_token, new_verification_token, notify, token_hash
 
@@ -534,6 +534,11 @@ async def status_me(
     profile, business, networking_profile, reg, membership, unread = row
     flags = await access_flags(db, user)
     registered, paid = flags["registered"], flags["paid"]
+    if user.email_verified_at is not None and not paid:
+        # Maybe they registered (or were verified) on tgl.skykeen.in moments
+        # ago: ask for a fresh copy of the legacy registrations (non-blocking,
+        # rate-limited) so the next page load sees it.
+        legacy_sync.kick()
     window = await finale_window(db)
 
     # Once the Finale is completed, a registered email's membership is the

@@ -186,6 +186,7 @@ class Base(DeclarativeBase):
 # would have produced — and so the DDL is correct on both SQLite and Postgres.
 _ADDED_COLUMNS: dict[str, dict[str, str | None]] = {
     "registrations": {
+        "source": "'local'",
         # Nullable bridge fields for authenticated P0 registrations. Legacy
         # public registrations stay valid; new product registrations point to
         # the customer/user-owned event-registration domain.

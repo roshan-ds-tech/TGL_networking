@@ -55,7 +55,20 @@ def _to_out(reg: Registration) -> RegistrationOut:
         verified_at=reg.verified_at,
         verified_by_email=reg.verified_by.email if reg.verified_by else None,
         created_at=reg.created_at,
+        source=reg.source,
     )
+
+
+_LEGACY_MSG = (
+    "This registration comes from the PythonAnywhere system (tgl.skykeen.in) and is only "
+    "mirrored here. Verify, delete or view its payment proof in that admin; changes sync here "
+    "within a few minutes."
+)
+
+
+def _refuse_if_mirrored(reg: Registration) -> None:
+    if reg.source != "local":
+        raise HTTPException(status.HTTP_409_CONFLICT, _LEGACY_MSG)
 
 
 @router.get("/registrations", response_model=RegistrationPage)
@@ -104,6 +117,7 @@ async def list_registrations(
         page=page,
         page_size=page_size,
         pages=max(1, math.ceil(total / page_size)),
+        legacy_admin_url=(settings.legacy_registrations_url.rstrip("/") + "/admin") if settings.legacy_registrations_url else None,
     )
 
 
@@ -334,6 +348,7 @@ async def set_verified(
     reg = await db.get(Registration, registration_id)
     if reg is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Registration not found")
+    _refuse_if_mirrored(reg)
 
     reg.verified = payload.verified
     reg.verified_at = utcnow() if payload.verified else None
@@ -399,6 +414,7 @@ async def delete_registration(
     reg = await db.get(Registration, registration_id)
     if reg is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Registration not found")
+    _refuse_if_mirrored(reg)
 
     proof_filename = reg.proof_filename
     business = reg.business_name
@@ -432,6 +448,7 @@ async def get_proof(
     reg = await db.get(Registration, registration_id)
     if reg is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Registration not found")
+    _refuse_if_mirrored(reg)
 
     data = await read_proof(reg.proof_filename)
     return Response(

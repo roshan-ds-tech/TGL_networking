@@ -17,7 +17,7 @@ from sqlalchemy.exc import IntegrityError
 
 from .config import settings
 from .observability import timing_middleware
-from . import http_client, outbox
+from . import http_client, legacy_sync, outbox
 from .database import Base, engine, lock_down_postgres, sync_schema
 from .routers import admin as admin_router
 from .routers import auth as auth_router
@@ -53,7 +53,9 @@ async def lifespan(_: FastAPI):
             await conn.run_sync(sync_schema)
             await conn.run_sync(lock_down_postgres)
     outbox.start()  # sends queued emails in the background (outbox.py)
+    legacy_sync.start()  # mirrors legacy (PythonAnywhere) registrations, if configured
     yield
+    await legacy_sync.stop()
     await outbox.stop()
     await http_client.aclose()
     await engine.dispose()

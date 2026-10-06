@@ -76,6 +76,11 @@ class Registration(Base):
         String(36), ForeignKey("event_registrations.id", ondelete="SET NULL"), nullable=True
     )
 
+    # "local" = submitted through this backend's form; "pythonanywhere" = copied
+    # read-only from the legacy registration system (legacy_sync.py), which
+    # stays the source of truth for those rows.
+    source: Mapped[str] = mapped_column(String(16), default="local", server_default="local", nullable=False)
+
     # Salted hash, not the raw IP — enough to spot abuse without storing PII.
     submitter_ip_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
 

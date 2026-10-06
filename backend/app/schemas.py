@@ -152,6 +152,7 @@ class RegistrationOut(BaseModel):
     verified_at: UtcDatetime | None
     verified_by_email: str | None = None
     created_at: UtcDatetime
+    source: str = "local"
 
     model_config = {"from_attributes": True}
 
@@ -162,6 +163,8 @@ class RegistrationPage(BaseModel):
     page: int
     page_size: int
     pages: int
+    # Admin of the legacy system that mirrored rows come from (for links).
+    legacy_admin_url: str | None = None
 
 
 class VerifyRequest(BaseModel):
