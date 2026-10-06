@@ -24,12 +24,12 @@ from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerifyMismatchError
 from fastapi import Cookie, Depends, Header, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import func, or_, select
+from sqlalchemy import exists, func, or_, select
 
 from .config import settings
 from .database import get_db
 from .observability import timed
-from .services import SEASON_1_SLUG, add_calendar_months
+from .services import SEASON_1_SLUG, EventSnapshot, add_calendar_months, season_1  # noqa: F401
 from .models import Admin, Event, Registration, TGLMembership, User, utcnow
 
 SESSION_COOKIE = "tgl_session"
@@ -241,11 +241,12 @@ async def has_registration(db: AsyncSession, user: User) -> bool:
     return found is not None
 
 
-async def finale_window(db: AsyncSession) -> tuple[Event, datetime, datetime] | None:
+async def finale_window(db: AsyncSession) -> tuple["EventSnapshot", datetime, datetime] | None:
     """(event, starts, expires) while the completed-Finale membership window is
-    open; None before the Finale is completed or after the window closes."""
-    event = await db.scalar(select(Event).where(Event.slug == SEASON_1_SLUG))
-    if event is None or event.completed_at is None:
+    open; None before the Finale is completed or after the window closes.
+    Reads the in-memory event snapshot (services.season_1), not the DB."""
+    event = await season_1(db)
+    if event.completed_at is None:
         return None
     started = event.completed_at
     if started.tzinfo is None:
@@ -254,24 +255,53 @@ async def finale_window(db: AsyncSession) -> tuple[Event, datetime, datetime] | 
     return (event, started, expires) if utcnow() < expires else None
 
 
-async def has_networking_access(db: AsyncSession, user: User) -> bool:
-    """Networking opens for a registered email once an admin completes the
-    Grand Finale, and stays open for the event's membership window (3 months).
-    An individually activated membership also grants access."""
-    if await has_registration(db, user) and await finale_window(db) is not None:
-        return True
-    now = utcnow()
-    active = await db.scalar(
+def _registration_exists(user: User, verified_only: bool = False):
+    q = select(Registration.id).where(func.lower(Registration.email) == user.email.lower())
+    if verified_only:
+        q = q.where(Registration.verified.is_(True))
+    return exists(q)
+
+
+def _active_membership_exists(user_id_col):
+    return exists(
         select(TGLMembership.id).where(
-            TGLMembership.user_id == user.id,
+            TGLMembership.user_id == user_id_col,
             TGLMembership.membership_type == "NETWORKING",
             TGLMembership.status == "ACTIVE",
             TGLMembership.starts_at.is_not(None),
             TGLMembership.expires_at.is_not(None),
-            TGLMembership.expires_at > now,
-        ).limit(1)
+            TGLMembership.expires_at > utcnow(),
+        )
     )
-    return active is not None
+
+
+async def access_flags(db: AsyncSession, user: User) -> dict:
+    """registered / paid / active_membership for one account in ONE query
+    (each used to be its own round trip)."""
+    if user.email_verified_at is None:
+        row = (await db.execute(select(_active_membership_exists(user.id)))).one()
+        return {"registered": False, "paid": False, "active_membership": bool(row[0])}
+    row = (
+        await db.execute(
+            select(
+                _registration_exists(user),
+                _registration_exists(user, verified_only=True),
+                _active_membership_exists(user.id),
+            )
+        )
+    ).one()
+    return {"registered": bool(row[0]), "paid": bool(row[1]), "active_membership": bool(row[2])}
+
+
+def networking_access_from(flags: dict, window) -> bool:
+    return (flags["registered"] and window is not None) or flags["active_membership"]
+
+
+async def has_networking_access(db: AsyncSession, user: User) -> bool:
+    """Networking opens for a registered email once an admin completes the
+    Grand Finale, and stays open for the event's membership window (3 months).
+    An individually activated membership also grants access."""
+    return networking_access_from(await access_flags(db, user), await finale_window(db))
 
 
 async def active_member_clause(db: AsyncSession, user_id_col):
@@ -292,7 +322,7 @@ async def active_member_clause(db: AsyncSession, user_id_col):
     if await finale_window(db) is not None:
         registrant_ids = (
             select(User.id)
-            .join(Registration, func.lower(Registration.email) == func.lower(User.email))
+            .join(Registration, func.lower(Registration.email) == User.email)
             .where(User.email_verified_at.is_not(None))
         )
         clause = or_(clause, user_id_col.in_(registrant_ids))
@@ -307,7 +337,7 @@ async def verified_registrant_ids(db: AsyncSession, user_ids: list[str] | set[st
         return set()
     rows = await db.execute(
         select(User.id)
-        .join(Registration, func.lower(Registration.email) == func.lower(User.email))
+        .join(Registration, func.lower(Registration.email) == User.email)
         .where(
             User.id.in_(list(user_ids)),
             User.email_verified_at.is_not(None),

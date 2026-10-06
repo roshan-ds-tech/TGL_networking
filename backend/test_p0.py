@@ -716,6 +716,37 @@ def main() -> int:
     check("member regains access after re-completing", r.status_code == 200, str(r.status_code))
     types = [n["type"] for n in u1.get("/api/v1/notifications").json()]
     check("re-completing leaves exactly one activation notification", types.count("membership_activated") == 1, str(types))
+
+    # ---------- performance budgets: DB round trips per request ----------
+    # In production every statement is a network round trip (measured ~90 ms
+    # Render->Supabase), so query count IS latency. These caps sit just above
+    # today's counts; a regression to per-item lookups fails here.
+    from sqlalchemy import event as _event
+
+    def queries(fn):
+        n = [0]
+        def _count(*_a, **_k):
+            n[0] += 1
+        _event.listen(engine.sync_engine, "before_cursor_execute", _count)
+        try:
+            r = fn()
+        finally:
+            _event.remove(engine.sync_engine, "before_cursor_execute", _count)
+        return r, n[0]
+
+    budgets = [
+        ("GET /status (every page change)", 4, lambda: u1.get("/api/v1/status")),
+        ("GET /auth/session", 1, lambda: u1.get("/api/v1/auth/session")),
+        ("GET /networking/members", 4, lambda: u1.get("/api/v1/networking/members")),
+        ("GET /notifications", 6, lambda: u1.get("/api/v1/notifications")),
+        ("GET /referrals", 4, lambda: u1.get("/api/v1/referrals")),
+        ("GET /networking/needs", 3, lambda: u1.get("/api/v1/networking/needs")),
+        ("PUT /profile/personal", 4, lambda: save_personal(u1, full_name="Founder One", city="Bengaluru")),
+        ("POST /networking/connections", 8, lambda: u2.post("/api/v1/networking/connections", json={"target_user_id": u1_id, "note": "budget"}, headers={"X-CSRF-Token": customer_csrf(u2)})),
+    ]
+    for label, cap, fn in budgets:
+        r, n = queries(fn)
+        check(f"perf budget: {label} uses <= {cap} queries", r.status_code < 400 and n <= cap, f"{n} queries, HTTP {r.status_code}")
     st = walk.get("/api/v1/status").json()
     check("public-form registrant is ACTIVE again after re-completing", st["networking_access"] is True and st["membership"]["status"] == "ACTIVE", str(st.get("membership")))
     wtypes = [n["type"] for n in walk.get("/api/v1/notifications").json()]

@@ -50,11 +50,16 @@ def _normalise_url(raw: str) -> tuple[str, dict]:
     sslmode = query.pop("sslmode", None)
     for libpq_only in ("channel_binding", "gssencmode", "target_session_attrs"):
         query.pop(libpq_only, None)
-    connect_args: dict = {
-        # Supabase's pooler (Supavisor, transaction mode) cannot keep
-        # server-side prepared statements between transactions; disabling the
-        # statement caches makes the same URL work on the pooler, the session
-        # pooler and a direct connection alike.
+    # Prepared-statement caching. Without it asyncpg prepares every query
+    # afresh — an extra network round trip per query (measured: a single
+    # SELECT cost 2 round trips, ~183 ms Render->Supabase). The session pooler
+    # (port 5432) and direct connections keep one server connection per
+    # client connection, so cached statements are safe there. Supabase's
+    # TRANSACTION pooler (port 6543) hands each transaction a different server
+    # connection, so caching must stay off for it.
+    transaction_pooler = parts.port == 6543
+    use_cache = settings.db_statement_cache and not transaction_pooler
+    connect_args: dict = {} if use_cache else {
         "statement_cache_size": 0,
         "prepared_statement_cache_size": 0,
     }
@@ -94,15 +99,43 @@ elif is_sqlite:
 else:
     # Kept small on purpose: a hosted Postgres (Supabase) caps connections
     # per project, and one web instance doesn't need more than this.
-    _pool_args = {"pool_size": 5, "max_overflow": 5, "pool_recycle": 1800}
+    _pool_args = {"pool_size": 5, "max_overflow": 5, "pool_recycle": 240, "pool_timeout": 10}
 
 engine = create_async_engine(
     DATABASE_URL,
     echo=False,
-    pool_pre_ping=True,
+    # Pre-ping costs a full network round trip on every request. Off by
+    # default: stale connections are retired by pool_recycle instead, and
+    # Render restarts the process (fresh pool) whenever the service wakes.
+    pool_pre_ping=settings.db_pool_pre_ping,
     connect_args=_CONNECT_ARGS,
     **_pool_args,
 )
+
+if not is_sqlite:
+    import time as _time
+
+    from sqlalchemy.exc import DisconnectionError
+
+    _IDLE_PING_SECONDS = 30
+
+    @event.listens_for(engine.sync_engine, "checkin")
+    def _mark_idle(dbapi_conn, record):  # pragma: no cover - pool hook
+        record.info["tgl_idle_since"] = _time.monotonic()
+
+    @event.listens_for(engine.sync_engine, "checkout")
+    def _ping_if_idle(dbapi_conn, record, proxy):  # pragma: no cover - pool hook
+        """Ping only connections that sat idle for a while — the ones a pooler
+        may have dropped. Busy connections skip the extra round trip."""
+        if settings.db_pool_pre_ping:
+            return  # the always-ping mode already covers it
+        idle_since = record.info.get("tgl_idle_since")
+        if idle_since is not None and _time.monotonic() - idle_since > _IDLE_PING_SECONDS:
+            try:
+                dbapi_conn.ping()
+            except Exception as exc:
+                raise DisconnectionError() from exc  # pool replaces it and retries
+
 
 if is_sqlite:
 

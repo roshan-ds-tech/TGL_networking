@@ -44,6 +44,8 @@ const UNGUARDED_PATHS = new Set(['/login', '/signup', '/forgot-password', '/rese
    would show the wrong controls — and so the unread count stays fresh. Only
    the first load of a guarded page shows the full-screen loader; later ones
    refresh in place. */
+const STATUS_FRESH_MS = 5000;
+
 function useStatus(path) {
   const guarded = !UNGUARDED_PATHS.has(path);
   const [status, setStatus] = useState(null);
@@ -52,6 +54,7 @@ function useStatus(path) {
   const [error, setError] = useState('');
   const seq = useRef(0);
   const statusRef = useRef(null);
+  const fetchedAt = useRef(0);
   statusRef.current = status;
 
   const load = async (silent) => {
@@ -62,8 +65,13 @@ function useStatus(path) {
     try {
       // Signed-out visitors on /login, /signup… are expected: ask the
       // always-200 session probe there instead of eating a 401.
-      const next = guardedNow ? await api.status() : await api.optionalStatus();
-      if (id === seq.current) setStatus(next);
+      // Already known to be signed in (e.g. reload() right after verifying
+      // the email on /verify-email): one request, not the session probe first.
+      const next = guardedNow || statusRef.current ? await api.status() : await api.optionalStatus();
+      if (id === seq.current) {
+        setStatus(next);
+        fetchedAt.current = Date.now();
+      }
     } catch (err) {
       if (id !== seq.current) return;
       if (err.status === 401) {
@@ -83,6 +91,11 @@ function useStatus(path) {
   };
 
   useEffect(() => {
+    // A save that navigates (onboarding steps, profile edits) has just called
+    // reload(); fetching the same account status again for the next page is a
+    // wasted round trip. Reuse it if it is only seconds old.
+    // Only between signed-in pages: /login etc. always re-check (e.g. after logout).
+    if (guarded && statusRef.current && Date.now() - fetchedAt.current < STATUS_FRESH_MS) return;
     load(!(guarded && !statusRef.current));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path]);

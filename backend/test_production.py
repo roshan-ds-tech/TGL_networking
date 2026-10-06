@@ -16,6 +16,7 @@ Run from backend/ after `npm run build` at the repo root:
 from __future__ import annotations
 
 import asyncio
+import re
 import io
 import os
 import pathlib
@@ -51,7 +52,8 @@ os.environ.update(
     UPLOAD_DIR=f"{TMP}/uploads",
     ADMIN_DIST_DIR=f"{TMP}/no-admin",
     SITE_DIST_DIR=str(SITE),
-    RESEND_API_KEY="",
+    RESEND_API_KEY="re_test_only_fake_key",
+    RESEND_API_URL=f"http://127.0.0.1:{STORAGE_PORT}/emails",
     TRUSTED_PROXY_HOPS="1",
     STORAGE_BACKEND="supabase",
     SUPABASE_URL=f"http://127.0.0.1:{STORAGE_PORT}",
@@ -124,6 +126,25 @@ async def delete_objects(bucket: str, request: Request):
     return gone
 
 
+EMAILS: list[dict] = []
+EMAIL_MODE = {"status": 200, "delay": 0.0}
+
+
+@fake.post("/emails")
+async def fake_resend(request: Request):
+    """Stand-in for Resend: records each delivery (idempotent per key)."""
+    if request.headers.get("authorization") != "Bearer re_test_only_fake_key":
+        return Response(status_code=401)
+    if EMAIL_MODE["delay"]:
+        await asyncio.sleep(EMAIL_MODE["delay"])
+    if EMAIL_MODE["status"] >= 300:
+        return Response(status_code=EMAIL_MODE["status"])
+    key = request.headers.get("idempotency-key")
+    if not any(e["key"] == key for e in EMAILS):
+        EMAILS.append({"key": key, **(await request.json())})
+    return {"id": key}
+
+
 server = uvicorn.Server(uvicorn.Config(fake, host="127.0.0.1", port=STORAGE_PORT, log_level="error"))
 threading.Thread(target=server.run, daemon=True).start()
 for _ in range(100):
@@ -137,7 +158,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from app.database import Base, SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
 from app.config import settings as app_settings  # noqa: E402
-from app.models import Admin  # noqa: E402
+from app.models import Admin, utcnow  # noqa: E402
 from app.ratelimit import _buckets  # noqa: E402
 from app.security import hash_password  # noqa: E402
 
@@ -229,7 +250,9 @@ def main() -> int:
         u = make_url(url)
         check("unencoded '@'/'!' in the password parse correctly", (u.username, u.password, u.host, u.database) == ("postgres.ref", "Pa@ss!w0rd", "aws-0-ap-south-1.pooler.supabase.com", "postgres"), str((u.username, u.host)))
         check("Supabase host gets TLS (encrypted, sslmode=require default)", isinstance(args.get("ssl"), _ssl.SSLContext) and args["ssl"].verify_mode == _ssl.CERT_NONE)
-        check("pooler-safe: statement caches disabled", args.get("statement_cache_size") == 0 and args.get("prepared_statement_cache_size") == 0)
+        check("session pooler (5432): prepared-statement cache ON (1 round trip per query)", "statement_cache_size" not in args, str(args))
+        _, targs = _normalise_url("postgresql://postgres.ref:pw@aws-0-ap-south-1.pooler.supabase.com:6543/postgres")
+        check("transaction pooler (6543): statement caches forced OFF", targs.get("statement_cache_size") == 0 and targs.get("prepared_statement_cache_size") == 0, str(targs))
         u2 = make_url(_normalise_url("postgres://u:p%40ss@db.example.com/x?sslmode=verify-full")[0])
         check("encoded password + libpq params handled", u2.password == "p@ss" and "sslmode" not in str(u2), str(u2))
         # ---------------- free-tier safety: no silent SQLite on Render ----------------
@@ -252,6 +275,12 @@ def main() -> int:
         check("PUBLIC_ORIGIN left empty -> Render's own URL is used", rs.public_origins == ["https://tgl-abc.onrender.com"], str(rs.public_origins))
         rs = Settings(_env_file=None, environment="development", public_origin="https://tgl.skykeen.in", render_external_url="https://tgl-abc.onrender.com")
         check("explicit PUBLIC_ORIGIN (custom domain) wins", rs.public_origins == ["https://tgl.skykeen.in"], str(rs.public_origins))
+        from alembic.config import Config as _AlembicConfig
+        from alembic.script import ScriptDirectory as _Scripts
+        from app.migrate import HEAD as _MIGRATE_HEAD
+        _cfg = _AlembicConfig(str(pathlib.Path(__file__).parent / "alembic.ini"))
+        _cfg.set_main_option("script_location", str(pathlib.Path(__file__).parent / "migrations"))
+        check("app.migrate.HEAD matches the newest migration", _Scripts.from_config(_cfg).get_heads() == [_MIGRATE_HEAD], str(_Scripts.from_config(_cfg).get_heads()))
         r = c.get("/api/health")
         check("health check", r.status_code == 200 and r.json() == {"status": "ok"})
         check("API responses stay noindex", "noindex" in r.headers.get("x-robots-tag", ""))
@@ -321,6 +350,65 @@ def main() -> int:
             check("simultaneous duplicate submissions: exactly one accepted", codes.count(201) == 1 and codes.count(409) == 5, str(codes))
         else:
             check("simultaneous duplicate submissions never error", all(code in (201, 409) for code in codes), str(codes))
+
+        # ---------------- email outbox: signup never waits on email ----------------
+        from app import outbox as _outbox
+        from app.models import EmailOutbox
+        from sqlalchemy import select as _select
+
+        async def outbox_rows(email):
+            async with SessionLocal() as db:
+                rows = (await db.execute(_select(EmailOutbox).where(EmailOutbox.to_email == email))).scalars().all()
+            return rows
+
+        def wait_for(pred, timeout=8.0):
+            end = time.time() + timeout
+            while time.time() < end:
+                if pred():
+                    return True
+                time.sleep(0.05)
+            return False
+
+        EMAIL_MODE.update(status=200, delay=3.0)  # a very slow email provider
+        t0 = time.perf_counter()
+        r = TestClient(app).post("/api/v1/auth/register", json={"full_name": "Mail Test", "phone": "9876543210", "email": "mail@example.com", "password": PASSWORD})
+        took = time.perf_counter() - t0
+        check("signup succeeds with a slow email provider", r.status_code == 201, r.text[:200])
+        check(f"signup does not wait for the email ({took:.2f}s with a 3 s provider)", took < 2.0, f"{took:.2f}s")
+        check("production signup returns no dev code", r.json().get("dev_verification_token") is None)
+        delivered = wait_for(lambda: any(e["to"] == ["mail@example.com"] for e in EMAILS), timeout=10)
+        check("background worker delivers the verification email", delivered, str(EMAILS)[:200])
+        rows = asyncio.run(outbox_rows("mail@example.com"))
+        check("outbox row marked SENT with its body erased", len(rows) == 1 and rows[0].status == "SENT" and rows[0].html is None, str([(x.status, bool(x.html)) for x in rows]))
+        check("email sent with the outbox id as Idempotency-Key", bool(rows) and any(e["key"] == rows[0].id for e in EMAILS))
+        check("email body contains a 6-digit code", any(re.search(r"\b\d{6}\b", e.get("text", "")) for e in EMAILS if e["to"] == ["mail@example.com"]))
+
+        EMAIL_MODE.update(status=503, delay=0.0)  # provider down
+        r = TestClient(app).post("/api/v1/auth/otp/request", json={"email": "mail@example.com"})
+        check("OTP request succeeds while the email provider is down", r.status_code == 200, r.text[:120])
+        wait_for(lambda: any(x.attempts >= 1 and x.status == "PENDING" and x.kind == "login_otp" for x in asyncio.run(outbox_rows("mail@example.com"))))
+        pending = [x for x in asyncio.run(outbox_rows("mail@example.com")) if x.kind == "login_otp"]
+        check("failed send is scheduled for retry with backoff", len(pending) == 1 and pending[0].status == "PENDING" and pending[0].next_attempt_at is not None and pending[0].attempts == 1, str([(x.status, x.attempts) for x in pending]))
+
+        async def make_due():
+            from sqlalchemy import update as _update
+            async with SessionLocal() as db:
+                await db.execute(_update(EmailOutbox).where(EmailOutbox.kind == "login_otp").values(next_attempt_at=utcnow()))
+                await db.commit()
+
+        EMAIL_MODE.update(status=200)
+        asyncio.run(make_due())
+        asyncio.run(_outbox.process_due())
+        rows = [x for x in asyncio.run(outbox_rows("mail@example.com")) if x.kind == "login_otp"]
+        check("retry delivers once the provider recovers", rows and rows[0].status == "SENT" and rows[0].attempts == 2, str([(x.status, x.attempts) for x in rows]))
+        check("each email delivered exactly once", len({e["key"] for e in EMAILS}) == len(EMAILS) == 2, str(len(EMAILS)))
+
+        EMAIL_MODE.update(status=422)  # permanent rejection
+        TestClient(app).post("/api/v1/auth/forgot-password", json={"email": "mail@example.com"})
+        wait_for(lambda: any(x.kind == "password_reset" and x.status == "FAILED" for x in asyncio.run(outbox_rows("mail@example.com"))))
+        rows = [x for x in asyncio.run(outbox_rows("mail@example.com")) if x.kind == "password_reset"]
+        check("permanent rejection is marked FAILED, not retried", rows and rows[0].status == "FAILED" and rows[0].html is None, str([(x.status, x.attempts) for x in rows]))
+        EMAIL_MODE.update(status=200)
 
         # ---------------- concurrent duplicate signups ----------------
         def signup(_: int) -> int:

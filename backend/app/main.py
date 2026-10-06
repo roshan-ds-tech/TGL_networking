@@ -15,7 +15,7 @@ from sqlalchemy.exc import IntegrityError
 
 from .config import settings
 from .observability import timing_middleware
-from . import http_client
+from . import http_client, outbox
 from .database import Base, engine, lock_down_postgres, sync_schema
 from .routers import admin as admin_router
 from .routers import auth as auth_router
@@ -40,12 +40,19 @@ async def lifespan(_: FastAPI):
         # Not fatal (the site still serves), but no signup, login or reset
         # code can be delivered until it is set.
         logger.error("RESEND_API_KEY is not set: account emails cannot be sent in production.")
-    await init_storage()
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-        await conn.run_sync(sync_schema)
-        await conn.run_sync(lock_down_postgres)
+    if settings.auto_create_schema:
+        # Local dev / tests: build the schema on the fly. Production runs
+        # migrations BEFORE starting (python -m app.migrate, see Dockerfile),
+        # so a cold start does no schema work at all — measured at ~26-41 s
+        # of round trips over the Render<->Supabase link.
+        await init_storage()
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+            await conn.run_sync(sync_schema)
+            await conn.run_sync(lock_down_postgres)
+    outbox.start()  # sends queued emails in the background (outbox.py)
     yield
+    await outbox.stop()
     await http_client.aclose()
     await engine.dispose()
 

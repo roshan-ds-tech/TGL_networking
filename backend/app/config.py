@@ -38,6 +38,17 @@ class Settings(BaseSettings):
     # Unset, Supabase connections are encrypted but not CA-verified.
     database_ssl_root_cert: str = ""
 
+    # Create/patch tables at app startup. Development and tests only; when
+    # unset it is on outside production. Production migrates at deploy time
+    # instead (python -m app.migrate) so startup does no schema work.
+    auto_create_schema: bool | None = None
+
+    # Cache prepared statements per connection (one round trip per query
+    # instead of two). Forced off for Supabase's transaction pooler (6543).
+    db_statement_cache: bool = True
+    # Ping each pooled connection before use (+1 round trip per request).
+    db_pool_pre_ping: bool = False
+
     # Open a fresh DB connection per checkout instead of pooling. For test
     # harnesses that run the app across several event loops; production keeps
     # the pool.
@@ -109,6 +120,7 @@ class Settings(BaseSettings):
     # verify).
     resend_api_key: str = ""
     email_from: str = "TGL <tgl@skykeen.in>"
+    resend_api_url: str = "https://api.resend.com/emails"
 
     @property
     def is_production(self) -> bool:
@@ -157,6 +169,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _validate_storage(self) -> "Settings":
+        if self.auto_create_schema is None:
+            self.auto_create_schema = not self.is_production
         if not self.public_origin.strip() or "public_origin" not in self.model_fields_set:
             if self.render_external_url.strip():
                 self.public_origin = self.render_external_url.strip()

@@ -84,7 +84,6 @@ async def login(
     admin.locked_until = None
     admin.last_login_at = utcnow()
     await db.commit()
-    await db.refresh(admin)
 
     reset(f"login:{ip}")
     _set_session_cookies(response, create_session_token(admin), new_csrf_token())

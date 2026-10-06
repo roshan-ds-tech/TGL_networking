@@ -38,7 +38,8 @@ COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend/app ./app
-COPY backend/create_admin.py .
+COPY backend/migrations ./migrations
+COPY backend/alembic.ini backend/create_admin.py ./
 COPY --from=admin-build /src/backend/static ./static
 COPY --from=site-build /src/dist ./static/site
 
@@ -58,5 +59,7 @@ USER tgl
 
 EXPOSE 8000
 # $PORT is provided by most PaaS platforms (Render, Railway, ...); 8000 is the local fallback.
-# One worker on purpose: the rate limiter is in-process (see ratelimit.py).
-CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --no-server-header"]
+# Deploy order: migrate the database, then start serving. When the schema is
+# already current (every restart / Render wake-up) the migrate step is one
+# query. One worker on purpose: the rate limiter is in-process (ratelimit.py).
+CMD ["sh", "-c", "python -m app.migrate && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --no-server-header"]

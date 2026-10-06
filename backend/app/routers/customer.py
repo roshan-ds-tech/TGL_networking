@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from ..config import settings
 from ..database import get_db
@@ -67,7 +68,9 @@ from ..security import (
     get_user_by_email,
     finale_window,
     active_member_clause,
+    access_flags,
     has_networking_access,
+    networking_access_from,
     has_registration,
     is_active_member,
     has_verified_registration,
@@ -79,8 +82,9 @@ from ..security import (
     require_verified_user,
     verify_password_async,
 )
-from ..email_service import send_login_otp_email, send_password_reset_email, send_verification_email
-from ..services import ensure_networking_profile, get_or_create_season_1, new_reset_token, new_verification_token, notify, token_hash
+from .. import outbox
+from ..email_service import login_otp_email, password_reset_email, verification_email
+from ..services import ensure_networking_profile, get_or_create_season_1, season_1, new_reset_token, new_verification_token, notify, token_hash
 
 router = APIRouter(prefix="/api/v1", tags=["customer"])
 
@@ -120,12 +124,45 @@ def _membership_out(m: TGLMembership | None) -> MembershipOut | None:
     )
 
 
+def _people_query(user_ids):
+    """One query: name, business, city and member-page id for each account."""
+    b2 = aliased(Business)
+    primary_business_id = (
+        select(b2.id).where(b2.user_id == User.id).order_by(b2.created_at.asc()).limit(1)
+    ).correlate(User).scalar_subquery()
+    return (
+        select(User.id, User.full_name, PersonalProfile.full_name, PersonalProfile.city,
+               Business.business_name, Business.city, NetworkingProfile.id)
+        .select_from(User)
+        .outerjoin(PersonalProfile, PersonalProfile.user_id == User.id)
+        .outerjoin(Business, Business.id == primary_business_id)
+        .outerjoin(NetworkingProfile, NetworkingProfile.user_id == User.id)
+        .where(User.id.in_(list(user_ids)))
+    )
+
+
+async def _people(db: AsyncSession, user_ids) -> dict[str, NotificationActor]:
+    if not user_ids:
+        return {}
+    out = {}
+    for uid, account_name, profile_name, profile_city, business_name, business_city, member_id in (
+        await db.execute(_people_query(user_ids))
+    ).all():
+        out[uid] = NotificationActor(
+            user_id=uid,
+            name=profile_name or account_name or "A TGL member",
+            business_name=business_name,
+            city=profile_city or business_city,
+            member_id=member_id,
+        )
+    return out
+
+
 async def _who(db: AsyncSession, user_id: str) -> str:
     """'Asha Rao (Asha Bakes)' — how a member is named in notification text."""
-    profile = await db.get(PersonalProfile, user_id)
-    business = await _primary_business(db, user_id)
-    name = profile.full_name if profile else (await db.get(User, user_id)).full_name or "A member"
-    return f"{name} ({business.business_name})" if business else name
+    person = (await _people(db, {user_id})).get(user_id)
+    name = person.name if person else "A member"
+    return f"{name} ({person.business_name})" if person and person.business_name else name
 
 
 def _business_out(business: Business | None, paid_registrant: bool) -> BusinessOut | None:
@@ -194,10 +231,12 @@ async def register(
             expires_at=utcnow() + timedelta(minutes=10),
         )
     )
+    # Queued in this transaction, sent by the background worker: the signup
+    # response no longer waits on the email provider.
+    outbox.enqueue(db, "verify_email", user.email, verification_email(raw))
     await db.commit()
-    await db.refresh(user)
+    outbox.kick()
     reset(f"customer-register:{ip}")
-    await send_verification_email(user.email, raw)
     _set_customer_cookies(response, create_customer_session_token(user), new_csrf_token())
     return AuthOut(user=user, dev_verification_token=raw if settings.expose_dev_codes else None)
 
@@ -230,7 +269,6 @@ async def login(
     user.failed_attempts = 0
     user.locked_until = None
     await db.commit()
-    await db.refresh(user)
     reset(f"customer-login:{ip}")
     _set_customer_cookies(response, create_customer_session_token(user), new_csrf_token())
     return user
@@ -289,7 +327,6 @@ async def verify_email(
     row.used_at = utcnow()
     user.email_verified_at = user.email_verified_at or utcnow()
     await db.commit()
-    await db.refresh(user)
     reset(f"verify-email:{user.id}")
     return user
 
@@ -311,8 +348,9 @@ async def resend_verification(
             expires_at=utcnow() + timedelta(minutes=10),
         )
     )
+    outbox.enqueue(db, "verify_email", user.email, verification_email(raw))
     await db.commit()
-    await send_verification_email(user.email, raw)
+    outbox.kick()
     return AuthOut(user=user, dev_verification_token=raw if settings.expose_dev_codes else None)
 
 
@@ -332,8 +370,9 @@ async def request_login_otp(
     if user is not None and user.is_active:
         raw = new_verification_token()
         db.add(UserVerificationToken(user_id=user.id, token_hash=token_hash(raw), purpose="LOGIN_OTP", expires_at=utcnow() + timedelta(minutes=10)))
+        outbox.enqueue(db, "login_otp", user.email, login_otp_email(raw))
         await db.commit()
-        await send_login_otp_email(user.email, raw)
+        outbox.kick()
         dev_otp = raw if settings.expose_dev_codes else None
     return OtpRequestOut(dev_otp=dev_otp)
 
@@ -374,7 +413,6 @@ async def verify_login_otp(
     user.failed_attempts = 0
     user.locked_until = None
     await db.commit()
-    await db.refresh(user)
     reset(f"otp-verify:{ip}")
     reset(f"otp-verify-email:{email}")
     _set_customer_cookies(response, create_customer_session_token(user), new_csrf_token())
@@ -393,10 +431,11 @@ async def forgot_password(
     user = await get_user_by_email(db, email)
     if user is not None and user.is_active:
         raw = new_reset_token()
-        db.add(UserVerificationToken(user_id=user.id, token_hash=token_hash(raw), purpose="PASSWORD_RESET", expires_at=utcnow() + timedelta(minutes=30)))
-        await db.commit()
         origin = settings.public_origins[0] if settings.public_origins else settings.public_origin.rstrip("/")
-        await send_password_reset_email(user.email, f"{origin}/reset-password?token={raw}")
+        db.add(UserVerificationToken(user_id=user.id, token_hash=token_hash(raw), purpose="PASSWORD_RESET", expires_at=utcnow() + timedelta(minutes=30)))
+        outbox.enqueue(db, "password_reset", user.email, password_reset_email(f"{origin}/reset-password?token={raw}"))
+        await db.commit()
+        outbox.kick()
     # Always 204 regardless of whether the email exists.
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -450,27 +489,53 @@ async def status_me(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> MyStatusOut:
-    event = await get_or_create_season_1(db)
-    profile = await db.get(PersonalProfile, user.id)
-    business = await _primary_business(db, user.id)
-    reg = await _current_registration(db, user.id)
-    membership = await _current_membership(db, user.id)
-    networking_profile = await db.scalar(select(NetworkingProfile).where(NetworkingProfile.user_id == user.id))
-    registered = await has_registration(db, user)
-    paid = bool(
-        registered
-        and await db.scalar(
-            select(Registration.id)
-            .where(func.lower(Registration.email) == user.email.lower(), Registration.verified.is_(True))
-            .limit(1)
+    """Everything the member app needs about this account. Called on every
+    page change, so it is built from as few round trips as possible: the event
+    comes from memory, the account's rows from ONE joined query, and the
+    access flags from one more (was 14 sequential queries)."""
+    event = await season_1(db)
+    # Aliases: the outer query also joins Business / TGLMembership, and the
+    # subqueries must pick "the primary one" independently of that join.
+    b2, m2 = aliased(Business), aliased(TGLMembership)
+    primary_business_id = (
+        select(b2.id).where(b2.user_id == User.id).order_by(b2.created_at.asc()).limit(1)
+    ).correlate(User).scalar_subquery()
+    latest_membership_id = (
+        select(m2.id)
+        .where(m2.user_id == User.id, m2.membership_type == "NETWORKING")
+        .order_by(m2.created_at.desc())
+        .limit(1)
+    ).correlate(User).scalar_subquery()
+    unread_count = (
+        select(func.count())
+        .select_from(Notification)
+        .where(Notification.recipient_user_id == User.id, Notification.read_at.is_(None))
+    ).correlate(User).scalar_subquery()
+    row = (
+        await db.execute(
+            select(PersonalProfile, Business, NetworkingProfile, EventRegistration, TGLMembership, unread_count)
+            .select_from(User)
+            .outerjoin(PersonalProfile, PersonalProfile.user_id == User.id)
+            .outerjoin(Business, Business.id == primary_business_id)
+            .outerjoin(NetworkingProfile, NetworkingProfile.user_id == User.id)
+            .outerjoin(
+                EventRegistration,
+                (EventRegistration.user_id == User.id) & (EventRegistration.event_id == event.id),
+            )
+            .outerjoin(TGLMembership, TGLMembership.id == latest_membership_id)
+            .where(User.id == user.id)
         )
-    )
+    ).one()
+    profile, business, networking_profile, reg, membership, unread = row
+    flags = await access_flags(db, user)
+    registered, paid = flags["registered"], flags["paid"]
+    window = await finale_window(db)
+
     # Once the Finale is completed, a registered email's membership is the
     # Finale window itself — even when the registration came through the public
     # form and so has no membership row of its own.
     out_membership = _membership_out(membership)
-    window = await finale_window(db) if registered else None
-    if window is not None and (out_membership is None or out_membership.status != "ACTIVE"):
+    if registered and window is not None and (out_membership is None or out_membership.status != "ACTIVE"):
         out_membership = MembershipOut(
             id=window[0].id,
             status="ACTIVE",
@@ -479,15 +544,12 @@ async def status_me(
             starts_at=window[1],
             expires_at=window[2],
         )
-    access = await has_networking_access(db, user)
+    access = networking_access_from(flags, window)
     if access and networking_profile is None:
         # Public-form registrants have no profile row until they first arrive
         # with access; without one they would be missing from the directory.
         networking_profile = await ensure_networking_profile(db, user.id)
         await db.commit()
-    unread = await db.scalar(
-        select(func.count()).select_from(Notification).where(Notification.recipient_user_id == user.id, Notification.read_at.is_(None))
-    ) or 0
     return MyStatusOut(
         user=user,
         personal_profile=profile,
@@ -501,7 +563,7 @@ async def status_me(
         networking_access=access,
         has_registration=registered,
         registration_verified=paid,
-        unread_notifications=unread,
+        unread_notifications=unread or 0,
     )
 
 
@@ -523,7 +585,6 @@ async def upsert_personal_profile(
             setattr(profile, key, value)
         profile.completed_at = profile.completed_at or utcnow()
     await db.commit()
-    await db.refresh(profile)
     return profile
 
 
@@ -542,7 +603,6 @@ async def upsert_business(
         for key, value in payload.model_dump(exclude_unset=True).items():
             setattr(business, key, value)
     await db.commit()
-    await db.refresh(business)
     return _business_out(business, await has_verified_registration(db, user))
 
 
@@ -707,7 +767,6 @@ async def create_referral(
         actor_user_id=user.id,
     )
     await db.commit()
-    await db.refresh(ref)
     return ref
 
 
@@ -748,7 +807,6 @@ async def transition_referral(
     else:
         notify(db, recipient, "referral_status_changed", f"{who} marked a referral as {label}", f"Business need: {ref.business_need}", "business_referral", ref.id, actor_user_id=user.id)
     await db.commit()
-    await db.refresh(ref)
     return ref
 
 
@@ -798,7 +856,6 @@ async def create_need(
     need = BusinessNeed(user_id=user.id, business_id=business.id, title=payload.title, category=payload.category, description=payload.description)
     db.add(need)
     await db.commit()
-    await db.refresh(need)
     return BusinessNeedOut(
         id=need.id,
         title=need.title,
@@ -880,7 +937,6 @@ async def create_connection(
         actor_user_id=user.id,
     )
     await db.commit()
-    await db.refresh(conn)
     return conn
 
 
@@ -930,7 +986,6 @@ async def start_verification(
         business.verification_status = "PENDING"
         business.verification_submitted_at = utcnow()
         await db.commit()
-        await db.refresh(business)
     return business
 
 
@@ -949,23 +1004,36 @@ async def list_notifications(
     # never be used to read someone else's connection or referral.
     details: dict[str, dict] = {}
     actors: dict[str, str] = {}
+    # Batch-load every linked entity per type (one IN query each) instead of
+    # one lookup per notification.
+    wanted: dict[str, set[str]] = {}
+    for n in items:
+        if n.related_entity_id and n.related_entity_type:
+            wanted.setdefault(n.related_entity_type, set()).add(n.related_entity_id)
+    by_type = {"connection": Connection, "referral_request": ReferralRequest, "business_referral": BusinessReferral, "business_need": BusinessNeed}
+    loaded: dict[str, dict] = {}
+    for kind, ids in wanted.items():
+        model = by_type.get(kind)
+        if model is not None:
+            loaded[kind] = {e.id: e for e in (await db.execute(select(model).where(model.id.in_(ids)))).scalars().all()}
+    get = lambda kind, entity_id: loaded.get(kind, {}).get(entity_id)  # noqa: E731
     for n in items:
         if n.actor_user_id:
             actors[n.id] = n.actor_user_id
         if not n.related_entity_id:
             continue
         if n.related_entity_type == "connection":
-            c = await db.get(Connection, n.related_entity_id)
+            c = get("connection", n.related_entity_id)
             if c and c.target_user_id == user.id:
                 details[n.id] = {"note": c.note}
                 actors.setdefault(n.id, c.requester_user_id)
         elif n.related_entity_type == "referral_request":
-            r = await db.get(ReferralRequest, n.related_entity_id)
+            r = get("referral_request", n.related_entity_id)
             if r and r.target_user_id == user.id:
                 details[n.id] = {"note": r.note}
                 actors.setdefault(n.id, r.requester_user_id)
         elif n.related_entity_type == "business_referral":
-            r = await db.get(BusinessReferral, n.related_entity_id)
+            r = get("business_referral", n.related_entity_id)
             if r and user.id in {r.giver_user_id, r.receiver_user_id}:
                 details[n.id] = {
                     "business_need": r.business_need,
@@ -975,25 +1043,12 @@ async def list_notifications(
                 }
                 actors.setdefault(n.id, r.giver_user_id if r.receiver_user_id == user.id else r.receiver_user_id)
         elif n.related_entity_type == "business_need":
-            need = await db.get(BusinessNeed, n.related_entity_id)
+            need = get("business_need", n.related_entity_id)
             if need and need.user_id == user.id:
                 details[n.id] = {"need_title": need.title, "need_description": need.description, "need_status": need.status}
 
-    actor_out: dict[str, NotificationActor] = {}
-    for uid in set(actors.values()):
-        u = await db.get(User, uid)
-        if u is None:
-            continue  # account deleted since
-        profile = await db.get(PersonalProfile, uid)
-        business = await _primary_business(db, uid)
-        np = await db.scalar(select(NetworkingProfile).where(NetworkingProfile.user_id == uid))
-        actor_out[uid] = NotificationActor(
-            user_id=uid,
-            name=(profile.full_name if profile else None) or u.full_name or "A TGL member",
-            business_name=business.business_name if business else None,
-            city=(profile.city if profile else None) or (business.city if business else None),
-            member_id=np.id if np else None,
-        )
+    # All senders in one query (deleted accounts simply don't come back).
+    actor_out = await _people(db, set(actors.values()))
 
     return [
         NotificationOut(
@@ -1024,7 +1079,6 @@ async def mark_notification_read(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Notification not found")
     item.read_at = item.read_at or utcnow()
     await db.commit()
-    await db.refresh(item)
     return item
 
 

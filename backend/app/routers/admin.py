@@ -27,7 +27,7 @@ from ..schemas import (
     EventOut,
 )
 from ..security import get_current_admin, verified_registrant_ids, require_csrf
-from ..services import activate_memberships_for_event, confirm_event_registration, count_registered_access, get_or_create_season_1, notify_finale_open, revert_finale
+from ..services import activate_memberships_for_event, confirm_event_registration, count_registered_access, get_or_create_season_1, invalidate_event_cache, notify_finale_open, revert_finale
 from ..storage import delete_proof, read_proof
 from .public import invalidate_availability_cache
 
@@ -222,6 +222,7 @@ async def undo_complete_season_1(
     event = await get_or_create_season_1(db)
     result = await revert_finale(db, event)
     await db.commit()
+    invalidate_event_cache()
     await db.refresh(event)
     logger.warning("Season 1 Grand Finale UNDONE by %s reverted=%s", admin.email, result["reverted"])
     return FinaleUndoOut(event=event, reverted=result["reverted"], was_completed=result["was_completed"])
@@ -368,6 +369,7 @@ async def complete_season_1(
     result = await activate_memberships_for_event(db, event, utcnow())
     await notify_finale_open(db, event)
     await db.commit()
+    invalidate_event_cache()  # after commit: no request can re-cache the old state
     await db.refresh(event)
     logger.warning(
         "Season 1 Grand Finale completed by %s activated=%s already_active=%s",

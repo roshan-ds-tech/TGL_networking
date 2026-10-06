@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import hashlib
 import secrets
+import time
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import delete, func, select
@@ -66,6 +68,64 @@ async def get_or_create_season_1(db: AsyncSession) -> Event:
     db.add(event)
     await db.flush()
     return event
+
+
+# ---------------------------------------------------------------- event cache
+# The Season 1 event row is read on almost every request (status, networking
+# access, directory) but changes only when an admin completes or undoes the
+# Grand Finale. Keep an immutable snapshot in memory: one process (Render runs
+# a single instance), invalidated on every write below, and re-read at least
+# every EVENT_CACHE_SECONDS as a safety net.
+EVENT_CACHE_SECONDS = 30
+
+
+@dataclass(frozen=True)
+class EventSnapshot:
+    id: str
+    slug: str
+    name: str
+    grand_finale_at: datetime | None
+    completed_at: datetime | None
+    registration_open: bool
+    registration_closes_at: datetime
+    membership_duration_months: int
+
+
+_event_cache: tuple[float, EventSnapshot] | None = None
+
+
+def invalidate_event_cache() -> None:
+    global _event_cache
+    _event_cache = None
+
+
+def _snapshot(event: Event) -> EventSnapshot:
+    return EventSnapshot(
+        id=event.id,
+        slug=event.slug,
+        name=event.name,
+        grand_finale_at=event.grand_finale_at,
+        completed_at=event.completed_at,
+        registration_open=event.registration_open,
+        registration_closes_at=event.registration_closes_at,
+        membership_duration_months=event.membership_duration_months,
+    )
+
+
+async def season_1(db: AsyncSession) -> EventSnapshot:
+    """Season 1, from memory when fresh. Creates (and commits) the row the
+    first time it is ever needed."""
+    global _event_cache
+    now = time.monotonic()
+    if _event_cache is not None and _event_cache[0] > now:
+        return _event_cache[1]
+    event = await db.scalar(select(Event).where(Event.slug == SEASON_1_SLUG))
+    if event is None:
+        event = await get_or_create_season_1(db)
+        await db.commit()
+    snap = _snapshot(event)
+    _event_cache = (now + EVENT_CACHE_SECONDS, snap)
+    return snap
 
 
 def notify(
@@ -184,6 +244,7 @@ async def activate_memberships_for_event(db: AsyncSession, event: Event, complet
     if completed_at.tzinfo is None:
         completed_at = completed_at.replace(tzinfo=timezone.utc)
     event.completed_at = event.completed_at or completed_at
+    invalidate_event_cache()
     actual_start = event.completed_at
 
     regs = await db.execute(
@@ -279,7 +340,7 @@ async def count_registered_access(db: AsyncSession) -> dict:
     accounts = await db.scalar(
         select(func.count(func.distinct(User.id)))
         .select_from(User)
-        .join(Registration, func.lower(Registration.email) == func.lower(User.email))
+        .join(Registration, func.lower(Registration.email) == User.email)
         .where(User.email_verified_at.is_not(None))
     ) or 0
     return {"registrations": registrations, "members_with_access": accounts}
@@ -293,7 +354,7 @@ async def notify_finale_open(db: AsyncSession, event: Event) -> int:
     users = (
         await db.execute(
             select(User)
-            .join(Registration, func.lower(Registration.email) == func.lower(User.email))
+            .join(Registration, func.lower(Registration.email) == User.email)
             .where(User.email_verified_at.is_not(None))
             .distinct()
         )
@@ -364,4 +425,5 @@ async def revert_finale(db: AsyncSession, event: Event) -> dict:
         )
     )
     event.completed_at = None
+    invalidate_event_cache()
     return {"reverted": reverted, "was_completed": True}
