@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CATEGORIES } from '../../data/categories';
 import { api, go } from '../../lib/customerApi';
 import { openConnectModal } from '../../components/AppShell';
@@ -6,67 +6,65 @@ import ImageSlot from '../../components/ImageSlot';
 import NetTabs from './NetTabs';
 
 const CATEGORY_MAP = new Map(CATEGORIES.map((c) => [c.code, c.name]));
+const SORTS = [
+  ['recommended', 'Recommended'],
+  ['name', 'Name A–Z'],
+  ['trust', 'Most trusted'],
+];
 
-const CHIP = { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', border: '1px solid rgba(53,26,78,0.14)', borderRadius: 999, background: '#FFFCF5', fontSize: 13, fontWeight: 600, color: '#35194E', cursor: 'pointer', whiteSpace: 'nowrap' };
+function Icon({ id, size = 16 }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true"><use href={`#${id}`} /></svg>;
+}
 
-/* The design source shows six filter chips. Only the three backed by data on
-   a member record are rendered: the other three (industry, business stage,
-   interests) have nothing to filter on yet, and a chip that opens an empty
-   menu is worse than one that isn't there. */
-function SelectChip({ label, value, options, onChange }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+function sortMembers(list, sort) {
+  const rows = [...list];
+  if (sort === 'name') return rows.sort((a, b) => a.founder_name.localeCompare(b.founder_name));
+  if (sort === 'trust') return rows.sort((a, b) => (b.trust_score || 0) - (a.trust_score || 0));
+  // Recommended: verified first, then trust, then mentors, so useful people lead.
+  return rows.sort((a, b) => (
+    (b.tgl_verified - a.tgl_verified) || ((b.trust_score || 0) - (a.trust_score || 0)) || (b.open_to_mentoring - a.open_to_mentoring)
+  ));
+}
 
-  useEffect(() => {
-    if (!open) return undefined;
-    const onDocClick = (e) => { if (!ref.current?.contains(e.target)) setOpen(false); };
-    document.addEventListener('mousedown', onDocClick);
-    return () => document.removeEventListener('mousedown', onDocClick);
-  }, [open]);
-
-  const active = !!value;
-
+function FilterGroup({ title, children }) {
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
-      <button
-        type="button"
-        className="tglp-chip"
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-        style={{ ...CHIP, borderColor: active ? '#C08D2E' : 'rgba(53,26,78,0.14)', color: active ? '#8A5A18' : '#35194E' }}
-      >
-        {active ? `${label}: ${options.find((o) => o.value === value)?.label ?? value}` : label}
-        <svg width="12" height="12" viewBox="0 0 24 24" style={{ transform: 'rotate(90deg)' }}><use href="#i-arrow" /></svg>
-      </button>
-      {open && (
-        <div style={{ position: 'absolute', zIndex: 20, top: 'calc(100% + 8px)', left: 0, minWidth: 220, maxHeight: 280, overflowY: 'auto', padding: 8, border: '1px solid rgba(53,26,78,0.14)', borderRadius: 16, background: '#FFFCF5', boxShadow: '0 26px 52px -26px rgba(53,26,78,0.4)' }}>
-          <button type="button" className="tglp-row" onClick={() => { onChange(''); setOpen(false); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', border: 'none', borderRadius: 10, background: 'transparent', font: 'inherit', fontSize: 13.5, color: 'rgba(43,23,64,0.65)', cursor: 'pointer' }}>
-            All
-          </button>
-          {options.map((o) => (
-            <button
-              key={o.value}
-              type="button"
-              className="tglp-row"
-              onClick={() => { onChange(o.value); setOpen(false); }}
-              style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 12px', border: 'none', borderRadius: 10, background: 'transparent', font: 'inherit', fontSize: 13.5, fontWeight: o.value === value ? 700 : 500, color: '#2B1740', cursor: 'pointer' }}
-            >
-              {o.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+    <fieldset className="nd-group">
+      <legend>{title}</legend>
+      {children}
+    </fieldset>
   );
 }
 
-export default function Directory() {
+function Option({ label, count, on, onClick }) {
+  return (
+    <button type="button" className={`nd-opt ${on ? 'is-on' : ''}`} aria-pressed={on} onClick={onClick}>
+      <span>{label}</span>
+      {count != null && <span className="nd-count">{count}</span>}
+    </button>
+  );
+}
+
+function Toggle({ label, icon, on, onChange }) {
+  return (
+    <button type="button" className={`nd-toggle ${on ? 'is-on' : ''}`} role="switch" aria-checked={on} onClick={() => onChange(!on)}>
+      <span className="nd-toggle-label"><Icon id={icon} size={15} />{label}</span>
+      <span className="nd-switch"><span /></span>
+    </button>
+  );
+}
+
+export default function Directory({ status }) {
+  const me = status?.user?.id;
   const [items, setItems] = useState([]);
   const [q, setQ] = useState('');
+  const [debouncedQ, setDebouncedQ] = useState('');
   const [view, setView] = useState('grid');
+  const [sort, setSort] = useState('recommended');
   const [category, setCategory] = useState('');
   const [city, setCity] = useState('');
   const [verifiedOnly, setVerifiedOnly] = useState(false);
+  const [mentorsOnly, setMentorsOnly] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [denied, setDenied] = useState(false);
   const [connections, setConnections] = useState(new Set());
@@ -75,163 +73,217 @@ export default function Directory() {
     api.listConnections().then((rows) => setConnections(new Set(rows.map((c) => c.target_user_id)))).catch(() => {});
   }, []);
 
+  // Wait for a pause in typing before asking the server, and keep the old
+  // results on screen meanwhile so the grid doesn't flash empty per keystroke.
   useEffect(() => {
+    const t = setTimeout(() => setDebouncedQ(q.trim()), 250);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  useEffect(() => {
+    let live = true;
     setLoading(true);
     setDenied(false);
-    api.members({ q })
-      .then(setItems)
+    api.members({ q: debouncedQ })
+      .then((rows) => live && setItems(rows))
       .catch((err) => {
+        if (!live) return;
         setItems([]);
         if (err.status === 403) setDenied(true);
       })
-      .finally(() => setLoading(false));
-  }, [q]);
+      .finally(() => live && setLoading(false));
+    return () => { live = false; };
+  }, [debouncedQ]);
 
-  const cityOptions = useMemo(() => {
-    const seen = [...new Set(items.map((m) => m.city).filter(Boolean))].sort();
-    return seen.map((c) => ({ value: c, label: c }));
+  const categories = useMemo(() => {
+    const counts = new Map();
+    items.forEach((m) => m.category && counts.set(m.category, (counts.get(m.category) || 0) + 1));
+    return [...counts].map(([code, n]) => ({ code, n, label: CATEGORY_MAP.get(code) || code })).sort((a, b) => b.n - a.n);
   }, [items]);
 
-  const categoryOptions = useMemo(() => {
-    const seen = new Set(items.map((m) => m.category).filter(Boolean));
-    return CATEGORIES.filter((c) => seen.has(c.code)).map((c) => ({ value: c.code, label: c.name }));
+  const cities = useMemo(() => {
+    const counts = new Map();
+    items.forEach((m) => m.city && counts.set(m.city, (counts.get(m.city) || 0) + 1));
+    return [...counts].map(([name, n]) => ({ name, n })).sort((a, b) => b.n - a.n);
   }, [items]);
 
-  const visible = items.filter((m) => (
+  const visible = useMemo(() => sortMembers(items.filter((m) => (
     (!category || m.category === category)
     && (!city || m.city === city)
     && (!verifiedOnly || m.tgl_verified)
-  ));
+    && (!mentorsOnly || m.open_to_mentoring)
+  )), sort), [items, category, city, verifiedOnly, mentorsOnly, sort]);
 
-  function Actions({ m, compact }) {
+  const activeChips = [
+    category && { key: 'c', label: CATEGORY_MAP.get(category) || category, clear: () => setCategory('') },
+    city && { key: 'l', label: city, clear: () => setCity('') },
+    verifiedOnly && { key: 'v', label: 'TGL Verified', clear: () => setVerifiedOnly(false) },
+    mentorsOnly && { key: 'm', label: 'Open to mentoring', clear: () => setMentorsOnly(false) },
+  ].filter(Boolean);
+
+  function clearAll() {
+    setCategory(''); setCity(''); setVerifiedOnly(false); setMentorsOnly(false); setQ('');
+  }
+
+  function Actions({ m }) {
+    const isMe = m.user_id === me;
     const requested = connections.has(m.user_id);
     return (
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button
-          type="button"
-          className="tglp-ghost"
-          onClick={() => go(`/app/networking/members/${m.member_id}`)}
-          style={{ flex: compact ? undefined : 1, padding: compact ? '10px 16px' : 12, border: '1px solid rgba(53,26,78,0.3)', borderRadius: 999, background: 'transparent', color: '#35194E', fontSize: 10.5, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', cursor: 'pointer', whiteSpace: 'nowrap' }}
-        >
-          {compact ? 'View' : 'View Profile'}
-        </button>
-        <button
-          type="button"
-          disabled={requested}
-          onClick={() => openConnectModal(m.business_name, m.user_id)}
-          style={{ flex: compact ? undefined : 1, padding: compact ? '10px 16px' : 12, border: 'none', borderRadius: 999, background: '#2B1740', color: '#F6EEDF', fontSize: 10.5, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', cursor: requested ? 'default' : 'pointer', whiteSpace: 'nowrap', opacity: requested ? 0.6 : 1 }}
-        >
-          {requested ? 'Requested' : 'Connect'}
-        </button>
+      <div className="nd-actions" onClick={(e) => e.stopPropagation()}>
+        {isMe ? (
+          <span className="nd-you">This is you</span>
+        ) : (
+          <button
+            type="button"
+            className={`nd-btn ${requested ? 'is-done' : 'nd-btn--dark'}`}
+            disabled={requested}
+            onClick={() => openConnectModal(m.business_name, m.user_id)}
+          >
+            {requested ? <><Icon id="i-check" size={13} /> Requested</> : 'Connect'}
+          </button>
+        )}
       </div>
     );
   }
 
+  const open = (m) => go(`/app/networking/members/${m.member_id}`);
+  const onKey = (m) => (e) => { if (e.key === 'Enter') open(m); };
+
   return (
     <>
       <NetTabs active="Members" />
-      <main style={{ maxWidth: 1240, margin: '0 auto', padding: '48px 28px 96px' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap', marginBottom: 26 }}>
+      <main className="nd">
+        <div className="nd-head">
           <div>
-            <p style={{ margin: '0 0 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.26em', textTransform: 'uppercase', color: '#8F6420' }}>Directory</p>
-            <h1 style={{ margin: 0, fontSize: 'clamp(30px,3.4vw,44px)', fontWeight: 800, letterSpacing: '-0.035em', color: '#2B1740' }}>Find Members</h1>
+            <h1>Members</h1>
+            <p>Founders in the Season 1 network. Find the right person, then ask for an introduction.</p>
           </div>
-          <div style={{ display: 'flex', padding: 4, border: '1px solid rgba(53,26,78,0.14)', borderRadius: 999, background: '#FFFCF5' }}>
-            {[['grid', 'i-grid', 'Grid view'], ['list', 'i-list', 'List view']].map(([key, icon, label]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setView(key)}
-                aria-label={label}
-                aria-pressed={view === key}
-                style={{ width: 40, height: 36, border: 'none', borderRadius: 999, background: view === key ? '#2B1740' : 'transparent', color: view === key ? '#F6EEDF' : '#2B1740', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              >
-                <svg width="17" height="17" viewBox="0 0 24 24"><use href={`#${icon}`} /></svg>
+          <div className="nd-search">
+            <Icon id="i-search" size={17} />
+            <input type="text" placeholder="Search by name, business or skill" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search members" />
+            {q && <button type="button" aria-label="Clear search" onClick={() => setQ('')}><Icon id="i-x" size={14} /></button>}
+          </div>
+        </div>
+
+        <div className="nd-layout">
+          <aside className={`nd-rail ${filtersOpen ? 'is-open' : ''}`} aria-label="Filters">
+            <FilterGroup title="Category">
+              <Option label="All categories" on={!category} onClick={() => setCategory('')} />
+              {categories.map((c) => <Option key={c.code} label={c.label} count={c.n} on={category === c.code} onClick={() => setCategory(category === c.code ? '' : c.code)} />)}
+            </FilterGroup>
+            {cities.length > 0 && (
+              <FilterGroup title="Location">
+                <Option label="Anywhere" on={!city} onClick={() => setCity('')} />
+                {cities.map((c) => <Option key={c.name} label={c.name} count={c.n} on={city === c.name} onClick={() => setCity(city === c.name ? '' : c.name)} />)}
+              </FilterGroup>
+            )}
+            <FilterGroup title="Show only">
+              <Toggle label="TGL Verified" icon="i-shield" on={verifiedOnly} onChange={setVerifiedOnly} />
+              <Toggle label="Open to mentoring" icon="i-bulb" on={mentorsOnly} onChange={setMentorsOnly} />
+            </FilterGroup>
+          </aside>
+
+          <section className="nd-results" aria-live="polite">
+            <div className="nd-bar">
+              <button type="button" className="nd-filter-btn" aria-expanded={filtersOpen} onClick={() => setFiltersOpen((v) => !v)}>
+                <Icon id="i-list" size={15} /> Filters{activeChips.length > 0 && <span className="nd-badge">{activeChips.length}</span>}
               </button>
-            ))}
-          </div>
-        </div>
+              <p className="nd-total"><strong>{loading && !items.length ? '–' : visible.length}</strong> {visible.length === 1 ? 'member' : 'members'}</p>
+              <label className="nd-sort">
+                <span>Sort</span>
+                <select value={sort} onChange={(e) => setSort(e.target.value)}>
+                  {SORTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+              </label>
+              <div className="nd-view" role="group" aria-label="Layout">
+                {[['grid', 'i-grid', 'Grid view'], ['list', 'i-list', 'List view']].map(([key, icon, label]) => (
+                  <button key={key} type="button" aria-label={label} aria-pressed={view === key} className={view === key ? 'is-on' : ''} onClick={() => setView(key)}>
+                    <Icon id={icon} size={16} />
+                  </button>
+                ))}
+              </div>
+            </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '6px 6px 6px 20px', border: '1px solid rgba(53,26,78,0.16)', borderRadius: 999, background: '#FFFCF5', marginBottom: 16 }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" style={{ color: 'rgba(43,23,64,0.65)', flexShrink: 0 }}><use href="#i-search" /></svg>
-          <input
-            type="text"
-            placeholder="Search businesses, founders or expertise..."
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            aria-label="Search members"
-            style={{ flex: 1, minWidth: 0, border: 'none', background: 'transparent', fontSize: 15, color: '#2B1740', outline: 'none', padding: '12px 0' }}
-          />
-        </div>
+            {activeChips.length > 0 && (
+              <div className="nd-chips">
+                {activeChips.map((c) => (
+                  <button key={c.key} type="button" className="nd-chip" onClick={c.clear} aria-label={`Remove filter ${c.label}`}>
+                    {c.label} <Icon id="i-x" size={12} />
+                  </button>
+                ))}
+                <button type="button" className="nd-clear" onClick={clearAll}>Clear all</button>
+              </div>
+            )}
 
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 30 }}>
-          <SelectChip label="Category" value={category} options={categoryOptions} onChange={setCategory} />
-          <SelectChip label="Location" value={city} options={cityOptions} onChange={setCity} />
-          <button
-            type="button"
-            className="tglp-chip"
-            aria-pressed={verifiedOnly}
-            onClick={() => setVerifiedOnly((v) => !v)}
-            style={{ ...CHIP, borderColor: verifiedOnly ? '#C08D2E' : 'rgba(53,26,78,0.14)', color: verifiedOnly ? '#8A5A18' : '#35194E' }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24"><use href="#i-shield" /></svg>
-            TGL Verified
-          </button>
-        </div>
-
-        <p style={{ margin: '0 0 14px', fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, color: 'rgba(43,23,64,0.65)' }}>
-          {visible.length} MEMBER{visible.length === 1 ? '' : 'S'}
-        </p>
-
-        {loading ? (
-          <p style={{ textAlign: 'center', color: 'var(--tgl-text-muted)', padding: 40 }}>Loading members…</p>
-        ) : denied ? (
-          <p style={{ textAlign: 'center', color: 'var(--tgl-text-muted)', padding: 48 }}>The member directory unlocks once your Networking membership is active.</p>
-        ) : visible.length === 0 ? (
-          <p style={{ textAlign: 'center', color: 'var(--tgl-text-muted)', padding: 48 }}>No members found.</p>
-        ) : view === 'grid' ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))', gap: 16 }}>
-            {visible.map((m) => (
-              <div key={m.member_id} className="tglp-lift" style={{ padding: 24, border: '1px solid rgba(53,26,78,0.1)', borderRadius: 20, background: '#FFFCF5', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
-                  <ImageSlot shape="circle" label="Photo" initial={m.founder_name || m.business_name} src={m.photo_url} style={{ width: 56, height: 56 }} fontSize={20} />
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <p style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#2B1740' }}>{m.founder_name}</p>
-                      {m.tgl_verified && <svg width="15" height="15" viewBox="0 0 24 24" style={{ color: '#A8762F' }}><use href="#i-shield" /></svg>}
+            {denied ? (
+              <div className="nd-empty">
+                <span className="nd-empty-icon"><Icon id="i-lock" size={22} /></span>
+                <h2>The directory unlocks with your membership</h2>
+                <p>Once your Networking membership is active you can browse and connect with every Season 1 founder.</p>
+              </div>
+            ) : loading && items.length === 0 ? (
+              <div className="nd-grid">
+                {[0, 1, 2].map((i) => <div key={i} className="nd-card nd-card--skeleton" aria-hidden="true"><span className="nd-sk nd-sk--avatar" /><span className="nd-sk" /><span className="nd-sk nd-sk--short" /></div>)}
+              </div>
+            ) : visible.length === 0 ? (
+              <div className="nd-empty">
+                <span className="nd-empty-icon"><Icon id="i-search" size={22} /></span>
+                <h2>No members match</h2>
+                <p>Try a different search, or remove a filter to widen the results.</p>
+                {(activeChips.length > 0 || q) && <button type="button" className="nd-btn" onClick={clearAll}>Clear filters</button>}
+              </div>
+            ) : view === 'grid' ? (
+              <div className="nd-grid" style={{ opacity: loading ? 0.6 : 1 }}>
+                {visible.map((m) => (
+                  <article key={m.member_id} className="nd-card" tabIndex={0} onClick={() => open(m)} onKeyDown={onKey(m)}>
+                    <div className="nd-card-top">
+                      <ImageSlot shape="circle" initial={m.founder_name || m.business_name} src={m.photo_url} style={{ width: 60, height: 60 }} fontSize={22} />
+                      <div className="nd-id">
+                        <h3>{m.founder_name}{m.tgl_verified && <span className="nd-verified" title="TGL Verified"><Icon id="i-shield" size={14} /></span>}</h3>
+                        <p>{m.business_name}</p>
+                      </div>
                     </div>
-                    <p style={{ margin: '2px 0 0', fontSize: 12.5, color: 'rgba(43,23,64,0.65)' }}>{m.business_name}</p>
-                  </div>
-                </div>
-                <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: '#6B3E96' }}>{CATEGORY_MAP.get(m.category) || m.category}</p>
-                <p style={{ margin: '0 0 6px', display: 'flex', alignItems: 'center', gap: 5, fontSize: 12.5, color: 'rgba(43,23,64,0.65)' }}>
-                  <svg width="13" height="13" viewBox="0 0 24 24"><use href="#i-pin" /></svg>
-                  {m.city || 'Bengaluru'}
-                </p>
-                <p style={{ margin: '0 0 20px', fontSize: 14, lineHeight: 1.55, color: 'rgba(43,23,64,0.72)', flex: 1 }}>{m.headline || 'No headline yet.'}</p>
-                <Actions m={m} />
+                    <p className="nd-headline">{m.headline || 'Founder in the TGL Season 1 network.'}</p>
+                    <div className="nd-tags">
+                      <span className="nd-tag">{CATEGORY_MAP.get(m.category) || m.category}</span>
+                      {m.city && <span className="nd-tag nd-tag--ghost"><Icon id="i-pin" size={12} />{m.city}</span>}
+                      {m.open_to_mentoring && <span className="nd-tag nd-tag--mentor">Mentor</span>}
+                    </div>
+                    <div className="nd-card-foot">
+                      <span className="nd-view-link">View profile <Icon id="i-arrow" size={13} /></span>
+                      <Actions m={m} />
+                    </div>
+                  </article>
+                ))}
               </div>
-            ))}
-          </div>
-        ) : (
-          <div style={{ border: '1px solid rgba(53,26,78,0.1)', borderRadius: 20, background: '#FFFCF5', overflow: 'hidden' }}>
-            {visible.map((m) => (
-              <div key={m.member_id} className="tglp-row" style={{ display: 'flex', alignItems: 'center', gap: 18, padding: '16px 22px', borderBottom: '1px solid rgba(53,26,78,0.08)', flexWrap: 'wrap' }}>
-                <ImageSlot shape="circle" label="Photo" initial={m.founder_name || m.business_name} src={m.photo_url} style={{ width: 44, height: 44 }} fontSize={16} />
-                <div style={{ flex: '1 1 200px', minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#2B1740' }}>{m.founder_name}</p>
-                    {m.tgl_verified && <svg width="14" height="14" viewBox="0 0 24 24" style={{ color: '#A8762F' }}><use href="#i-shield" /></svg>}
-                  </div>
-                  <p style={{ margin: '2px 0 0', fontSize: 12.5, color: 'rgba(43,23,64,0.65)' }}>{m.business_name}</p>
+            ) : (
+              <ul className="nd-list" style={{ opacity: loading ? 0.6 : 1 }}>
+                {visible.map((m) => (
+                  <li key={m.member_id} className="nd-item" tabIndex={0} onClick={() => open(m)} onKeyDown={onKey(m)}>
+                    <ImageSlot shape="circle" initial={m.founder_name || m.business_name} src={m.photo_url} style={{ width: 48, height: 48 }} fontSize={18} />
+                    <div className="nd-item-main">
+                      <h3>{m.founder_name}{m.tgl_verified && <span className="nd-verified" title="TGL Verified"><Icon id="i-shield" size={14} /></span>}{m.open_to_mentoring && <span className="nd-tag nd-tag--mentor">Mentor</span>}</h3>
+                      <p>{m.business_name}{m.headline ? ` · ${m.headline}` : ''}</p>
+                    </div>
+                    <span className="nd-item-cat">{CATEGORY_MAP.get(m.category) || m.category}</span>
+                    <span className="nd-item-city">{m.city}</span>
+                    <Actions m={m} />
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {!denied && !loading && visible.length > 0 && (
+              <div className="nd-cta">
+                <div>
+                  <h3>Can&apos;t find who you need?</h3>
+                  <p>Post a business need and let members come to you.</p>
                 </div>
-                <p style={{ flex: '1 1 200px', margin: 0, fontSize: 13, color: 'rgba(43,23,64,0.65)' }}>{CATEGORY_MAP.get(m.category) || m.category}</p>
-                <p style={{ flex: '0 0 110px', margin: 0, fontSize: 13, color: 'rgba(43,23,64,0.65)' }}>{m.city || 'Bengaluru'}</p>
-                <Actions m={m} compact />
+                <button type="button" className="nd-btn nd-btn--primary" onClick={() => go('/app/networking/needs')}>Post a need</button>
               </div>
-            ))}
-          </div>
-        )}
+            )}
+          </section>
+        </div>
       </main>
     </>
   );

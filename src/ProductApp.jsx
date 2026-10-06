@@ -172,7 +172,7 @@ function AuthedProduct({ path, status, loading, error, reload }) {
   if (providerId) return <VertexProvider id={providerId} />;
   if (path === '/app/events') return <Events status={status} />;
   if (path === '/app/networking') return active ? <NetworkingHome status={status} /> : locked;
-  if (path === '/app/networking/members') return active ? <Directory /> : locked;
+  if (path === '/app/networking/members') return active ? <Directory status={status} /> : locked;
   if (memberId) return active ? <Member id={memberId} /> : locked;
   if (path === '/app/referrals/new') return active ? <Referrals status={status} openGiveOnMount /> : locked;
   if (path === '/app/networking/referrals' || path === '/app/referrals') return active ? <Referrals status={status} /> : locked;
