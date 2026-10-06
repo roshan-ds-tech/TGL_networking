@@ -1,6 +1,7 @@
 """FastAPI application entrypoint."""
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -11,6 +12,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
+from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
 from .config import settings
@@ -195,7 +197,24 @@ app.include_router(customer_router.router)
 
 @app.get("/api/health", tags=["ops"])
 async def health() -> dict:
+    """Liveness only (Render's deploy health check): no database round trip,
+    so a database blip can't make Render restart a healthy process."""
     return {"status": "ok"}
+
+
+@app.api_route("/api/health/db", methods=["GET", "HEAD"], tags=["ops"])
+async def health_db() -> JSONResponse:
+    """Readiness incl. the database — for an external uptime monitor
+    (e.g. UptimeRobot every 5 min). One `SELECT 1`, 5 s cap. Keeps the Render
+    service awake and gives Supabase regular database activity. Reveals
+    nothing beyond up/down."""
+    try:
+        async with engine.connect() as conn:
+            await asyncio.wait_for(conn.execute(text("SELECT 1")), timeout=5)
+        return JSONResponse({"status": "ok"}, headers={"Cache-Control": "no-store"})
+    except Exception:
+        logger.warning("health/db: database check failed")
+        return JSONResponse(status_code=503, content={"status": "unavailable"}, headers={"Cache-Control": "no-store"})
 
 
 # ---- Admin SPA (same-origin so session cookies can stay SameSite=Strict) ----

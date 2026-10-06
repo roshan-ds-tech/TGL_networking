@@ -747,6 +747,36 @@ def main() -> int:
     for label, cap, fn in budgets:
         r, n = queries(fn)
         check(f"perf budget: {label} uses <= {cap} queries", r.status_code < 400 and n <= cap, f"{n} queries, HTTP {r.status_code}")
+
+    # ---------- Argon2 parameters: OWASP minimum, old hashes upgraded on login ----------
+    from argon2 import PasswordHasher as _PH
+
+    async def plant_old_hash() -> None:
+        from sqlalchemy import update as _update
+        from app.models import User as _User
+        old = _PH(time_cost=3, memory_cost=64 * 1024, parallelism=2).hash("LegacyPass123!")
+        async with SessionLocal() as db:
+            await db.execute(_update(_User).where(_User.email == "founder2@example.com").values(password_hash=old))
+            await db.commit()
+
+    async def stored_hash(email: str) -> str:
+        from sqlalchemy import select as _select
+        from app.models import User as _User
+        async with SessionLocal() as db:
+            return await db.scalar(_select(_User.password_hash).where(_User.email == email))
+
+    check("new password hashes use OWASP Argon2id params (m=19456,t=2,p=1)", "m=19456,t=2,p=1" in asyncio.run(stored_hash("founder1@example.com")), "")
+    asyncio.run(plant_old_hash())
+    reset("customer-login:testclient")
+    r = new_client().post("/api/v1/auth/login", json={"email": "founder2@example.com", "password": "LegacyPass123!"})
+    check("account with an old (64 MiB) hash still logs in", r.status_code == 200, r.text[:120])
+    check("old hash is upgraded to the new parameters at login", "m=19456,t=2,p=1" in asyncio.run(stored_hash("founder2@example.com")), "")
+    reset("customer-login:testclient")
+    r = new_client().post("/api/v1/auth/login", json={"email": "founder2@example.com", "password": "LegacyPass123!"})
+    check("login still works after the upgrade", r.status_code == 200, r.text[:120])
+    reset("customer-login:testclient")
+    r = new_client().post("/api/v1/auth/login", json={"email": "founder2@example.com", "password": "wrong-password"})
+    check("wrong password still rejected after the upgrade", r.status_code == 401, str(r.status_code))
     st = walk.get("/api/v1/status").json()
     check("public-form registrant is ACTIVE again after re-completing", st["networking_access"] is True and st["membership"]["status"] == "ACTIVE", str(st.get("membership")))
     wtypes = [n["type"] for n in walk.get("/api/v1/notifications").json()]

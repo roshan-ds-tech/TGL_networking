@@ -20,6 +20,8 @@ from ..security import (
     get_current_admin,
     new_csrf_token,
     require_csrf,
+    hash_password_async,
+    needs_rehash,
     verify_password_async,
 )
 
@@ -83,6 +85,8 @@ async def login(
     admin.failed_attempts = 0
     admin.locked_until = None
     admin.last_login_at = utcnow()
+    if needs_rehash(admin.password_hash):
+        admin.password_hash = await hash_password_async(payload.password)  # upgrade Argon2 params
     await db.commit()
 
     reset(f"login:{ip}")

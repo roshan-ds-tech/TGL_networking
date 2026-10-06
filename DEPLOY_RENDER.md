@@ -196,6 +196,52 @@ Deploy from `main` (Render auto-deploys each push to it — `autoDeploy: true`).
 `.env` files, `backend/var/` (local database and uploads) and build output
 are git-ignored; only `*.example` files with empty values are committed.
 
+## Keeping the free services awake (UptimeRobot)
+
+Render Free sleeps after 15 idle minutes (first visitor then waits for the
+container to start); Supabase Free pauses a project after about a week
+without database activity. One external monitor prevents both:
+
+1. Sign up at <https://uptimerobot.com> (free plan: 5-minute checks).
+2. *New monitor* → type **HTTP(s)** → URL
+   `https://<your-render-service>.onrender.com/api/health/db`
+   → interval **5 minutes** → alert contact: your email.
+3. Save. Every check runs one `SELECT 1` through the app, so the Render
+   service never reaches 15 idle minutes and Supabase sees database activity
+   every 5 minutes. It returns 200 when healthy and 503 if the database is
+   unreachable — so you also get an email if the site or database goes down.
+
+Notes:
+* Monitor the **Render** URL (not the Vercel one) so checks don't count
+  against Vercel usage.
+* An always-awake free service uses ~744 instance-hours a month — inside
+  Render's 750 free hours **for one service**. A second free service in the
+  same workspace would exceed it and be suspended for the rest of the month.
+* `/api/health` (no database) stays as Render's own deploy health check.
+
+## Moving Supabase to another region (e.g. Mumbai → Singapore)
+
+Render's closest region is Singapore; a Supabase project in Singapore
+(`ap-southeast-1`) cuts every database round trip from ~90 ms to a few ms.
+
+1. Create a new Supabase project in **Southeast Asia (Singapore)**. Copy its
+   session-pooler URL, Project URL and service_role key.
+2. From `backend/` on your machine, with both projects' values in the
+   environment (never in files or chat):
+   ```bash
+   export OLD_DATABASE_URL='…'  OLD_SUPABASE_URL='…'  OLD_SUPABASE_SERVICE_ROLE_KEY='…'
+   export NEW_DATABASE_URL='…'  NEW_SUPABASE_URL='…'  NEW_SUPABASE_SERVICE_ROLE_KEY='…'
+   .venv/bin/python scripts/move_supabase.py           # dry run: counts only
+   .venv/bin/python scripts/move_supabase.py --apply   # schema + rows + proof files, then verifies
+   ```
+   It only reads the old project, never overwrites or deletes in the new one,
+   and is safe to re-run.
+3. In Render → Environment, replace `DATABASE_URL`, `SUPABASE_URL` and
+   `SUPABASE_SERVICE_ROLE_KEY` with the new project's values → Save (redeploys).
+4. Run `--apply` once more to copy anything written during the switch.
+5. Point the UptimeRobot monitor at the same Render URL (unchanged); keep the
+   old project for a week as a fallback, then delete it.
+
 ## Operations notes
 
 * **One instance.** Rate limits are in-process (`app/ratelimit.py`); keep the

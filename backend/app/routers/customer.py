@@ -76,6 +76,7 @@ from ..security import (
     has_verified_registration,
     verified_registrant_ids,
     hash_password_async,
+    needs_rehash,
     new_csrf_token,
     require_active_networking_member,
     require_customer_csrf,
@@ -268,6 +269,10 @@ async def login(
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, _GENERIC)
     user.failed_attempts = 0
     user.locked_until = None
+    if needs_rehash(user.password_hash):
+        # Transparent upgrade to the current Argon2 parameters (we have the
+        # plaintext only now, at a successful login).
+        user.password_hash = await hash_password_async(payload.password)
     await db.commit()
     reset(f"customer-login:{ip}")
     _set_customer_cookies(response, create_customer_session_token(user), new_csrf_token())

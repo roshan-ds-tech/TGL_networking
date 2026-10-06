@@ -39,7 +39,12 @@ CUSTOMER_CSRF_COOKIE = "tgl_customer_csrf"
 CSRF_HEADER = "x-csrf-token"
 ALGORITHM = "HS256"
 
-_hasher = PasswordHasher(time_cost=3, memory_cost=64 * 1024, parallelism=2)
+# Argon2id at the OWASP Password Storage Cheat Sheet's recommended minimum:
+# 19 MiB memory, 2 iterations, 1 lane. (Was 64 MiB / 3 / 2 — ~5x the work,
+# measured at ~1.3 s per hash on Render Free's CPU.) Each stored hash records
+# its own parameters, so older hashes still verify; they are upgraded to these
+# parameters the next time their owner logs in (needs_rehash below).
+_hasher = PasswordHasher(time_cost=2, memory_cost=19 * 1024, parallelism=1)
 
 # Pre-computed hash used to equalise timing when an email does not exist.
 _DUMMY_HASH = _hasher.hash("dummy-password-for-constant-time-comparison")
@@ -54,6 +59,14 @@ def verify_password(password: str, password_hash: str) -> bool:
         _hasher.verify(password_hash, password)
         return True
     except (VerifyMismatchError, InvalidHashError, Exception):
+        return False
+
+
+def needs_rehash(password_hash: str) -> bool:
+    """True for a valid hash made with different (older) parameters."""
+    try:
+        return _hasher.check_needs_rehash(password_hash)
+    except Exception:
         return False
 
 
