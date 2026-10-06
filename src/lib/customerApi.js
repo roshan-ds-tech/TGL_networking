@@ -1,4 +1,4 @@
-import { API_BASE } from './apiBase';
+import { API_BASE, WAKING_STATUSES, markAwake, markMaybeAsleep, wakeBackend } from './apiBase';
 
 const REQUEST_TIMEOUT_MS = 20000;
 
@@ -8,6 +8,21 @@ export class ApiError extends Error {
     this.status = status;
     this.payload = payload;
   }
+}
+
+function sleepingError() {
+  return new ApiError('The TGL server is starting up. Please try again in a few seconds.', 503, null);
+}
+
+function networkError(err) {
+  const timedOut = err?.name === 'TimeoutError' || err?.name === 'AbortError';
+  return new ApiError(
+    timedOut
+      ? 'The server is taking too long to respond. Please try again.'
+      : "Can't reach TGL right now. Check your connection and try again.",
+    0,
+    null,
+  );
 }
 
 function csrfToken() {
@@ -26,26 +41,46 @@ async function request(path, options = {}) {
     const csrf = csrfToken();
     if (csrf) headers['X-CSRF-Token'] = decodeURIComponent(csrf);
   }
-  let res;
-  try {
-    res = await fetch(`${API_BASE}${path}`, {
+  const method = (options.method || 'GET').toUpperCase();
+  const isRead = method === 'GET' || method === 'HEAD';
+  const send = () =>
+    fetch(`${API_BASE}${path}`, {
       credentials: 'include',
-      // A hung request must not leave a button spinning forever.
-      signal: options.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       ...options,
       headers,
+      // A hung request must not leave a button spinning forever.
+      signal: options.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
+
+  // Writes only go out once the backend is known to be awake (see apiBase.js),
+  // and are then sent exactly once — never retried, so a slow start can't
+  // create a duplicate account or submission.
+  if (!isRead && !(await wakeBackend())) throw sleepingError();
+
+  let res;
+  try {
+    res = await send();
   } catch (err) {
     if (err?.name === 'AbortError' && options.signal?.aborted) throw err; // caller cancelled
-    const timedOut = err?.name === 'TimeoutError' || err?.name === 'AbortError';
-    throw new ApiError(
-      timedOut
-        ? 'The server is taking too long to respond. Please try again.'
-        : "Can't reach TGL right now. Check your connection and try again.",
-      0,
-      null,
-    );
+    res = null;
+    if (!isRead) throw networkError(err);
   }
+  // A read that met a sleeping backend: wait for it, then try once more.
+  if (isRead && (res === null || WAKING_STATUSES.has(res.status))) {
+    markMaybeAsleep();
+    if (!(await wakeBackend())) throw sleepingError();
+    try {
+      res = await send();
+    } catch (err) {
+      if (err?.name === 'AbortError' && options.signal?.aborted) throw err;
+      throw networkError(err);
+    }
+  }
+  if (WAKING_STATUSES.has(res.status)) {
+    markMaybeAsleep();
+    throw sleepingError();
+  }
+  markAwake();
   if (res.status === 204) return null;
   const text = await res.text();
   let payload = null;

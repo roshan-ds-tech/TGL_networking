@@ -110,6 +110,18 @@ export default function App() {
   // then aren't mistaken for "logged out".
   const [authChecked, setAuthChecked] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  // True while the sleeping backend is starting (see lib/apiBase.js).
+  const [serverWaking, setServerWaking] = useState(false);
+  useEffect(() => {
+    const on = () => setServerWaking(true);
+    const off = () => setServerWaking(false);
+    window.addEventListener('tgl:backend-waking', on);
+    window.addEventListener('tgl:backend-awake', off);
+    return () => {
+      window.removeEventListener('tgl:backend-waking', on);
+      window.removeEventListener('tgl:backend-awake', off);
+    };
+  }, []);
   const [submitted, setSubmitted] = useState(false);
   const [submittedName, setSubmittedName] = useState('');
   const [errors, setErrors] = useState({});
@@ -364,7 +376,7 @@ export default function App() {
         submitted={submitted}
         submittedName={submittedName || 'founder'}
         submitting={submitting}
-        submitLabel={submitting ? 'Submitting…' : 'Submit Registration'}
+        submitLabel={submitting ? (serverWaking ? 'Waking up the server…' : 'Submitting…') : 'Submit Registration'}
         availability={availability}
         errName={errors.name || ''}
         errBusiness={errors.business || ''}

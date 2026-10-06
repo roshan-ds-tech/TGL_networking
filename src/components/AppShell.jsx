@@ -19,6 +19,20 @@ export function showToast(msg) {
 
 function ToastHost() {
   const [msg, setMsg] = useState(null);
+  const [waking, setWaking] = useState(false);
+
+  // The backend sleeps when idle and takes up to a minute to start (see
+  // lib/apiBase.js). Say so for as long as it lasts, instead of a silent spinner.
+  useEffect(() => {
+    const on = () => setWaking(true);
+    const off = () => setWaking(false);
+    window.addEventListener('tgl:backend-waking', on);
+    window.addEventListener('tgl:backend-awake', off);
+    return () => {
+      window.removeEventListener('tgl:backend-waking', on);
+      window.removeEventListener('tgl:backend-awake', off);
+    };
+  }, []);
 
   useEffect(() => {
     let timer;
@@ -33,6 +47,14 @@ function ToastHost() {
     };
   }, []);
 
+  if (waking && !msg) {
+    return (
+      <div className="tgl-toast" role="status" aria-live="polite">
+        <span style={{ width: 16, height: 16, border: '2px solid rgba(239,203,119,0.35)', borderTopColor: '#EFCB77', borderRadius: '50%', display: 'inline-block', animation: 'tglSpin .7s linear infinite', flexShrink: 0 }} />
+        Waking up the TGL server — this can take up to a minute…
+      </div>
+    );
+  }
   if (!msg) return null;
   return (
     <div className="tgl-toast" role="status">

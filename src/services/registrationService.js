@@ -3,7 +3,7 @@
  * The whole FormData object is posted (not a plain object) so the payment
  * screenshot travels with the rest of the fields as multipart/form-data. */
 
-import { API_BASE } from '../lib/apiBase';
+import { API_BASE, WAKING_STATUSES, markAwake, markMaybeAsleep, wakeBackend } from '../lib/apiBase';
 
 export class SubmissionError extends Error {
   constructor(message, fieldErrors = {}) {
@@ -13,6 +13,11 @@ export class SubmissionError extends Error {
 }
 
 export async function submitRegistration(formData) {
+  // Make sure the backend is awake first, then send the entry exactly once
+  // (a retried submission could otherwise register the business twice).
+  if (!(await wakeBackend())) {
+    throw new SubmissionError('The registration server is starting up. Please try again in a few seconds.');
+  }
   let res;
   try {
     res = await fetch(`${API_BASE}/api/registrations`, {
@@ -30,6 +35,11 @@ export async function submitRegistration(formData) {
     );
   }
 
+  if (WAKING_STATUSES.has(res.status)) {
+    markMaybeAsleep();
+    throw new SubmissionError('The registration server is starting up. Please try again in a few seconds.');
+  }
+  markAwake();
   if (res.ok) return res.json();
 
   let payload = null;
