@@ -109,6 +109,10 @@ class User(Base):
     # the moment the account exists. Nullable for accounts created before.
     full_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # Stored name of the member's profile photo (storage.py), e.g.
+    # "3f2c….jpg". On the account, not the personal profile, so it can be set
+    # at signup before that profile exists.
+    photo_key: Mapped[str | None] = mapped_column(String(80), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     failed_attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -116,6 +120,18 @@ class User(Base):
     token_version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
+
+    @property
+    def photo_url(self) -> str | None:
+        return photo_url_for(self.id, self.photo_key)
+
+
+def photo_url_for(user_id: str, photo_key: str | None) -> str | None:
+    """Same-origin URL of a member's photo. The version (part of the stored
+    name) changes on every upload, so browsers may cache each URL forever."""
+    if not photo_key:
+        return None
+    return f"/api/v1/members/{user_id}/photo?v={photo_key.split('.')[0][:12]}"
 
 
 class UserVerificationToken(Base):

@@ -121,7 +121,7 @@ export default function NetworkingHome({ status }) {
               return (
                 <div key={m.member_id} className="tglp-lift" style={{ border: '1px solid rgba(53,26,78,0.1)', borderRadius: 20, background: '#FFFCF5', overflow: 'hidden' }}>
                   <div style={{ position: 'relative', height: 220 }}>
-                    <ImageSlot shape="rect" label="Member photo" initial={m.founder_name || m.business_name} fontSize={64} />
+                    <ImageSlot shape="rect" label="Member photo" initial={m.founder_name || m.business_name} src={m.photo_url} fontSize={64} />
                   </div>
                   <div style={{ padding: 22 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>

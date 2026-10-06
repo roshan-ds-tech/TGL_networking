@@ -64,8 +64,12 @@ const initialsOf = (name) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((
 function Avatar({ actor, cat, size = 42 }) {
   if (actor) {
     return (
-      <span aria-hidden="true" style={{ width: size, height: size, borderRadius: '50%', background: 'linear-gradient(135deg,#35194E,#6B3E96)', color: '#EFCB77', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: size * 0.36, fontWeight: 800 }}>
-        {initialsOf(actor.name)}
+      <span aria-hidden="true" style={{ width: size, height: size, borderRadius: '50%', background: 'linear-gradient(135deg,#35194E,#6B3E96)', color: '#EFCB77', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: size * 0.36, fontWeight: 800, overflow: 'hidden' }}>
+        {actor.photo_url ? (
+          <img src={actor.photo_url} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        ) : (
+          initialsOf(actor.name)
+        )}
       </span>
     );
   }

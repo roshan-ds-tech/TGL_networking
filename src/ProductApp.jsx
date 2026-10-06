@@ -153,7 +153,7 @@ function AuthedProduct({ path, status, loading, error, reload }) {
 
   if (path === '/onboarding/personal') {
     if (pendingStep === '/verify-email') return <Redirect to={pendingStep} />;
-    return <Personal initial={status.personal_profile} reload={reload} />;
+    return <Personal initial={status.personal_profile} photoUrl={status.user?.photo_url} reload={reload} />;
   }
   if (path === '/onboarding/business') {
     if (pendingStep && pendingStep !== path) return <Redirect to={pendingStep} />;
@@ -180,7 +180,7 @@ function AuthedProduct({ path, status, loading, error, reload }) {
   if (path === '/app/notifications') return <Notifications reload={reload} />;
   if (path === '/app/profile/membership') return <Membership status={status} />;
   if (path === '/app/profile/verification') return <Verification status={status} reload={reload} />;
-  if (path === '/app/profile') return <ProfilePage status={status} />;
+  if (path === '/app/profile') return <ProfilePage status={status} reload={reload} />;
 
   /* Vertex is the product's landing surface — a signed-in member with nothing
      specific in mind lands on "what business solution do you need?", not on a

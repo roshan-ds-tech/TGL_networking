@@ -1,5 +1,8 @@
 import { CATEGORIES } from '../../data/categories';
+import { useRef, useState } from 'react';
 import { api, go } from '../../lib/customerApi';
+import { showToast } from '../../components/AppShell';
+import { PHOTO_TYPES, photoError, shrinkPhoto } from '../../lib/photo';
 
 const CATEGORY_MAP = new Map(CATEGORIES.map((c) => [c.code, c.name]));
 
@@ -116,7 +119,44 @@ function Strength({ pct, items }) {
   );
 }
 
-export default function Profile({ status }) {
+export default function Profile({ status, reload }) {
+  const photoInput = useRef(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
+
+  async function pickPhoto(ev) {
+    const file = ev.target.files?.[0];
+    ev.target.value = '';
+    if (!file) return;
+    const problem = photoError(file);
+    if (problem) {
+      showToast(problem);
+      return;
+    }
+    setPhotoBusy(true);
+    try {
+      await api.uploadPhoto(await shrinkPhoto(file));
+      await reload?.();
+      showToast('Profile photo updated.');
+    } catch (err) {
+      showToast(err?.message || 'Could not upload the photo.');
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
+
+  async function removePhoto() {
+    setPhotoBusy(true);
+    try {
+      await api.removePhoto();
+      await reload?.();
+      showToast('Profile photo removed.');
+    } catch (err) {
+      showToast(err?.message || 'Could not remove the photo.');
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
+
   const p = status.personal_profile;
   const b = status.business;
   const user = status.user;
@@ -128,6 +168,7 @@ export default function Profile({ status }) {
 
   const items = [
     { label: 'Create your profile', done: !!p, to: '/onboarding/personal' },
+    { label: 'Add a profile photo', done: !!user.photo_url, to: '/onboarding/personal' },
     { label: 'Add your business', done: !!b, to: '/onboarding/business' },
     { label: 'Write a short bio', done: !!p?.short_bio, to: '/onboarding/personal' },
     { label: 'Share your founder story', done: !!b?.founder_story, to: '/onboarding/business#founder-story' },
@@ -145,7 +186,13 @@ export default function Profile({ status }) {
       <div className="pf-hero">
         <div className="pf-cover" />
         <div className="pf-hero-body">
-          <div className="pf-avatar" aria-hidden="true">{initials}</div>
+          <div className="pf-avatar" aria-hidden="true" style={user.photo_url ? { overflow: 'hidden', padding: 0 } : undefined}>
+            {user.photo_url ? (
+              <img src={user.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%', display: 'block' }} />
+            ) : (
+              initials
+            )}
+          </div>
           <div className="pf-ident">
             <h1>{name}</h1>
             <p className="pf-headline">
@@ -164,6 +211,13 @@ export default function Profile({ status }) {
           <div className="pf-hero-actions">
             <button type="button" className="pf-btn pf-btn--primary" onClick={() => go('/onboarding/personal')}>Edit profile</button>
             <button type="button" className="pf-btn" onClick={() => go('/onboarding/business')}>Edit business</button>
+            <button type="button" className="pf-btn" disabled={photoBusy} onClick={() => photoInput.current?.click()}>
+              {photoBusy ? 'Saving…' : user.photo_url ? 'Change photo' : 'Add photo'}
+            </button>
+            {user.photo_url && (
+              <button type="button" className="pf-btn" disabled={photoBusy} onClick={removePhoto}>Remove photo</button>
+            )}
+            <input ref={photoInput} type="file" accept={PHOTO_TYPES.join(',')} onChange={pickPhoto} hidden />
           </div>
         </div>
       </div>

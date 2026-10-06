@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
@@ -24,6 +24,7 @@ from ..models import (
     TGLMembership,
     User,
     UserVerificationToken,
+    photo_url_for,
     utcnow,
 )
 from ..ratelimit import client_ip, enforce, reset
@@ -84,6 +85,7 @@ from ..security import (
     verify_password_async,
 )
 from .. import legacy_sync, outbox
+from ..storage import delete_profile_photo, read_profile_photo, save_profile_photo
 from ..email_service import login_otp_email, password_reset_email, verification_email
 from ..services import ensure_networking_profile, get_or_create_season_1, season_1, new_reset_token, new_verification_token, notify, token_hash
 
@@ -133,7 +135,7 @@ def _people_query(user_ids):
     ).correlate(User).scalar_subquery()
     return (
         select(User.id, User.full_name, PersonalProfile.full_name, PersonalProfile.city,
-               Business.business_name, Business.city, NetworkingProfile.id)
+               Business.business_name, Business.city, NetworkingProfile.id, User.photo_key)
         .select_from(User)
         .outerjoin(PersonalProfile, PersonalProfile.user_id == User.id)
         .outerjoin(Business, Business.id == primary_business_id)
@@ -146,7 +148,7 @@ async def _people(db: AsyncSession, user_ids) -> dict[str, NotificationActor]:
     if not user_ids:
         return {}
     out = {}
-    for uid, account_name, profile_name, profile_city, business_name, business_city, member_id in (
+    for uid, account_name, profile_name, profile_city, business_name, business_city, member_id, photo_key in (
         await db.execute(_people_query(user_ids))
     ).all():
         out[uid] = NotificationActor(
@@ -155,6 +157,7 @@ async def _people(db: AsyncSession, user_ids) -> dict[str, NotificationActor]:
             business_name=business_name,
             city=profile_city or business_city,
             member_id=member_id,
+            photo_url=photo_url_for(uid, photo_key),
         )
     return out
 
@@ -577,6 +580,72 @@ async def status_me(
     )
 
 
+@router.post("/profile/photo")
+async def upload_profile_photo(
+    photo: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+    __: None = Depends(require_customer_csrf),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Set or replace the member's profile photo. Allowed before email
+    verification so it can be part of signup; nobody else can see an
+    account's photo until it has Networking access."""
+    enforce(f"profile-photo:{user.id}", 10, 3600, "Too many photo uploads. Please try again later.")
+    new_key = await save_profile_photo(photo)
+    old_key = user.photo_key
+    user.photo_key = new_key
+    try:
+        await db.commit()
+    except Exception:
+        await delete_profile_photo(new_key)  # don't leak an unreferenced file
+        raise
+    await delete_profile_photo(old_key)  # only after the new one is committed
+    return {"photo_url": photo_url_for(user.id, new_key)}
+
+
+@router.delete("/profile/photo", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_profile_photo(
+    user: User = Depends(get_current_user),
+    __: None = Depends(require_customer_csrf),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    old_key = user.photo_key
+    user.photo_key = None
+    await db.commit()
+    await delete_profile_photo(old_key)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/members/{user_id}/photo")
+async def member_photo(
+    user_id: str,
+    viewer: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """A member's photo. Visible to its owner, and to members with Networking
+    access when the photo's owner is also an active member — the same rule
+    as the directory. Everything else is a 404 (no hint the account exists)."""
+    not_found = HTTPException(status.HTTP_404_NOT_FOUND, "Photo not found")
+    if user_id != viewer.id:
+        if not await has_networking_access(db, viewer) or not await is_active_member(db, user_id):
+            raise not_found
+    key = await db.scalar(select(User.photo_key).where(User.id == user_id))
+    if not key:
+        raise not_found
+    data = await read_profile_photo(key)
+    return Response(
+        content=data,
+        media_type="image/jpeg",
+        headers={
+            # The URL carries the photo's version (?v=), so it never changes
+            # content: cache it in this browser only, for good.
+            "Cache-Control": "private, max-age=31536000, immutable",
+            "X-Content-Type-Options": "nosniff",
+            "Content-Security-Policy": "default-src 'none'; sandbox",
+        },
+    )
+
+
 @router.put("/profile/personal", response_model=PersonalProfileOut)
 async def upsert_personal_profile(
     payload: PersonalProfileIn,
@@ -636,15 +705,16 @@ async def member_directory(
         needle = f"%{q.lower().strip()}%"
         filters.append(or_(func.lower(Business.business_name).like(needle), func.lower(PersonalProfile.full_name).like(needle)))
     rows = await db.execute(
-        select(NetworkingProfile, Business, PersonalProfile)
+        select(NetworkingProfile, Business, PersonalProfile, User.photo_key)
         .join(Business, Business.id == NetworkingProfile.business_id)
         .join(PersonalProfile, PersonalProfile.user_id == NetworkingProfile.user_id)
+        .join(User, User.id == NetworkingProfile.user_id)
         .where(*filters)
         .order_by(Business.business_name.asc())
         .limit(50)
     )
     found = rows.all()
-    registrants = await verified_registrant_ids(db, {p.user_id for p, _, _ in found})
+    registrants = await verified_registrant_ids(db, {p.user_id for p, _, _, _ in found})
     return [
         MemberListItem(
             member_id=p.id,
@@ -657,8 +727,9 @@ async def member_directory(
             tgl_verified=b.tgl_verified or p.user_id in registrants,
             open_to_mentoring=p.open_to_mentoring,
             trust_score=p.trust_score,
+            photo_url=photo_url_for(p.user_id, photo_key),
         )
-        for p, b, profile in found
+        for p, b, profile, photo_key in found
     ]
 
 
@@ -670,15 +741,16 @@ async def member_detail(
 ) -> MemberDetail:
     row = (
         await db.execute(
-            select(NetworkingProfile, Business, PersonalProfile)
+            select(NetworkingProfile, Business, PersonalProfile, User.photo_key)
             .join(Business, Business.id == NetworkingProfile.business_id)
             .join(PersonalProfile, PersonalProfile.user_id == NetworkingProfile.user_id)
+            .join(User, User.id == NetworkingProfile.user_id)
             .where(NetworkingProfile.id == member_id, await active_member_clause(db, NetworkingProfile.user_id))
         )
     ).first()
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Member not found")
-    p, b, profile = row
+    p, b, profile, photo_key = row
     given = await db.scalar(select(func.count()).select_from(BusinessReferral).where(BusinessReferral.giver_user_id == p.user_id)) or 0
     received = await db.scalar(select(func.count()).select_from(BusinessReferral).where(BusinessReferral.receiver_user_id == p.user_id)) or 0
     return MemberDetail(
@@ -699,6 +771,7 @@ async def member_detail(
         growth_points=p.growth_points,
         referrals_given=given,
         referrals_received=received,
+        photo_url=photo_url_for(p.user_id, photo_key),
     )
 
 
@@ -714,25 +787,28 @@ async def list_referrals(
     )
     refs = rows.scalars().all()
     party_ids = {uid for r in refs for uid in (r.giver_user_id, r.receiver_user_id)}
-    names: dict[str, tuple[str, str]] = {}
+    names: dict[str, tuple] = {}
     if party_ids:
         party_rows = await db.execute(
-            select(PersonalProfile, Business)
+            select(PersonalProfile, Business, User.photo_key)
             .join(Business, Business.user_id == PersonalProfile.user_id)
+            .join(User, User.id == PersonalProfile.user_id)
             .where(PersonalProfile.user_id.in_(party_ids))
             .order_by(Business.created_at.asc())
         )
-        for profile, business in party_rows.all():
-            names.setdefault(profile.user_id, (profile.full_name, business.business_name))
+        for profile, business, photo_key in party_rows.all():
+            names.setdefault(profile.user_id, (profile.full_name, business.business_name, photo_url_for(profile.user_id, photo_key)))
     return [
         ReferralOut(
             id=r.id,
             giver_user_id=r.giver_user_id,
             receiver_user_id=r.receiver_user_id,
-            giver_name=names.get(r.giver_user_id, (None, None))[0],
-            giver_business=names.get(r.giver_user_id, (None, None))[1],
-            receiver_name=names.get(r.receiver_user_id, (None, None))[0],
-            receiver_business=names.get(r.receiver_user_id, (None, None))[1],
+            giver_name=names.get(r.giver_user_id, (None, None, None))[0],
+            giver_business=names.get(r.giver_user_id, (None, None, None))[1],
+            giver_photo_url=names.get(r.giver_user_id, (None, None, None))[2],
+            receiver_name=names.get(r.receiver_user_id, (None, None, None))[0],
+            receiver_business=names.get(r.receiver_user_id, (None, None, None))[1],
+            receiver_photo_url=names.get(r.receiver_user_id, (None, None, None))[2],
             business_need=r.business_need,
             note=r.note,
             status=r.status,
@@ -826,9 +902,10 @@ async def list_needs(
     db: AsyncSession = Depends(get_db),
 ) -> list[BusinessNeedOut]:
     rows = await db.execute(
-        select(BusinessNeed, Business, PersonalProfile)
+        select(BusinessNeed, Business, PersonalProfile, User.photo_key)
         .join(Business, Business.id == BusinessNeed.business_id)
         .join(PersonalProfile, PersonalProfile.user_id == BusinessNeed.user_id)
+        .join(User, User.id == BusinessNeed.user_id)
         .where(BusinessNeed.status == "OPEN")
         .order_by(BusinessNeed.created_at.desc())
         .limit(100)
@@ -845,8 +922,9 @@ async def list_needs(
             business_name=b.business_name,
             city=profile.city or b.city,
             created_at=n.created_at,
+            poster_photo_url=photo_url_for(n.user_id, photo_key),
         )
-        for n, b, profile in rows.all()
+        for n, b, profile, photo_key in rows.all()
     ]
 
 
@@ -877,6 +955,7 @@ async def create_need(
         business_name=business.business_name,
         city=(profile.city if profile else None) or business.city,
         created_at=need.created_at,
+        poster_photo_url=user.photo_url,
     )
 
 

@@ -287,6 +287,7 @@ class CustomerOut(BaseModel):
     full_name: str | None = None
     phone: str | None = None
 
+    photo_url: str | None = None
     model_config = {"from_attributes": True}
 
 
@@ -483,6 +484,7 @@ class MemberListItem(BaseModel):
     tgl_verified: bool
     open_to_mentoring: bool
     trust_score: int
+    photo_url: str | None = None
 
 
 class MemberDetail(MemberListItem):
@@ -526,6 +528,8 @@ class ReferralOut(BaseModel):
     created_at: UtcDatetime
     updated_at: UtcDatetime
 
+    giver_photo_url: str | None = None
+    receiver_photo_url: str | None = None
     model_config = {"from_attributes": True}
 
 
@@ -547,6 +551,7 @@ class BusinessNeedOut(BaseModel):
     city: str | None
     created_at: UtcDatetime
 
+    poster_photo_url: str | None = None
     model_config = {"from_attributes": True}
 
 
@@ -559,6 +564,7 @@ class NotificationActor(BaseModel):
     business_name: str | None = None
     city: str | None = None
     member_id: str | None = None
+    photo_url: str | None = None
 
 
 class NotificationOut(BaseModel):

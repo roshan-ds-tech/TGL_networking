@@ -4,6 +4,7 @@ import { api } from '../../lib/customerApi';
 import { timeAgo } from '../../lib/format';
 import { Field, showToast } from '../../components/AppShell';
 import NetTabs from './NetTabs';
+import ImageSlot from '../../components/ImageSlot';
 
 const CATEGORY_MAP = new Map(CATEGORIES.map((c) => [c.code, c.name]));
 
@@ -129,6 +130,7 @@ export default function Needs({ status }) {
                     <p style={{ margin: '0 0 14px', fontSize: 14, lineHeight: 1.6, color: 'rgba(43,23,64,0.72)' }}>{n.description}</p>
                   )}
                   <p style={{ margin: '0 0 24px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'rgba(43,23,64,0.65)', flex: 1 }}>
+                    <ImageSlot shape="circle" label="" initial={n.poster_name} src={n.poster_photo_url} style={{ width: 22, height: 22 }} fontSize={10} />
                     {n.poster_name}
                     <span style={{ width: 3, height: 3, borderRadius: '50%', background: 'rgba(43,23,64,0.35)' }} />
                     <svg width="13" height="13" viewBox="0 0 24 24"><use href="#i-pin" /></svg>

@@ -45,6 +45,17 @@ PASSWORD = "CorrectHorse123!"
 ADMIN_EMAIL = "admin@tglseason.com"
 
 PNG = bytes.fromhex("89504e470d0a1a0a") + b"\x00" * 64
+
+
+def _real_png() -> bytes:
+    from PIL import Image
+
+    out = io.BytesIO()
+    Image.new("RGB", (300, 200), (20, 90, 160)).save(out, format="PNG")
+    return out.getvalue()
+
+
+PNG_REAL = _real_png()
 results: list[tuple[bool, str]] = []
 
 # Several users are signed up below; the default ceiling of 10/hour per IP is
@@ -856,6 +867,70 @@ def main() -> int:
     check("an optional link can be cleared explicitly", r.status_code == 200 and r.json()["instagram"] is None, r.text[:200])
 
     outsider = full_member("outsider@example.com", name="Out Sider", business="Outside Biz")
+
+    # ---------- profile photos ----------
+    from PIL import Image as _Image
+
+    def jpeg_with_gps(size=(1200, 900)) -> bytes:
+        img = _Image.new("RGB", size, (200, 120, 40))
+        exif = _Image.Exif()
+        exif[0x8825] = {1: "N", 2: (12.0, 58.0, 0.0), 3: "E", 4: (77.0, 35.0, 0.0)}  # GPS IFD: Bengaluru
+        exif[0x010F] = "PhoneMaker"
+        out = io.BytesIO()
+        img.save(out, format="JPEG", exif=exif)
+        return out.getvalue()
+
+    raw = jpeg_with_gps()
+    check("test photo really carries GPS EXIF", bool(_Image.open(io.BytesIO(raw)).getexif().get_ifd(0x8825)))
+    up = lambda c, data, name="me.jpg", ctype="image/jpeg", csrf=True: c.post(  # noqa: E731
+        "/api/v1/profile/photo", files={"photo": (name, io.BytesIO(data), ctype)},
+        headers={"X-CSRF-Token": customer_csrf(c)} if csrf else {})
+    check("photo upload needs CSRF", up(u1, raw, csrf=False).status_code == 403)
+    check("photo upload needs a login", up(new_client(), raw, csrf=False).status_code in (401, 403))
+    r = up(u1, raw)
+    check("member uploads a profile photo", r.status_code == 200 and "/api/v1/members/" in r.json().get("photo_url", ""), r.text[:200])
+    photo_url = r.json().get("photo_url", "")
+    st = u1.get("/api/v1/status").json()
+    check("status carries the member's photo_url", st["user"].get("photo_url") == photo_url, str(st["user"].get("photo_url")))
+    r = u1.get(photo_url)
+    check("owner can view their photo", r.status_code == 200 and r.headers["content-type"] == "image/jpeg")
+    served = _Image.open(io.BytesIO(r.content))
+    check("photo is re-encoded to 512x512 JPEG", served.format == "JPEG" and served.size == (512, 512), str((served.format, served.size)))
+    check("all metadata (incl. GPS) is stripped", len(served.getexif()) == 0 and not served.info.get("exif"), str(dict(served.getexif())))
+    check("photo response is locked down + cacheable per version", r.headers.get("x-content-type-options") == "nosniff" and "immutable" in r.headers.get("cache-control", "") and "private" in r.headers.get("cache-control", ""))
+    check("another member with Networking access can view it", u2.get(photo_url).status_code == 200)
+    check("an account without Networking access cannot (404)", outsider.get(photo_url).status_code == 404)
+    check("signed-out visitors cannot", new_client().get(photo_url).status_code == 401)
+    listing = u2.get("/api/v1/networking/members").json()
+    me = next((m for m in listing if m["user_id"] == u1_id), {})
+    check("directory shows the photo", me.get("photo_url") == photo_url, str(me.get("photo_url")))
+    detail = u2.get(f"/api/v1/networking/members/{me.get('member_id')}").json()
+    check("member page shows the photo", detail.get("photo_url") == photo_url)
+    u1.post("/api/v1/networking/connections", json={"target_user_id": u2_me["id"], "note": "photo test"}, headers={"X-CSRF-Token": customer_csrf(u1)})
+    actors = [n["actor"] for n in u2.get("/api/v1/notifications").json() if n.get("actor") and n["actor"]["user_id"] == u1_id]
+    check("notifications show the sender's photo", bool(actors) and actors[0].get("photo_url") == photo_url, str(actors[:1]))
+
+    old_files = set(os.listdir(f"{TMP}/uploads/photos"))
+    r = up(u1, PNG_REAL, name="new.png", ctype="image/png")
+    new_url = r.json().get("photo_url", "")
+    check("replacing the photo changes its versioned URL", r.status_code == 200 and new_url != photo_url, r.text[:120])
+    check("the replaced photo file is deleted (no orphans)", len(os.listdir(f"{TMP}/uploads/photos")) == 1 and not (set(os.listdir(f"{TMP}/uploads/photos")) & old_files))
+    check("HTML disguised as an image is refused", up(u1, b"<html><script>alert(1)</script>", name="x.png", ctype="image/png").status_code == 415)
+    check("a GIF is refused (PNG/JPG/WEBP only)", up(u1, b"GIF89a" + b"\0" * 64, name="x.gif", ctype="image/gif").status_code == 415)
+    big_ok = io.BytesIO()
+    _Image.frombytes("RGB", (1400, 1400), os.urandom(1400 * 1400 * 3)).save(big_ok, format="PNG")  # ~5.6 MB of noise
+    big_ok = big_ok.getvalue()
+    mid = io.BytesIO()
+    _Image.frombytes("RGB", (1000, 1000), os.urandom(1000 * 1000 * 3)).save(mid, format="PNG")  # ~3 MB
+    check("a ~3 MB phone-sized photo is accepted", len(mid.getvalue()) > 2_600_000 and up(u1, mid.getvalue(), name="mid.png", ctype="image/png").status_code == 200, str(len(mid.getvalue())))
+    check("over 5 MB is refused", len(big_ok) > 5 * 1024 * 1024 and up(u1, big_ok, name="big.png", ctype="image/png").status_code == 413, str(len(big_ok)))
+    bomb = io.BytesIO()
+    _Image.new("1", (10000, 10000)).save(bomb, format="PNG")  # 100 MP, tiny file
+    check("decompression bomb is refused", up(u1, bomb.getvalue(), name="bomb.png", ctype="image/png").status_code == 415)
+    r = u1.delete("/api/v1/profile/photo", headers={"X-CSRF-Token": customer_csrf(u1)})
+    check("member can remove their photo", r.status_code == 204 and u1.get("/api/v1/status").json()["user"]["photo_url"] is None)
+    check("removed photo is gone (404) and its file deleted", u1.get(new_url).status_code == 404 and os.listdir(f"{TMP}/uploads/photos") == [])
+    up(u1, raw)  # keep one for the rest of the run
     st = outsider.get("/api/v1/status").json()
     check("non-registrant has no automatic badge", st["business"]["tgl_verified"] is False and st["business"]["verified_via_registration"] is False, str(st.get("business")))
     outsider_id = st["user"]["id"]

@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { ApiError, api, go } from '../../lib/customerApi';
 import { Field } from '../../components/AppShell';
 import WizardShell from './WizardShell';
+import PhotoPicker from '../../components/PhotoPicker';
+import { shrinkPhoto } from '../../lib/photo';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
@@ -17,6 +19,7 @@ export default function Signup() {
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
+  const [photo, setPhoto] = useState(null);
 
   function set(key, value) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -36,6 +39,12 @@ export default function Signup() {
     try {
       await api.signup({ full_name: form.full_name.trim(), email: form.email.trim(), phone: form.phone.trim(), password: form.password });
       sessionStorage.setItem(SIGNUP_DETAILS_KEY, JSON.stringify({ full_name: form.full_name.trim(), phone: form.phone.trim() }));
+      if (photo) {
+        // The account (and its session) exists now, so the photo can be
+        // attached. In the background: signup itself has already succeeded,
+        // and a failed photo can be added again later from the profile.
+        shrinkPhoto(photo).then((blob) => api.uploadPhoto(blob)).catch(() => {});
+      }
       go('/verify-email');
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
@@ -56,6 +65,15 @@ export default function Signup() {
       <p style={{ margin: '0 0 30px', fontSize: 15, color: 'rgba(43,23,64,0.65)' }}>Your account is the first step of the TGL journey.</p>
 
       <form onSubmit={submit} noValidate>
+        <div style={{ marginBottom: 22 }}>
+          <PhotoPicker
+            pending={photo}
+            initial={form.full_name}
+            onPick={async (file) => setPhoto(file)}
+            onRemove={async () => setPhoto(null)}
+            size={72}
+          />
+        </div>
         <Field label="Full name" error={fieldErrors.full_name}>
           <input className="tgl-input" placeholder="Your full name" value={form.full_name} onChange={(e) => set('full_name', e.target.value)} autoFocus autoComplete="name" />
         </Field>

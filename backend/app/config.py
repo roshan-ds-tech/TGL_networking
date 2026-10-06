@@ -85,6 +85,9 @@ class Settings(BaseSettings):
     # Server-side only. Never exposed to the browser or committed.
     supabase_service_role_key: str = ""
     supabase_storage_bucket: str = "payment-proofs"
+    # Members' profile photos: a second private bucket, served only through
+    # the API (owner + members with Networking access).
+    supabase_photos_bucket: str = "profile-photos"
 
     # Must be >= the 24h email-verification token lifetime (see services.py /
     # customer.py register()) — otherwise a user's session can expire before

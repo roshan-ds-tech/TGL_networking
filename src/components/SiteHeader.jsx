@@ -153,8 +153,12 @@ export default function SiteHeader({ path, authUser, authChecked, unread = 0, on
                 )}
               </button>
               <button type="button" onClick={() => go('/app/profile')} aria-label="Profile" aria-current={path.startsWith('/app/profile') ? 'page' : undefined} style={{ width: 44, height: 44, borderRadius: '50%', border: '1px solid rgba(192,141,46,0.5)', padding: 2, background: 'transparent', cursor: 'pointer', flexShrink: 0 }}>
-                <span style={{ width: 38, height: 38, borderRadius: '50%', background: '#2B1740', color: '#EFCB77', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24"><use href="#i-user" /></svg>
+                <span style={{ width: 38, height: 38, borderRadius: '50%', background: '#2B1740', color: '#EFCB77', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                  {authUser?.photo_url ? (
+                    <img src={authUser.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <svg width="18" height="18" viewBox="0 0 24 24"><use href="#i-user" /></svg>
+                  )}
                 </span>
               </button>
             </>

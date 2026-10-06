@@ -28,7 +28,7 @@ from ..schemas import (
 )
 from ..security import get_current_admin, verified_registrant_ids, require_csrf
 from ..services import activate_memberships_for_event, confirm_event_registration, count_registered_access, get_or_create_season_1, invalidate_event_cache, notify_finale_open, revert_finale
-from ..storage import delete_proof, read_proof
+from ..storage import delete_profile_photo, delete_proof, read_proof
 from .public import invalidate_availability_cache
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -260,8 +260,10 @@ async def delete_customer(
     if user is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Account not found")
     email = user.email
+    photo_key = user.photo_key
     await db.delete(user)
     await db.commit()
+    await delete_profile_photo(photo_key)  # the account's photo goes with it
     logger.warning("Account deleted: id=%s email=%s by=%s", user_id, email, admin.email)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

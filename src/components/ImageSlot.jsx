@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+
 /* Stand-in for the design source's <image-slot> element.
  *
  * The prototype (TGL Product Platform.dc.html) uses a custom element that lets
@@ -22,8 +24,14 @@ export default function ImageSlot({
   label,
   fontSize,
   style = {},
+  src,
 }) {
   const glyph = (initial || '').trim().charAt(0).toUpperCase();
+  // A member's uploaded photo, when there is one; the initial otherwise (and
+  // as the fallback if the image can't load).
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [src]);
+  const showPhoto = !!src && !failed;
 
   return (
     <span
@@ -44,7 +52,16 @@ export default function ImageSlot({
         ...style,
       }}
     >
-      {glyph ? (
+      {showPhoto ? (
+        <img
+          src={src}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          onError={() => setFailed(true)}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        />
+      ) : glyph ? (
         <span style={{ fontSize: fontSize || 'clamp(18px, 40%, 56px)' }}>{glyph}</span>
       ) : (
         <span

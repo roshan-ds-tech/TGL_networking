@@ -194,7 +194,7 @@ export default function Directory() {
             {visible.map((m) => (
               <div key={m.member_id} className="tglp-lift" style={{ padding: 24, border: '1px solid rgba(53,26,78,0.1)', borderRadius: 20, background: '#FFFCF5', display: 'flex', flexDirection: 'column' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
-                  <ImageSlot shape="circle" label="Photo" initial={m.founder_name || m.business_name} style={{ width: 56, height: 56 }} fontSize={20} />
+                  <ImageSlot shape="circle" label="Photo" initial={m.founder_name || m.business_name} src={m.photo_url} style={{ width: 56, height: 56 }} fontSize={20} />
                   <div style={{ minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <p style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#2B1740' }}>{m.founder_name}</p>
@@ -217,7 +217,7 @@ export default function Directory() {
           <div style={{ border: '1px solid rgba(53,26,78,0.1)', borderRadius: 20, background: '#FFFCF5', overflow: 'hidden' }}>
             {visible.map((m) => (
               <div key={m.member_id} className="tglp-row" style={{ display: 'flex', alignItems: 'center', gap: 18, padding: '16px 22px', borderBottom: '1px solid rgba(53,26,78,0.08)', flexWrap: 'wrap' }}>
-                <ImageSlot shape="circle" label="Photo" initial={m.founder_name || m.business_name} style={{ width: 44, height: 44 }} fontSize={16} />
+                <ImageSlot shape="circle" label="Photo" initial={m.founder_name || m.business_name} src={m.photo_url} style={{ width: 44, height: 44 }} fontSize={16} />
                 <div style={{ flex: '1 1 200px', minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#2B1740' }}>{m.founder_name}</p>

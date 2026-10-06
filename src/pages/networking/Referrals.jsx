@@ -3,6 +3,7 @@ import { api, go } from '../../lib/customerApi';
 import { shortDate } from '../../lib/format';
 import { showToast } from '../../components/AppShell';
 import NetTabs from './NetTabs';
+import ImageSlot from '../../components/ImageSlot';
 
 const STAGES = ['GIVEN', 'ACCEPTED', 'MEETING_DONE', 'BUSINESS_CLOSED', 'REVENUE_GENERATED'];
 const STAGE_LABELS = ['Given', 'Accepted', 'Meeting Done', 'Business Closed', 'Revenue Generated'];
@@ -267,12 +268,16 @@ export default function Referrals({ status, openGiveOnMount }) {
               const iAmReceiver = r.receiver_user_id === myId;
               const otherName = iAmReceiver ? r.giver_name : r.receiver_name;
               const otherBusiness = iAmReceiver ? r.giver_business : r.receiver_business;
+              const otherPhoto = iAmReceiver ? r.giver_photo_url : r.receiver_photo_url;
               const action = nextAction(r, myId);
               const idx = stageIndex(r.status);
               return (
                 <div key={r.id} data-grid-2="" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.4fr) minmax(0,1fr) auto', gap: 28, alignItems: 'center', padding: '24px 26px', border: '1px solid rgba(53,26,78,0.1)', borderRadius: 20, background: '#FFFCF5' }}>
                   <div style={{ minWidth: 0 }}>
-                    <p style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 800, color: '#2B1740' }}>{otherName || 'TGL Member'}</p>
+                    <p style={{ margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 16, fontWeight: 800, color: '#2B1740' }}>
+                      <ImageSlot shape="circle" label="" initial={otherName || 'T'} src={otherPhoto} style={{ width: 32, height: 32 }} fontSize={13} />
+                      {otherName || 'TGL Member'}
+                    </p>
                     <p style={{ margin: '0 0 8px', fontSize: 12.5, color: 'rgba(43,23,64,0.65)' }}>{otherBusiness || ''} · {shortDate(r.created_at)}</p>
                     <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, color: 'rgba(43,23,64,0.75)' }}>{r.business_need}</p>
                   </div>

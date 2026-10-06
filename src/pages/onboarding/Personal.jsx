@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { api, go } from '../../lib/customerApi';
 import { Field } from '../../components/AppShell';
-import ImageSlot from '../../components/ImageSlot';
+import PhotoPicker from '../../components/PhotoPicker';
+import { shrinkPhoto } from '../../lib/photo';
 import WizardShell from '../auth/WizardShell';
 import { SIGNUP_DETAILS_KEY } from '../auth/Signup';
 
@@ -16,7 +17,7 @@ function stashedDetails() {
   return null;
 }
 
-export default function Personal({ initial, reload }) {
+export default function Personal({ initial, photoUrl, reload }) {
   // Name and phone were captured at sign-up (Signup.jsx) and are not asked
   // again. They are only rendered as fields when this page is reached without
   // that stash — an account created before this flow existed, or a reload of
@@ -60,12 +61,13 @@ export default function Personal({ initial, reload }) {
       <h1 style={{ margin: '0 0 8px', fontSize: 30, fontWeight: 800, letterSpacing: '-0.025em', color: '#2B1740' }}>About you</h1>
       <p style={{ margin: '0 0 30px', fontSize: 15, color: 'rgba(43,23,64,0.65)' }}>A light profile so members know who they&apos;re talking to.</p>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 26 }}>
-        <ImageSlot shape="circle" label="Photo" initial={form.full_name} style={{ width: 84, height: 84 }} fontSize={30} />
-        <div>
-          <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700, color: '#2B1740' }}>Profile photo</p>
-          <p style={{ margin: 0, fontSize: 12.5, color: 'rgba(43,23,64,0.65)' }}>Shown from your initial for now — photo uploads are coming soon.</p>
-        </div>
+      <div style={{ marginBottom: 26 }}>
+        <PhotoPicker
+          value={photoUrl}
+          initial={form.full_name}
+          onPick={async (file) => { await api.uploadPhoto(await shrinkPhoto(file)); await reload?.(); }}
+          onRemove={async () => { await api.removePhoto(); await reload?.(); }}
+        />
       </div>
 
       <form onSubmit={submit}>

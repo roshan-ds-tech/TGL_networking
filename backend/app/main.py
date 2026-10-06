@@ -100,9 +100,12 @@ def _is_private_path(path: str) -> bool:
     return path.startswith(("/api", "/admin")) or _is_product_path(path)
 
 
-# Largest legitimate request: a payment proof (max_upload_bytes) plus a few
-# form fields. Anything bigger is refused before it is read or parsed.
-_MAX_BODY_BYTES = settings.max_upload_bytes + 512 * 1024
+# Largest legitimate request: a payment proof (max_upload_bytes) or a profile
+# photo (5 MB, storage.PHOTO_UPLOAD_MAX_BYTES) plus a few form fields.
+# Anything bigger is refused before it is read or parsed.
+from .storage import PHOTO_UPLOAD_MAX_BYTES  # noqa: E402
+
+_MAX_BODY_BYTES = max(settings.max_upload_bytes, PHOTO_UPLOAD_MAX_BYTES) + 512 * 1024
 
 
 @app.middleware("http")
@@ -116,7 +119,7 @@ async def limit_body_size(request: Request, call_next):
         if too_big:
             return JSONResponse(
                 status_code=413,
-                content={"detail": f"Request too large. Files must be under {settings.max_upload_bytes // (1024 * 1024)} MB."},
+                content={"detail": "Request too large. Payment proofs must be under 2 MB and photos under 5 MB."},
             )
     return await call_next(request)
 

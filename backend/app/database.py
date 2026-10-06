@@ -203,6 +203,7 @@ _ADDED_COLUMNS: dict[str, dict[str, str | None]] = {
         "actor_user_id": None,
     },
     "users": {
+        "photo_key": None,
         "full_name": None,
         "phone": None,
     },

@@ -82,15 +82,15 @@ def _sb_headers(content_type: str | None = None) -> dict[str, str]:
     return headers
 
 
-def _sb_object_url(filename: str) -> str:
+def _sb_object_url(filename: str, bucket: str | None = None) -> str:
     base = settings.supabase_url.rstrip("/")
-    return f"{base}/storage/v1/object/{settings.supabase_storage_bucket}/{filename}"
+    return f"{base}/storage/v1/object/{bucket or settings.supabase_storage_bucket}/{filename}"
 
 
-async def _sb_put(filename: str, data: bytes, mime: str) -> None:
+async def _sb_put(filename: str, data: bytes, mime: str, bucket: str | None = None) -> None:
     r = await http_client.request(
         "POST",
-        _sb_object_url(filename),
+        _sb_object_url(filename, bucket),
         content=data,
         headers={**_sb_headers(mime), "x-upsert": "false", "Cache-Control": "no-store"},
     )
@@ -102,8 +102,8 @@ async def _sb_put(filename: str, data: bytes, mime: str) -> None:
         )
 
 
-async def _sb_get(filename: str) -> bytes:
-    r = await http_client.request("GET", _sb_object_url(filename), headers=_sb_headers())
+async def _sb_get(filename: str, bucket: str | None = None) -> bytes:
+    r = await http_client.request("GET", _sb_object_url(filename, bucket), headers=_sb_headers())
     if r.status_code in (400, 404):
         raise HTTPException(status_code=404, detail="Payment proof not found")
     if r.status_code >= 300:
@@ -112,11 +112,11 @@ async def _sb_get(filename: str) -> bytes:
     return r.content
 
 
-async def _sb_delete(filename: str) -> bool:
+async def _sb_delete(filename: str, bucket: str | None = None) -> bool:
     base = settings.supabase_url.rstrip("/")
     r = await http_client.request(
         "DELETE",
-        f"{base}/storage/v1/object/{settings.supabase_storage_bucket}",
+        f"{base}/storage/v1/object/{bucket or settings.supabase_storage_bucket}",
         json={"prefixes": [filename]},
         headers=_sb_headers("application/json"),
     )
@@ -126,33 +126,36 @@ async def _sb_delete(filename: str) -> bool:
     return bool(r.json()) if r.content else False
 
 
-async def init_storage() -> None:
-    """Make sure the storage target exists. Safe to run on every boot."""
-    if not _use_supabase():
-        upload_root()
-        return
+async def _ensure_bucket(bucket: str, size_limit: int, mime_types: list[str]) -> None:
     base = settings.supabase_url.rstrip("/")
-    bucket = settings.supabase_storage_bucket
     r = await http_client.request("GET", f"{base}/storage/v1/bucket/{bucket}", headers=_sb_headers())
     if r.status_code == 200:
         if r.json().get("public"):
-            # Never serve payment proofs from a public bucket.
+            # Never serve proofs or member photos from a public bucket.
             logger.error("Supabase bucket %r is PUBLIC — make it private in the Supabase dashboard.", bucket)
         return
     r = await http_client.request(
         "POST",
         f"{base}/storage/v1/bucket",
-        json={
-            "id": bucket,
-            "name": bucket,
-            "public": False,
-            "file_size_limit": settings.max_upload_bytes,
-            "allowed_mime_types": ["image/png", "image/jpeg", "image/gif", "image/webp", "application/pdf"],
-        },
+        json={"id": bucket, "name": bucket, "public": False, "file_size_limit": size_limit, "allowed_mime_types": mime_types},
         headers=_sb_headers("application/json"),
     )
     if r.status_code >= 300 and r.status_code != 409:
         logger.error("Could not create Supabase bucket %r: HTTP %s", bucket, r.status_code)
+
+
+async def init_storage() -> None:
+    """Make sure the storage targets exist. Safe to run on every boot."""
+    if not _use_supabase():
+        upload_root()
+        photo_root()
+        return
+    await _ensure_bucket(
+        settings.supabase_storage_bucket,
+        settings.max_upload_bytes,
+        ["image/png", "image/jpeg", "image/gif", "image/webp", "application/pdf"],
+    )
+    await _ensure_bucket(settings.supabase_photos_bucket, PHOTO_STORED_MAX_BYTES, ["image/jpeg"])
 
 
 # ------------------------------------------------------------------ public ---
@@ -222,6 +225,96 @@ async def delete_proof(filename: str) -> bool:
     root = upload_root()
     candidate = (root / name).resolve()
     if root not in candidate.parents or not candidate.is_file():
+        return False
+    candidate.unlink(missing_ok=True)
+    return True
+
+
+# ------------------------------------------------------------ profile photos ---
+# Accepted as PNG / JPEG / WebP up to PHOTO_UPLOAD_MAX_BYTES, then RE-ENCODED
+# server-side (Pillow) to a square JPEG of at most PHOTO_SIZE px:
+#   * strips every byte of metadata — phone photos carry GPS location in EXIF;
+#   * normalises orientation, colour mode and size (fast directory pages);
+#   * anything that isn't a decodable image is refused, and decompression
+#     bombs are rejected before they are decoded.
+PHOTO_UPLOAD_MAX_BYTES = 5 * 1024 * 1024
+PHOTO_STORED_MAX_BYTES = 1024 * 1024
+PHOTO_SIZE = 512
+_PHOTO_MAX_PIXELS = 40_000_000
+_PHOTO_NAME_RE = re.compile(r"^[0-9a-f]{32}\.jpg$")
+
+
+def photo_root() -> Path:
+    root = (Path(settings.upload_dir) / "photos").resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def _process_photo(raw: bytes) -> bytes:
+    import io
+    import warnings
+
+    from PIL import Image, ImageOps
+
+    Image.MAX_IMAGE_PIXELS = _PHOTO_MAX_PIXELS
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", Image.DecompressionBombWarning)
+        try:
+            img = Image.open(io.BytesIO(raw))
+            if img.format not in {"PNG", "JPEG", "WEBP"}:
+                raise ValueError("format")
+            img.load()
+        except Exception as exc:
+            raise HTTPException(
+                status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "Photo must be a PNG, JPG or WEBP image."
+            ) from exc
+    img = ImageOps.exif_transpose(img)
+    img = ImageOps.fit(img.convert("RGB"), (PHOTO_SIZE, PHOTO_SIZE), method=Image.Resampling.LANCZOS)
+    out = io.BytesIO()
+    img.save(out, format="JPEG", quality=85, optimize=True)  # no exif/icc passed: metadata stripped
+    return out.getvalue()
+
+
+async def save_profile_photo(upload: UploadFile) -> str:
+    """Validate, re-encode and store a profile photo. Returns its stored name."""
+    import anyio
+
+    head = await upload.read(32)
+    sniffed = _sniff(head)
+    if sniffed is None or sniffed[0] not in {"image/png", "image/jpeg", "image/webp"}:
+        raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "Photo must be a PNG, JPG or WEBP image.")
+    buf = bytearray(head)
+    while chunk := await upload.read(_CHUNK):
+        buf += chunk
+        if len(buf) > PHOTO_UPLOAD_MAX_BYTES:
+            raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Photo must be under 5 MB.")
+    data = await anyio.to_thread.run_sync(_process_photo, bytes(buf))  # CPU work off the event loop
+    name = f"{uuid.uuid4().hex}.jpg"
+    if _use_supabase():
+        await _sb_put(name, data, "image/jpeg", settings.supabase_photos_bucket)
+    else:
+        (photo_root() / name).write_bytes(data)
+    return name
+
+
+async def read_profile_photo(name: str) -> bytes:
+    if not _PHOTO_NAME_RE.fullmatch(name or ""):
+        raise HTTPException(status_code=404, detail="Photo not found")
+    if _use_supabase():
+        return await _sb_get(name, settings.supabase_photos_bucket)
+    candidate = (photo_root() / name).resolve()
+    if not candidate.is_file() or photo_root() not in candidate.parents:
+        raise HTTPException(status_code=404, detail="Photo not found")
+    return candidate.read_bytes()
+
+
+async def delete_profile_photo(name: str | None) -> bool:
+    if not name or not _PHOTO_NAME_RE.fullmatch(name):
+        return False
+    if _use_supabase():
+        return await _sb_delete(name, settings.supabase_photos_bucket)
+    candidate = (photo_root() / name).resolve()
+    if photo_root() not in candidate.parents or not candidate.is_file():
         return False
     candidate.unlink(missing_ok=True)
     return True

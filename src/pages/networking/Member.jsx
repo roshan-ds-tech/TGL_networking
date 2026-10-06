@@ -91,7 +91,7 @@ export default function Member({ id }) {
             <div className="tglp-framed">
               <div className="tgl-dark-card" style={{ borderRadius: 22, overflow: 'hidden', boxShadow: '0 30px 60px rgba(34,16,58,0.28)' }}>
                 <div style={{ position: 'relative', height: 320 }}>
-                  <ImageSlot shape="rect" label="Member photo" initial={member.founder_name || member.business_name} fontSize={88} />
+                  <ImageSlot shape="rect" label="Member photo" initial={member.founder_name || member.business_name} src={member.photo_url} fontSize={88} />
                 </div>
                 <div style={{ padding: 26 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>

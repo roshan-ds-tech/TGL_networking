@@ -124,6 +124,12 @@ export const api = {
   forgotPassword: (email) => request('/api/v1/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
   resetPassword: (token, newPassword) => request('/api/v1/auth/reset-password', { method: 'POST', body: JSON.stringify({ token, new_password: newPassword }) }),
   status: () => request('/api/v1/status'),
+  uploadPhoto: (blob) => {
+    const fd = new FormData();
+    fd.set('photo', blob, 'photo.jpg');
+    return request('/api/v1/profile/photo', { method: 'POST', body: fd });
+  },
+  removePhoto: () => request('/api/v1/profile/photo', { method: 'DELETE' }),
   savePersonal: (payload) => request('/api/v1/profile/personal', { method: 'PUT', body: JSON.stringify(payload) }),
   saveBusiness: (payload) => request('/api/v1/business', { method: 'PUT', body: JSON.stringify(payload) }),
   members: (params = {}) => {
