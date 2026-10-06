@@ -938,8 +938,8 @@ textarea.tgl-input {
    ========================================================= */
 .pf { max-width: 1240px; margin: 0 auto; padding: 32px 28px 96px; }
 
-.pf-hero { border: 1px solid rgba(53,26,78,0.1); border-radius: 22px; background: #FFFCF5; overflow: hidden; box-shadow: 0 1px 2px rgba(53,26,78,0.04), 0 18px 40px -28px rgba(53,26,78,0.25); }
-.pf-cover { height: 132px; background:
+.pf-hero { border: 1px solid rgba(53,26,78,0.1); border-radius: 22px; background: #FFFCF5; position: relative; z-index: 2; box-shadow: 0 1px 2px rgba(53,26,78,0.04), 0 18px 40px -28px rgba(53,26,78,0.25); }
+.pf-cover { height: 132px; border-radius: 21px 21px 0 0; background:
   radial-gradient(120% 140% at 85% -20%, rgba(224,181,88,0.38), transparent 55%),
   linear-gradient(120deg, #22103A 0%, #35194E 60%, #4A2A6B 100%); }
 .pf-hero-body { display: flex; align-items: flex-end; gap: 24px; flex-wrap: wrap; padding: 0 32px 28px; }
