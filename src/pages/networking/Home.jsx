@@ -1,31 +1,110 @@
 import { useEffect, useState } from 'react';
 import { CATEGORIES } from '../../data/categories';
 import { api, go } from '../../lib/customerApi';
-import { timeAgo, trustTier } from '../../lib/format';
-import { Eyebrow, openConnectModal, showToast } from '../../components/AppShell';
+import { shortAgo, shortDate, trustTier } from '../../lib/format';
+import { openConnectModal, showToast } from '../../components/AppShell';
 import ImageSlot from '../../components/ImageSlot';
 import NetTabs from './NetTabs';
 
 const CATEGORY_MAP = new Map(CATEGORIES.map((c) => [c.code, c.name]));
-const STAGES = ['GIVEN', 'ACCEPTED', 'MEETING_DONE', 'BUSINESS_CLOSED', 'REVENUE_GENERATED'];
-const STAGE_LABELS = ['Given', 'Accepted', 'Meeting Done', 'Business Closed', 'Revenue Generated'];
+const STAGES = [
+  ['GIVEN', 'Given'],
+  ['ACCEPTED', 'Accepted'],
+  ['MEETING_DONE', 'Meeting done'],
+  ['BUSINESS_CLOSED', 'Business closed'],
+  ['REVENUE_GENERATED', 'Revenue generated'],
+];
+const STAGE_LABEL = Object.fromEntries(STAGES);
+const DAY = 24 * 60 * 60 * 1000;
+
+function greeting(now) {
+  const h = new Date(now).getHours();
+  return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+}
+
+function Icon({ id, size = 16 }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true"><use href={`#${id}`} /></svg>;
+}
+
+function nav(to) {
+  return (e) => { e.preventDefault(); go(to); };
+}
+
+function Panel({ title, sub, link, children }) {
+  return (
+    <article className="nh-panel">
+      <header className="nh-panel-head">
+        <div>
+          <h2>{title}</h2>
+          {sub && <p>{sub}</p>}
+        </div>
+        {link && (
+          <a className="nh-more" href={link.to} onClick={nav(link.to)}>
+            {link.label} <Icon id="i-arrow" size={13} />
+          </a>
+        )}
+      </header>
+      {children}
+    </article>
+  );
+}
+
+function Empty({ icon, title, body, action }) {
+  return (
+    <div className="nh-empty">
+      <span className="nh-empty-icon"><Icon id={icon} size={20} /></span>
+      <p className="nh-empty-title">{title}</p>
+      <p className="nh-empty-body">{body}</p>
+      {action}
+    </div>
+  );
+}
+
+function SkeletonRows({ n = 3 }) {
+  return Array.from({ length: n }, (_, i) => (
+    <div key={i} className="nh-row nh-row--skeleton" aria-hidden="true">
+      <span className="nh-sk nh-sk--avatar" />
+      <span className="nh-sk-lines"><span className="nh-sk" /><span className="nh-sk nh-sk--short" /></span>
+    </div>
+  ));
+}
 
 export default function NetworkingHome({ status }) {
-  const [members, setMembers] = useState([]);
-  const [needs, setNeeds] = useState([]);
-  const [referrals, setReferrals] = useState([]);
+  // null = still loading, [] = loaded and empty: the two read very differently.
+  const [members, setMembers] = useState(null);
+  const [needs, setNeeds] = useState(null);
+  const [referrals, setReferrals] = useState(null);
   const [connections, setConnections] = useState(new Set());
   const [helped, setHelped] = useState(new Set());
+  const [now] = useState(Date.now); // one clock per visit keeps render pure
 
   useEffect(() => {
-    api.members({}).then((rows) => setMembers(rows.slice(0, 3))).catch(() => setMembers([]));
-    api.needs().then((rows) => setNeeds(rows.slice(0, 3))).catch(() => setNeeds([]));
+    api.members({}).then((rows) => setMembers(rows.slice(0, 4))).catch(() => setMembers([]));
+    api.needs().then((rows) => setNeeds(rows.slice(0, 4))).catch(() => setNeeds([]));
     api.referrals().then(setReferrals).catch(() => setReferrals([]));
     api.listConnections().then((rows) => setConnections(new Set(rows.map((c) => c.target_user_id)))).catch(() => {});
   }, []);
 
-  const tier = trustTier(status.networking_profile?.trust_score || 0);
-  const pipeline = STAGES.map((s, i) => ({ label: STAGE_LABELS[i], n: '0' + (i + 1), count: referrals.filter((r) => r.status === s).length }));
+  const me = status.user?.id;
+  const firstName = (status.personal_profile?.full_name || '').split(/\s+/)[0];
+  const profile = status.networking_profile;
+  const tier = trustTier(profile?.trust_score || 0);
+  const refs = referrals || [];
+  const given = refs.filter((r) => r.giver_user_id === me).length;
+  const received = refs.filter((r) => r.receiver_user_id === me).length;
+  const pipeline = STAGES.map(([key, label]) => ({ key, label, count: refs.filter((r) => r.status === key).length }));
+  const maxStage = Math.max(1, ...pipeline.map((p) => p.count));
+  const recent = [...refs].sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at)).slice(0, 3);
+
+  const m = status.membership;
+  let membershipLeft = null;
+  if (m?.starts_at && m?.expires_at) {
+    const start = new Date(m.starts_at).getTime();
+    const end = new Date(m.expires_at).getTime();
+    const days = Math.max(0, Math.ceil((end - now) / DAY));
+    const pct = Math.min(100, Math.max(0, ((now - start) / (end - start)) * 100));
+    membershipLeft = { days, pct };
+  }
 
   async function offerHelp(need) {
     try {
@@ -40,167 +119,186 @@ export default function NetworkingHome({ status }) {
   return (
     <>
       <NetTabs active="Overview" />
-      <main style={{ maxWidth: 1240, margin: '0 auto', padding: '52px 28px 96px' }}>
-        <div data-grid-2="" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.2fr) minmax(0,1fr)', gap: 48, alignItems: 'end', marginBottom: 44 }}>
+      <main className="nh">
+        <div className="nh-top">
           <div>
-            <Eyebrow>TGL&apos;s private business community</Eyebrow>
-            <h1 style={{ margin: '0 0 16px', fontSize: 'clamp(32px,4vw,52px)', lineHeight: 1.04, letterSpacing: '-0.035em', fontWeight: 800, color: '#2B1740' }}>
-              Build relationships that move business{' '}
-              <span style={{ fontFamily: "'Kaushan Script', cursive", fontWeight: 500, color: '#8F6420', letterSpacing: 0 }}>forward.</span>
-            </h1>
-            <p style={{ margin: 0, maxWidth: 520, fontSize: 16, lineHeight: 1.65, color: 'rgba(43,23,64,0.68)' }}>
-              Discover members, exchange referrals and build meaningful business relationships within the TGL ecosystem.
-            </p>
+            <p className="nh-kicker">{greeting(now)}{firstName ? `, ${firstName}` : ''}</p>
+            <h1>Your network at a glance</h1>
+            <p className="nh-lede">Meet founders worth knowing, answer what members need, and track every referral from introduction to revenue.</p>
           </div>
-          <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-            <button type="button" className="tglp-gold" onClick={() => go('/app/referrals/new')} style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '15px 24px', border: 'none', borderRadius: 999, background: 'linear-gradient(135deg,#E0B558,#C08D2E)', color: '#22103A', fontSize: 11.5, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-              <svg width="15" height="15" viewBox="0 0 24 24"><use href="#i-plus" /></svg>
-              Give Referral
+          <div className="nh-actions">
+            <button type="button" className="nh-btn nh-btn--primary" onClick={() => go('/app/referrals/new')}>
+              <Icon id="i-plus" size={15} /> Give referral
             </button>
-            <button type="button" className="tglp-ghost" onClick={() => go('/app/networking/members')} style={{ padding: '15px 24px', border: '1px solid rgba(53,26,78,0.3)', borderRadius: 999, background: 'transparent', color: '#35194E', fontSize: 11.5, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-              Find Members
+            <button type="button" className="nh-btn" onClick={() => go('/app/networking/needs')}>
+              <Icon id="i-megaphone" size={15} /> Post a need
+            </button>
+            <button type="button" className="nh-btn" onClick={() => go('/app/networking/members')}>
+              <Icon id="i-search" size={15} /> Find members
             </button>
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14, marginBottom: 60 }}>
-          <div className="tgl-dark-card" style={{ padding: 24, borderRadius: 18 }}>
-            <p style={{ margin: '0 0 14px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.22em', textTransform: 'uppercase', color: '#E0B558' }}>Membership</p>
-            <p style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 800, color: '#FFFBF3' }}>Active</p>
-            <p style={{ margin: 0, fontSize: 13, color: 'rgba(246,238,223,0.65)' }}>
-              {status.membership?.expires_at ? `Season 1 · until ${new Date(status.membership.expires_at).toLocaleDateString()}` : 'Season 1 registrant'}
-            </p>
+        <div className="nh-stats">
+          <div className="nh-stat">
+            <span className="nh-stat-label"><Icon id="i-chart" size={14} /> Growth points</span>
+            <span className="nh-stat-value nh-stat-value--gold">{profile?.growth_points || 0}</span>
+            <span className="nh-stat-note">From referrals and closed business</span>
           </div>
-          <div style={{ padding: 24, border: '1px solid rgba(53,26,78,0.1)', borderRadius: 18, background: '#FFFCF5' }}>
-            <p style={{ margin: '0 0 14px', display: 'flex', alignItems: 'center', gap: 8, fontSize: 10.5, fontWeight: 700, letterSpacing: '.22em', textTransform: 'uppercase', color: '#6B3E96' }}>
-              <svg width="14" height="14" viewBox="0 0 24 24"><use href="#i-shield" /></svg>
-              Trust Score
-            </p>
-            <p style={{ margin: '0 0 12px', fontSize: 22, fontWeight: 800, color: '#2B1740' }}>{tier.label}</p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 4, marginBottom: 8 }}>
-              {[1, 2, 3, 4, 5].map((n) => (
-                <span key={n} style={{ height: 4, borderRadius: 2, background: n <= tier.filled ? '#6B3E96' : 'rgba(107,62,150,0.15)' }} />
-              ))}
-            </div>
-            <p style={{ margin: 0, fontSize: 12, color: 'rgba(43,23,64,0.65)' }}>Reflects relationship history. Not a rating.</p>
+          <div className="nh-stat">
+            <span className="nh-stat-label"><Icon id="i-shield" size={14} /> Trust</span>
+            <span className="nh-stat-value nh-stat-value--text">{tier.label}</span>
+            <span className="nh-meter" aria-label={`Trust level ${tier.filled} of 5`}>
+              {[1, 2, 3, 4, 5].map((n) => <span key={n} className={n <= tier.filled ? 'on' : ''} />)}
+            </span>
           </div>
-          <div style={{ padding: 24, border: '1px solid rgba(53,26,78,0.1)', borderRadius: 18, background: '#FFFCF5' }}>
-            <p style={{ margin: '0 0 14px', display: 'flex', alignItems: 'center', gap: 8, fontSize: 10.5, fontWeight: 700, letterSpacing: '.22em', textTransform: 'uppercase', color: '#A8762F' }}>
-              <svg width="14" height="14" viewBox="0 0 24 24"><use href="#i-chart" /></svg>
-              Growth Points
-            </p>
-            <p style={{ margin: '0 0 4px', fontSize: 30, fontWeight: 800, color: '#8F6420', fontVariantNumeric: 'tabular-nums' }}>{status.networking_profile?.growth_points || 0}</p>
-            <p style={{ margin: 0, fontSize: 12, color: 'rgba(43,23,64,0.65)' }}>Earned through referrals and closed business.</p>
+          <div className="nh-stat">
+            <span className="nh-stat-label"><Icon id="i-send" size={14} /> Referrals</span>
+            <span className="nh-stat-value">{referrals ? given : '–'}<small> given</small></span>
+            <span className="nh-stat-note">{referrals ? `${received} received` : 'Loading…'}</span>
           </div>
-          <div style={{ padding: 24, border: '1px solid rgba(53,26,78,0.1)', borderRadius: 18, background: '#FFFCF5' }}>
-            <p style={{ margin: '0 0 14px', display: 'flex', alignItems: 'center', gap: 8, fontSize: 10.5, fontWeight: 700, letterSpacing: '.22em', textTransform: 'uppercase', color: '#35194E' }}>
-              <svg width="14" height="14" viewBox="0 0 24 24"><use href="#i-medal" /></svg>
-              Membership level
-            </p>
-            <p style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 800, color: '#2B1740' }}>Season 1 Member</p>
-            <p style={{ margin: 0, fontSize: 12, color: 'rgba(43,23,64,0.65)' }}>Complimentary · 3 months</p>
+          <div className="nh-stat">
+            <span className="nh-stat-label"><Icon id="i-users" size={14} /> Connections</span>
+            <span className="nh-stat-value">{connections.size}</span>
+            <span className="nh-stat-note">Introductions you&apos;ve requested</span>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, marginBottom: 22 }}>
-          <div>
-            <p style={{ margin: '0 0 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.26em', textTransform: 'uppercase', color: '#8F6420' }}>Curated for you</p>
-            <h2 style={{ margin: 0, fontSize: 'clamp(24px,2.6vw,32px)', fontWeight: 800, letterSpacing: '-0.03em', color: '#2B1740' }}>Who should you meet?</h2>
-          </div>
-          <a href="/app/networking/members" onClick={(e) => { e.preventDefault(); go('/app/networking/members'); }} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
-            All members
-            <svg width="14" height="14" viewBox="0 0 24 24"><use href="#i-arrow" /></svg>
-          </a>
-        </div>
-        {members.length === 0 ? (
-          <p style={{ fontSize: 14, color: 'var(--tgl-text-muted)', marginBottom: 64 }}>No other members yet — check back after more Season 1 founders activate.</p>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 64 }}>
-            {members.map((m) => {
-              const requested = connections.has(m.user_id);
-              return (
-                <div key={m.member_id} className="tglp-lift" style={{ border: '1px solid rgba(53,26,78,0.1)', borderRadius: 20, background: '#FFFCF5', overflow: 'hidden' }}>
-                  <div style={{ position: 'relative', height: 220 }}>
-                    <ImageSlot shape="rect" label="Member photo" initial={m.founder_name || m.business_name} src={m.photo_url} fontSize={64} />
-                  </div>
-                  <div style={{ padding: 22 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                      <p style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#2B1740' }}>{m.founder_name}</p>
-                      {m.tgl_verified && <svg width="16" height="16" viewBox="0 0 24 24" style={{ color: '#A8762F' }}><use href="#i-shield" /></svg>}
-                    </div>
-                    <p style={{ margin: '0 0 12px', fontSize: 13, color: 'rgba(43,23,64,0.65)' }}>{m.business_name}</p>
-                    <p style={{ margin: '0 0 18px', fontSize: 14, lineHeight: 1.55, color: 'rgba(43,23,64,0.72)' }}>{m.headline || 'No headline yet.'}</p>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button type="button" className="tglp-ghost" onClick={() => go(`/app/networking/members/${m.member_id}`)} style={{ flex: 1, padding: 12, border: '1px solid rgba(53,26,78,0.3)', borderRadius: 999, background: 'transparent', color: '#35194E', fontSize: 10.5, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                        View Profile
-                      </button>
-                      <button
-                        type="button"
-                        disabled={requested}
-                        onClick={() => openConnectModal(m.business_name, m.user_id)}
-                        style={{ flex: 1, padding: 12, border: 'none', borderRadius: 999, background: '#2B1740', color: '#F6EEDF', fontSize: 10.5, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', cursor: requested ? 'default' : 'pointer', whiteSpace: 'nowrap', opacity: requested ? 0.6 : 1 }}
-                      >
-                        {requested ? 'Requested' : 'Connect'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        <div className="nh-grid">
+          <div className="nh-col">
+            <Panel title="People to meet" sub="Founders in the Season 1 network" link={{ to: '/app/networking/members', label: 'All members' }}>
+              {members === null ? <SkeletonRows /> : members.length === 0 ? (
+                <Empty icon="i-users" title="No other members yet" body="Check back as more Season 1 founders activate their membership." />
+              ) : (
+                <ul className="nh-list">
+                  {members.map((mb) => {
+                    const requested = connections.has(mb.user_id);
+                    const meta = [mb.business_name, CATEGORY_MAP.get(mb.category) || mb.category, mb.city].filter(Boolean).join(' · ');
+                    return (
+                      <li key={mb.member_id} className="nh-row">
+                        <a className="nh-person" href={`/app/networking/members/${mb.member_id}`} onClick={nav(`/app/networking/members/${mb.member_id}`)}>
+                          <ImageSlot shape="circle" initial={mb.founder_name} src={mb.photo_url} style={{ width: 48, height: 48 }} fontSize={18} />
+                          <span className="nh-person-text">
+                            <span className="nh-name">
+                              {mb.founder_name}
+                              {mb.tgl_verified && <span className="nh-verified" title="TGL Verified"><Icon id="i-shield" size={13} /></span>}
+                              {mb.open_to_mentoring && <span className="nh-tag">Mentor</span>}
+                            </span>
+                            <span className="nh-meta">{meta}</span>
+                            {mb.headline && <span className="nh-headline">{mb.headline}</span>}
+                          </span>
+                        </a>
+                        <button
+                          type="button"
+                          className={`nh-btn nh-btn--sm ${requested ? 'is-done' : 'nh-btn--dark'}`}
+                          disabled={requested}
+                          onClick={() => openConnectModal(mb.business_name, mb.user_id)}
+                        >
+                          {requested ? <><Icon id="i-check" size={13} /> Requested</> : 'Connect'}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </Panel>
 
-        <div data-grid-2="" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.4fr) minmax(0,1fr)', gap: 40 }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, marginBottom: 18 }}>
-              <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em', color: '#2B1740' }}>Business needs</h2>
-              <a href="/app/networking/needs" onClick={(e) => { e.preventDefault(); go('/app/networking/needs'); }} style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase' }}>Need Board</a>
-            </div>
-            {needs.length === 0 ? (
-              <p style={{ fontSize: 14, color: 'var(--tgl-text-muted)' }}>No open needs right now.</p>
-            ) : (
-              <div style={{ borderTop: '1px solid rgba(53,26,78,0.12)' }}>
-                {needs.map((n) => {
-                  const isOwn = n.poster_user_id === status?.user?.id;
-                  const done = helped.has(n.id);
-                  return (
-                    <div key={n.id} className="tglp-row-slide" style={{ display: 'flex', alignItems: 'center', gap: 18, padding: '20px 8px', borderBottom: '1px solid rgba(53,26,78,0.1)' }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ margin: '0 0 4px', fontSize: 15.5, fontWeight: 700, color: '#2B1740' }}>{n.title}</p>
-                        <p style={{ margin: 0, fontSize: 12.5, color: 'rgba(43,23,64,0.65)' }}>
-                          {n.poster_name} · {CATEGORY_MAP.get(n.category) || n.category} · {timeAgo(n.created_at)}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        className="tglp-help"
-                        disabled={isOwn || done}
-                        onClick={() => offerHelp(n)}
-                        style={{ flexShrink: 0, padding: '11px 18px', border: '1px solid #C08D2E', borderRadius: 999, background: 'transparent', color: '#8A5A18', fontSize: 10.5, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', cursor: isOwn || done ? 'default' : 'pointer', whiteSpace: 'nowrap' }}
-                      >
-                        {isOwn ? 'Your Need' : done ? 'Offer Sent' : 'I Can Help'}
-                      </button>
-                    </div>
-                  );
-                })}
+            <Panel title="Open business needs" sub="Members asking for an introduction or a supplier" link={{ to: '/app/networking/needs', label: 'Need board' }}>
+              {needs === null ? <SkeletonRows /> : needs.length === 0 ? (
+                <Empty
+                  icon="i-megaphone"
+                  title="No open needs right now"
+                  body="Looking for a supplier, partner or client? Ask the network."
+                  action={<button type="button" className="nh-btn nh-btn--sm" onClick={() => go('/app/networking/needs')}>Post a need</button>}
+                />
+              ) : (
+                <ul className="nh-list">
+                  {needs.map((n) => {
+                    const isOwn = n.poster_user_id === me;
+                    const done = helped.has(n.id);
+                    return (
+                      <li key={n.id} className="nh-row">
+                        <div className="nh-person">
+                          <ImageSlot shape="circle" initial={n.poster_name} src={n.poster_photo_url} style={{ width: 48, height: 48 }} fontSize={18} />
+                          <span className="nh-person-text">
+                            <span className="nh-name nh-name--need">{n.title}</span>
+                            <span className="nh-meta">
+                              {n.poster_name} · {CATEGORY_MAP.get(n.category) || n.category} · {shortAgo(n.created_at)} ago
+                            </span>
+                          </span>
+                        </div>
+                        <button type="button" className={`nh-btn nh-btn--sm ${isOwn || done ? 'is-done' : 'nh-btn--gold-line'}`} disabled={isOwn || done} onClick={() => offerHelp(n)}>
+                          {isOwn ? 'Your need' : done ? <><Icon id="i-check" size={13} /> Offer sent</> : 'I can help'}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </Panel>
+          </div>
+
+          <aside className="nh-col">
+            <Panel title="Referral pipeline" link={{ to: '/app/networking/referrals', label: 'Open' }}>
+              <p className="nh-total">
+                <strong>{referrals ? refs.length : '–'}</strong> {refs.length === 1 ? 'referral' : 'referrals'} in motion
+              </p>
+              <ol className="nh-funnel">
+                {pipeline.map((p) => (
+                  <li key={p.key}>
+                    <span className="nh-funnel-label">{p.label}</span>
+                    <span className="nh-funnel-track"><span style={{ width: `${(p.count / maxStage) * 100}%` }} /></span>
+                    <span className="nh-funnel-n">{p.count}</span>
+                  </li>
+                ))}
+              </ol>
+            </Panel>
+
+            <Panel title="Recent activity">
+              {referrals === null ? <SkeletonRows n={2} /> : recent.length === 0 ? (
+                <Empty
+                  icon="i-send"
+                  title="No referrals yet"
+                  body="Your first referral starts your Growth Points and Trust history."
+                  action={<button type="button" className="nh-btn nh-btn--sm nh-btn--primary" onClick={() => go('/app/referrals/new')}>Give a referral</button>}
+                />
+              ) : (
+                <ul className="nh-feed">
+                  {recent.map((r) => {
+                    const outgoing = r.giver_user_id === me;
+                    const other = outgoing ? r.receiver_name : r.giver_name;
+                    return (
+                      <li key={r.id}>
+                        <span className={`nh-dot ${outgoing ? 'out' : 'in'}`} />
+                        <span className="nh-feed-text">
+                          <strong>{outgoing ? `To ${other || 'a member'}` : `From ${other || 'a member'}`}</strong>
+                          <span>{r.business_need}</span>
+                          <span className="nh-feed-meta">{STAGE_LABEL[r.status] || r.status.replace(/_/g, ' ').toLowerCase()} · {shortAgo(r.updated_at)} ago</span>
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </Panel>
+
+            <article className="nh-member tgl-dark-card">
+              <div className="nh-member-head">
+                <span>Season 1 membership</span>
+                <span className="nh-member-pill">Active</span>
               </div>
-            )}
-          </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, marginBottom: 18 }}>
-              <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em', color: '#2B1740' }}>Referral pipeline</h2>
-              <a href="/app/networking/referrals" onClick={(e) => { e.preventDefault(); go('/app/networking/referrals'); }} style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase' }}>Open</a>
-            </div>
-            <div style={{ padding: '8px 24px', border: '1px solid rgba(53,26,78,0.1)', borderRadius: 18, background: '#FFFCF5' }}>
-              {pipeline.map((p) => (
-                <div key={p.label} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '13px 0', borderBottom: '1px solid rgba(53,26,78,0.07)' }}>
-                  <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'rgba(43,23,64,0.65)' }}>{p.n}</span>
-                  <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: '#2B1740' }}>{p.label}</span>
-                  <span style={{ fontSize: 17, fontWeight: 800, color: '#6B3E96', fontVariantNumeric: 'tabular-nums' }}>{p.count}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+              {membershipLeft ? (
+                <>
+                  <p className="nh-member-big">{membershipLeft.days} <small>days left</small></p>
+                  <span className="nh-member-track"><span style={{ width: `${membershipLeft.pct}%` }} /></span>
+                  <p className="nh-member-note">Ends on {shortDate(m.expires_at)}</p>
+                </>
+              ) : (
+                <p className="nh-member-note">Complimentary for Season 1 registrants · 3 months</p>
+              )}
+              <a href="/app/profile/membership" onClick={nav('/app/profile/membership')}>Membership details <Icon id="i-arrow" size={13} /></a>
+            </article>
+          </aside>
         </div>
       </main>
     </>
