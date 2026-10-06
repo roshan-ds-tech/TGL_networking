@@ -48,13 +48,27 @@ _last_run = 0.0
 last_result: dict = {}
 
 
+class LegacyAuthError(Exception):
+    """The legacy admin refused our credentials (401/403)."""
+
+
+class LegacyRateLimited(Exception):
+    """The legacy admin is rate-limiting logins (429)."""
+
+
+# Set after a refused login: stop trying until the process restarts (saving new
+# credentials in Render restarts it). Retrying wrong credentials would trip
+# the legacy admin's lockout (5 failures -> account locked for 15 minutes).
+_auth_failed = False
+
+
 def enabled() -> bool:
     return bool(settings.legacy_registrations_url and settings.legacy_admin_email and settings.legacy_admin_password)
 
 
 def kick() -> None:
     """Ask for a sync soon (rate-limited; thread-safe, never blocks)."""
-    if not enabled() or _loop is None or _loop.is_closed():
+    if not enabled() or _auth_failed or _loop is None or _loop.is_closed():
         return
     if time.monotonic() - _last_run < KICK_COOLDOWN_SECONDS:
         return
@@ -82,6 +96,10 @@ async def _fetch_all() -> list[dict]:
             f"{base}/api/auth/login",
             json={"email": settings.legacy_admin_email, "password": settings.legacy_admin_password},
         )
+        if r.status_code in (401, 403):
+            raise LegacyAuthError(f"HTTP {r.status_code}")
+        if r.status_code == 429:
+            raise LegacyRateLimited("HTTP 429")
         if r.status_code != 200:
             raise RuntimeError(f"legacy admin login failed (HTTP {r.status_code})")
         items, page = [], 1
@@ -171,16 +189,32 @@ async def sync_once() -> dict:
 
 
 async def _run() -> None:
+    global _auth_failed
     while True:
+        wait = settings.legacy_sync_seconds
         try:
             await sync_once()
         except asyncio.CancelledError:
             raise
+        except LegacyAuthError as exc:
+            _auth_failed = True
+            last_result.update(ok=False, at=time.time(), error="login refused")
+            logger.error(
+                "legacy registrations sync STOPPED: the legacy admin refused the login (%s) for "
+                "LEGACY_ADMIN_EMAIL at %s. Check that you can sign in at %s/admin with exactly those "
+                "credentials, then save them again in Render (that restarts the sync). Not retrying, "
+                "so wrong credentials can't lock that admin account.",
+                exc, settings.legacy_registrations_url, settings.legacy_registrations_url.rstrip("/"),
+            )
+            return
+        except LegacyRateLimited:
+            wait = max(wait, 900)
+            logger.warning("legacy registrations sync: legacy admin is rate-limiting logins; retrying in 15 min")
         except Exception as exc:  # nothing is changed on failure
-            logger.warning("legacy registrations sync failed: %s", type(exc).__name__)
+            logger.warning("legacy registrations sync failed: %s: %s", type(exc).__name__, str(exc)[:200])
             last_result.update(ok=False, at=time.time())
         try:
-            await asyncio.wait_for(_wake.wait(), timeout=settings.legacy_sync_seconds)
+            await asyncio.wait_for(_wake.wait(), timeout=wait)
         except asyncio.TimeoutError:
             pass
         _wake.clear()

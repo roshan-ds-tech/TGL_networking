@@ -60,8 +60,12 @@ def _row(email: str, verified: bool = False, category: str = "03") -> dict:
     }
 
 
+LOGINS = {"count": 0}
+
+
 @legacy.post("/api/auth/login")
 async def _login(request: Request):
+    LOGINS["count"] += 1
     body = await request.json()
     if body == {"email": "sync-bot@example.com", "password": "SyncBotPass123!"}:
         r = Response('{"id":"a","email":"sync-bot@example.com"}', media_type="application/json")
@@ -163,8 +167,15 @@ def main() -> int:
         try:
             asyncio.run(legacy_sync.sync_once())
             check("wrong credentials raise", False)
-        except Exception:
+        except legacy_sync.LegacyAuthError:
             check("wrong legacy credentials: nothing changes", filled(c) == 129)
+        # The background loop must stop for good after a refused login, so it
+        # can't lock the legacy admin account by retrying.
+        LOGINS["count"] = 0
+        asyncio.run(asyncio.wait_for(legacy_sync._run(), timeout=5))
+        check("refused login stops the sync loop (no retries)", legacy_sync._auth_failed is True and LOGINS["count"] == 1, str(LOGINS))
+        legacy_sync.kick()
+        check("kick() does nothing once credentials were refused", LOGINS["count"] == 1)
         settings.legacy_admin_password = "SyncBotPass123!"
 
     server.should_exit = True
