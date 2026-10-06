@@ -26,9 +26,9 @@ import re
 import uuid
 from pathlib import Path
 
-import httpx
 from fastapi import HTTPException, UploadFile, status
 
+from . import http_client
 from .config import settings
 
 logger = logging.getLogger("tgl")
@@ -46,7 +46,6 @@ _CHUNK = 64 * 1024
 # Exactly what save_payment_proof generates — anything else is refused before
 # it reaches a filesystem path or a storage URL.
 _NAME_RE = re.compile(r"^[0-9a-f]{32}\.(png|jpg|pdf|gif|webp)$")
-_TIMEOUT = httpx.Timeout(20.0, connect=5.0)
 
 
 def _use_supabase() -> bool:
@@ -89,12 +88,12 @@ def _sb_object_url(filename: str) -> str:
 
 
 async def _sb_put(filename: str, data: bytes, mime: str) -> None:
-    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-        r = await client.post(
-            _sb_object_url(filename),
-            content=data,
-            headers={**_sb_headers(mime), "x-upsert": "false", "Cache-Control": "no-store"},
-        )
+    r = await http_client.request(
+        "POST",
+        _sb_object_url(filename),
+        content=data,
+        headers={**_sb_headers(mime), "x-upsert": "false", "Cache-Control": "no-store"},
+    )
     if r.status_code >= 300:
         logger.error("Supabase Storage upload failed: HTTP %s", r.status_code)
         raise HTTPException(
@@ -104,8 +103,7 @@ async def _sb_put(filename: str, data: bytes, mime: str) -> None:
 
 
 async def _sb_get(filename: str) -> bytes:
-    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-        r = await client.get(_sb_object_url(filename), headers=_sb_headers())
+    r = await http_client.request("GET", _sb_object_url(filename), headers=_sb_headers())
     if r.status_code in (400, 404):
         raise HTTPException(status_code=404, detail="Payment proof not found")
     if r.status_code >= 300:
@@ -116,13 +114,12 @@ async def _sb_get(filename: str) -> bytes:
 
 async def _sb_delete(filename: str) -> bool:
     base = settings.supabase_url.rstrip("/")
-    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-        r = await client.request(
-            "DELETE",
-            f"{base}/storage/v1/object/{settings.supabase_storage_bucket}",
-            json={"prefixes": [filename]},
-            headers=_sb_headers("application/json"),
-        )
+    r = await http_client.request(
+        "DELETE",
+        f"{base}/storage/v1/object/{settings.supabase_storage_bucket}",
+        json={"prefixes": [filename]},
+        headers=_sb_headers("application/json"),
+    )
     if r.status_code >= 300:
         logger.error("Supabase Storage delete failed: HTTP %s", r.status_code)
         return False
@@ -136,26 +133,26 @@ async def init_storage() -> None:
         return
     base = settings.supabase_url.rstrip("/")
     bucket = settings.supabase_storage_bucket
-    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-        r = await client.get(f"{base}/storage/v1/bucket/{bucket}", headers=_sb_headers())
-        if r.status_code == 200:
-            if r.json().get("public"):
-                # Never serve payment proofs from a public bucket.
-                logger.error("Supabase bucket %r is PUBLIC — make it private in the Supabase dashboard.", bucket)
-            return
-        r = await client.post(
-            f"{base}/storage/v1/bucket",
-            json={
-                "id": bucket,
-                "name": bucket,
-                "public": False,
-                "file_size_limit": settings.max_upload_bytes,
-                "allowed_mime_types": ["image/png", "image/jpeg", "image/gif", "image/webp", "application/pdf"],
-            },
-            headers=_sb_headers("application/json"),
-        )
-        if r.status_code >= 300 and r.status_code != 409:
-            logger.error("Could not create Supabase bucket %r: HTTP %s", bucket, r.status_code)
+    r = await http_client.request("GET", f"{base}/storage/v1/bucket/{bucket}", headers=_sb_headers())
+    if r.status_code == 200:
+        if r.json().get("public"):
+            # Never serve payment proofs from a public bucket.
+            logger.error("Supabase bucket %r is PUBLIC — make it private in the Supabase dashboard.", bucket)
+        return
+    r = await http_client.request(
+        "POST",
+        f"{base}/storage/v1/bucket",
+        json={
+            "id": bucket,
+            "name": bucket,
+            "public": False,
+            "file_size_limit": settings.max_upload_bytes,
+            "allowed_mime_types": ["image/png", "image/jpeg", "image/gif", "image/webp", "application/pdf"],
+        },
+        headers=_sb_headers("application/json"),
+    )
+    if r.status_code >= 300 and r.status_code != 409:
+        logger.error("Could not create Supabase bucket %r: HTTP %s", bucket, r.status_code)
 
 
 # ------------------------------------------------------------------ public ---

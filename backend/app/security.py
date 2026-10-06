@@ -18,6 +18,7 @@ import hmac
 import secrets
 from datetime import datetime, timedelta, timezone
 
+import anyio
 import jwt
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerifyMismatchError
@@ -27,6 +28,7 @@ from sqlalchemy import func, or_, select
 
 from .config import settings
 from .database import get_db
+from .observability import timed
 from .services import SEASON_1_SLUG, add_calendar_months
 from .models import Admin, Event, Registration, TGLMembership, User, utcnow
 
@@ -61,6 +63,25 @@ def burn_timing() -> None:
         _hasher.verify(_DUMMY_HASH, "wrong")
     except Exception:
         pass
+
+
+# Argon2id is deliberately expensive (64 MiB, 3 passes). Run it in a worker
+# thread: argon2-cffi releases the GIL, so the event loop keeps serving every
+# other request instead of freezing for the duration of each hash. Same
+# parameters, same security — it just stops one login from stalling the site.
+async def hash_password_async(password: str) -> str:
+    async with timed("hash"):
+        return await anyio.to_thread.run_sync(hash_password, password)
+
+
+async def verify_password_async(password: str, password_hash: str) -> bool:
+    async with timed("hash"):
+        return await anyio.to_thread.run_sync(verify_password, password, password_hash)
+
+
+async def burn_timing_async() -> None:
+    async with timed("hash"):
+        await anyio.to_thread.run_sync(burn_timing)
 
 
 def hash_ip(ip: str) -> str:

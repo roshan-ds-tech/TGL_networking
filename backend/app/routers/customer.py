@@ -60,7 +60,7 @@ from ..security import (
     CSRF_HEADER,
     CUSTOMER_CSRF_COOKIE,
     CUSTOMER_SESSION_COOKIE,
-    burn_timing,
+    burn_timing_async,
     create_customer_session_token,
     get_current_user,
     get_optional_user,
@@ -72,12 +72,12 @@ from ..security import (
     is_active_member,
     has_verified_registration,
     verified_registrant_ids,
-    hash_password,
+    hash_password_async,
     new_csrf_token,
     require_active_networking_member,
     require_customer_csrf,
     require_verified_user,
-    verify_password,
+    verify_password_async,
 )
 from ..email_service import send_login_otp_email, send_password_reset_email, send_verification_email
 from ..services import ensure_networking_profile, get_or_create_season_1, new_reset_token, new_verification_token, notify, token_hash
@@ -180,7 +180,7 @@ async def register(
         raise HTTPException(status.HTTP_409_CONFLICT, "An account with this email already exists.")
     user = User(
         email=email,
-        password_hash=hash_password(payload.password),
+        password_hash=await hash_password_async(payload.password),
         full_name=payload.full_name,
         phone=payload.phone,
     )
@@ -213,14 +213,14 @@ async def login(
     enforce(f"customer-login:{ip}", settings.login_max_attempts, settings.login_window_seconds, "Too many login attempts. Please try again later.")
     user = await get_user_by_email(db, payload.email)
     if user is None:
-        burn_timing()
+        await burn_timing_async()
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, _GENERIC)
     now = datetime.now(timezone.utc)
     locked_until = user.locked_until.replace(tzinfo=timezone.utc) if user.locked_until and user.locked_until.tzinfo is None else user.locked_until
     if locked_until and locked_until > now:
-        burn_timing()
+        await burn_timing_async()
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, _GENERIC)
-    if not user.is_active or not verify_password(payload.password, user.password_hash):
+    if not user.is_active or not await verify_password_async(payload.password, user.password_hash):
         user.failed_attempts += 1
         if user.failed_attempts >= settings.login_max_attempts:
             user.locked_until = now + timedelta(minutes=15)
@@ -353,7 +353,7 @@ async def verify_login_otp(
     enforce(f"otp-verify-email:{email}", 8, 600, "Too many attempts. Please request a new code and try again.")
     user = await get_user_by_email(db, email)
     if user is None or not user.is_active:
-        burn_timing()
+        await burn_timing_async()
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired code.")
     hashed = token_hash(payload.code.strip())
     result = await db.execute(
@@ -424,7 +424,7 @@ async def reset_password(
     user = await db.get(User, row.user_id)
     if user is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid or expired reset link.")
-    user.password_hash = hash_password(payload.new_password)
+    user.password_hash = await hash_password_async(payload.new_password)
     user.failed_attempts = 0
     user.locked_until = None
     # Sign out every existing session — including one an attacker may hold

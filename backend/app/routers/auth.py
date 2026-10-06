@@ -14,13 +14,13 @@ from ..schemas import AdminOut, LoginRequest
 from ..security import (
     CSRF_COOKIE,
     SESSION_COOKIE,
-    burn_timing,
+    burn_timing_async,
     create_session_token,
     get_admin_by_email,
     get_current_admin,
     new_csrf_token,
     require_csrf,
-    verify_password,
+    verify_password_async,
 )
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -61,7 +61,7 @@ async def login(
     admin = await get_admin_by_email(db, payload.email)
 
     if admin is None:
-        burn_timing()  # keep response time indistinguishable from a real miss
+        await burn_timing_async()  # keep response time indistinguishable from a real miss
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, _GENERIC)
 
     now = datetime.now(timezone.utc)
@@ -69,10 +69,10 @@ async def login(
     if locked_until is not None and locked_until.tzinfo is None:
         locked_until = locked_until.replace(tzinfo=timezone.utc)
     if locked_until and locked_until > now:
-        burn_timing()
+        await burn_timing_async()
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, _GENERIC)
 
-    if not admin.is_active or not verify_password(payload.password, admin.password_hash):
+    if not admin.is_active or not await verify_password_async(payload.password, admin.password_hash):
         admin.failed_attempts += 1
         if admin.failed_attempts >= settings.login_max_attempts:
             admin.locked_until = now + timedelta(minutes=LOCKOUT_MINUTES)

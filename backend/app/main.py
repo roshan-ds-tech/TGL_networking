@@ -14,6 +14,8 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import IntegrityError
 
 from .config import settings
+from .observability import timing_middleware
+from . import http_client
 from .database import Base, engine, lock_down_postgres, sync_schema
 from .routers import admin as admin_router
 from .routers import auth as auth_router
@@ -22,6 +24,14 @@ from .routers import public as public_router
 from .storage import init_storage
 
 logger = logging.getLogger("tgl")
+# One plain line per event on stdout (Render captures it). Uvicorn configures
+# only its own loggers, so ours need a handler for INFO lines to appear.
+if not logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(levelname)s %(name)s %(message)s"))
+    logger.addHandler(_handler)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
 
 
 @asynccontextmanager
@@ -36,6 +46,7 @@ async def lifespan(_: FastAPI):
         await conn.run_sync(sync_schema)
         await conn.run_sync(lock_down_postgres)
     yield
+    await http_client.aclose()
     await engine.dispose()
 
 
@@ -145,6 +156,11 @@ async def security_headers(request: Request, call_next):
             "base-uri 'self'; form-action 'self'"
         )
     return response
+
+
+# Outermost middleware (registered last): times the whole request, including
+# the other middlewares, and tags it with a request ID.
+app.middleware("http")(timing_middleware)
 
 
 @app.exception_handler(IntegrityError)

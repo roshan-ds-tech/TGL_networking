@@ -10,6 +10,7 @@ import logging
 
 import httpx
 
+from . import http_client
 from .config import settings
 
 logger = logging.getLogger("tgl")
@@ -33,12 +34,12 @@ async def _send(to_email: str, subject: str, html: str, text: str) -> bool:
         logger.warning("RESEND_API_KEY not set; skipping email (%s) to %s", subject, _mask(to_email))
         return False
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.post(
-                _RESEND_URL,
-                headers={"Authorization": f"Bearer {settings.resend_api_key}"},
-                json={"from": settings.email_from, "to": [to_email], "subject": subject, "html": html, "text": text},
-            )
+        response = await http_client.request(
+            "POST",
+            _RESEND_URL,
+            headers={"Authorization": f"Bearer {settings.resend_api_key}"},
+            json={"from": settings.email_from, "to": [to_email], "subject": subject, "html": html, "text": text},
+        )
         if response.status_code >= 400:
             logger.error("Resend rejected email (%s) to %s: HTTP %s", subject, _mask(to_email), response.status_code)
             return False

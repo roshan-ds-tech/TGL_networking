@@ -125,6 +125,11 @@ if is_sqlite:
 
 SessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
+# Per-request DB time and query count (observability.py).
+from .observability import install_db_timing  # noqa: E402
+
+install_db_timing(engine)
+
 
 class Base(DeclarativeBase):
     pass
