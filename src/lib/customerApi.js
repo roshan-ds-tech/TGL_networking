@@ -1,3 +1,4 @@
+import { setAuthHint } from './authHint';
 import { API_BASE, WAKING_STATUSES, markAwake, markMaybeAsleep, wakeBackend } from './apiBase';
 
 const REQUEST_TIMEOUT_MS = 20000;
@@ -106,11 +107,11 @@ async function request(path, options = {}) {
 
 export const api = {
   signup: (details) => request('/api/v1/auth/register', { method: 'POST', body: JSON.stringify(details) }),
-  login: (email, password) => request('/api/v1/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
-  logout: () => request('/api/v1/auth/logout', { method: 'POST' }),
+  login: (email, password) => request('/api/v1/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }).then((r) => { setAuthHint(true); return r; }),
+  logout: () => request('/api/v1/auth/logout', { method: 'POST' }).finally(() => setAuthHint(false)),
   me: () => request('/api/v1/auth/me'),
   // 200 either way: { authenticated, user? }. For pages that work signed out.
-  session: () => request('/api/v1/auth/session'),
+  session: () => request('/api/v1/auth/session').then((r) => { setAuthHint(!!r?.authenticated, r?.user ? r.user.photo_url : undefined); return r; }),
   // Full status when signed in, null when not — without a 401 round trip.
   optionalStatus: async () => ((await api.session())?.authenticated ? api.status() : null),
   verifyEmail: (token) => {
@@ -123,7 +124,10 @@ export const api = {
   otpVerify: (email, code) => request('/api/v1/auth/otp/verify', { method: 'POST', body: JSON.stringify({ email, code }) }),
   forgotPassword: (email) => request('/api/v1/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
   resetPassword: (token, newPassword) => request('/api/v1/auth/reset-password', { method: 'POST', body: JSON.stringify({ token, new_password: newPassword }) }),
-  status: () => request('/api/v1/status'),
+  status: () => request('/api/v1/status').then(
+    (r) => { setAuthHint(true, r?.user ? r.user.photo_url : undefined); return r; },
+    (err) => { if (err?.status === 401) setAuthHint(false); throw err; },
+  ),
   uploadPhoto: (blob) => {
     const fd = new FormData();
     fd.set('photo', blob, 'photo.jpg');

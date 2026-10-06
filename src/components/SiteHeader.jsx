@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { go } from '../lib/customerApi';
 import { moduleClickHandler } from '../lib/moduleNav';
+import { getAuthHint, getServerAuthHint, parseAuthHint, subscribeAuthHint } from '../lib/authHint';
 import logo from '../assets/logo.png';
 
 /* The one navbar for the whole site — the marketing homepage and every
@@ -37,6 +38,14 @@ export default function SiteHeader({ path, authUser, authChecked, unread = 0, on
 
   const isHome = path === '/';
   const signedIn = !!authUser;
+  // Until the session check settles we don't know which controls are right.
+  // Draw what this browser last saw (hint), and if there is none, reserve the
+  // button's space invisibly — never flash "Create Account" at a member.
+  const hint = parseAuthHint(useSyncExternalStore(subscribeAuthHint, getAuthHint, getServerAuthHint));
+  const hinted = hint.signedIn;
+  const pending = !signedIn && !authChecked;
+  const showMemberControls = signedIn || (pending && hinted);
+  const ctaHidden = pending && !hinted;
   const openModule = moduleClickHandler({ authUser, authChecked, onOpenModule });
   const closeMenu = () => setMenuOpen(false);
 
@@ -144,7 +153,7 @@ export default function SiteHeader({ path, authUser, authChecked, unread = 0, on
         <span data-nav-mobile="" style={{ marginLeft: 'auto' }} />
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-          {signedIn ? (
+          {showMemberControls ? (
             <>
               <button type="button" className="tglp-icon-btn" onClick={() => go('/app/notifications')} aria-label={unread > 0 ? `Notifications (${unread} unread)` : 'Notifications'} aria-current={path === '/app/notifications' ? 'page' : undefined} style={ICON_BTN}>
                 <svg width="18" height="18" viewBox="0 0 24 24"><use href="#i-bell" /></svg>
@@ -154,8 +163,8 @@ export default function SiteHeader({ path, authUser, authChecked, unread = 0, on
               </button>
               <button type="button" onClick={() => go('/app/profile')} aria-label="Profile" aria-current={path.startsWith('/app/profile') ? 'page' : undefined} style={{ width: 44, height: 44, borderRadius: '50%', border: '1px solid rgba(192,141,46,0.5)', padding: 2, background: 'transparent', cursor: 'pointer', flexShrink: 0 }}>
                 <span style={{ width: 38, height: 38, borderRadius: '50%', background: '#2B1740', color: '#EFCB77', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                  {authUser?.photo_url ? (
-                    <img src={authUser.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  {(signedIn ? authUser.photo_url : hint.photo) ? (
+                    <img src={signedIn ? authUser.photo_url : hint.photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
                     <svg width="18" height="18" viewBox="0 0 24 24"><use href="#i-user" /></svg>
                   )}
@@ -163,7 +172,7 @@ export default function SiteHeader({ path, authUser, authChecked, unread = 0, on
               </button>
             </>
           ) : (
-            <a data-nav-desktop="" href={cta.to} onClick={openCta} style={{ position: 'relative', overflow: 'hidden', flexShrink: '0', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '10px', background: 'linear-gradient(135deg, #EFCB77, #E0B558 45%, #C08D2E)', color: '#22103A', fontWeight: '700', fontSize: '12px', letterSpacing: '.14em', textTransform: 'uppercase', padding: '14px 24px', borderRadius: '999px', boxShadow: '0 8px 22px -8px rgba(192,141,46,0.7), inset 0 1px 0 rgba(255,255,255,0.45)', transition: 'transform .35s cubic-bezier(.34,1.56,.64,1), box-shadow .3s ease, filter .3s ease' }} className="hv-7">
+            <a data-nav-desktop="" href={cta.to} onClick={openCta} aria-hidden={ctaHidden || undefined} tabIndex={ctaHidden ? -1 : undefined} style={{ visibility: ctaHidden ? 'hidden' : 'visible', position: 'relative', overflow: 'hidden', flexShrink: '0', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '10px', background: 'linear-gradient(135deg, #EFCB77, #E0B558 45%, #C08D2E)', color: '#22103A', fontWeight: '700', fontSize: '12px', letterSpacing: '.14em', textTransform: 'uppercase', padding: '14px 24px', borderRadius: '999px', boxShadow: '0 8px 22px -8px rgba(192,141,46,0.7), inset 0 1px 0 rgba(255,255,255,0.45)', transition: 'transform .35s cubic-bezier(.34,1.56,.64,1), box-shadow .3s ease, filter .3s ease' }} className="hv-7">
               {cta.label}
               <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true" style={{ flexShrink: '0' }}>
                 <use href="#i-arrow"></use>
@@ -200,7 +209,7 @@ export default function SiteHeader({ path, authUser, authChecked, unread = 0, on
               Podcasts
             </a>
           </div>
-          {!signedIn && (
+          {!showMemberControls && !ctaHidden && (
             <a href={cta.to} onClick={openCta} style={{ marginTop: '12px', textAlign: 'center', background: 'linear-gradient(135deg, #E0B558, #C08D2E)', color: '#22103A', fontWeight: '700', letterSpacing: '.06em', textTransform: 'uppercase', padding: '16px', borderRadius: '999px' }}>
               {cta.label}
             </a>
