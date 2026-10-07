@@ -173,7 +173,7 @@ function AuthedProduct({ path, status, loading, error, reload }) {
   if (path === '/app/events') return <Events status={status} />;
   if (path === '/app/networking') return active ? <NetworkingHome status={status} /> : locked;
   if (path === '/app/networking/members') return active ? <Directory status={status} /> : locked;
-  if (memberId) return active ? <Member id={memberId} /> : locked;
+  if (memberId) return active ? <Member id={memberId} status={status} /> : locked;
   if (path === '/app/referrals/new') return active ? <Referrals status={status} openGiveOnMount /> : locked;
   if (path === '/app/networking/referrals' || path === '/app/referrals') return active ? <Referrals status={status} /> : locked;
   if (path === '/app/networking/needs' || path === '/app/needs') return active ? <Needs status={status} /> : locked;

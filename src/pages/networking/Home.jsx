@@ -78,14 +78,16 @@ export default function NetworkingHome({ status }) {
   const [helped, setHelped] = useState(new Set());
   const [now] = useState(Date.now); // one clock per visit keeps render pure
 
+  const me = status.user?.id;
+
   useEffect(() => {
-    api.members({}).then((rows) => setMembers(rows.slice(0, 4))).catch(() => setMembers([]));
+    // Never suggest the signed-in member to themselves.
+    api.members({}).then((rows) => setMembers(rows.filter((m) => m.user_id !== me).slice(0, 4))).catch(() => setMembers([]));
     api.needs().then((rows) => setNeeds(rows.slice(0, 4))).catch(() => setNeeds([]));
     api.referrals().then(setReferrals).catch(() => setReferrals([]));
     api.listConnections().then((rows) => setConnections(new Set(rows.map((c) => c.target_user_id)))).catch(() => {});
-  }, []);
+  }, [me]);
 
-  const me = status.user?.id;
   const firstName = (status.personal_profile?.full_name || '').split(/\s+/)[0];
   const profile = status.networking_profile;
   const tier = trustTier(profile?.trust_score || 0);

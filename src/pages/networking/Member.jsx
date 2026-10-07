@@ -11,11 +11,14 @@ const CAPTION = { margin: '0 0 12px', fontSize: 10.5, fontWeight: 700, letterSpa
 const METRIC_LABEL = { margin: '0 0 10px', fontSize: 10, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.65)' };
 const METRIC_VALUE = { margin: 0, fontSize: 24, fontWeight: 800, color: '#2B1740' };
 
-export default function Member({ id }) {
+export default function Member({ id, status }) {
+  const myId = status?.user?.id;
   const [member, setMember] = useState(null);
   const [loading, setLoading] = useState(true);
   const [denied, setDenied] = useState(false);
-  const [connected, setConnected] = useState(false);
+  // User ids this member has already asked to connect with. (The route id is
+  // the member id, so it has to be compared against member.user_id, not id.)
+  const [connectedIds, setConnectedIds] = useState(new Set());
   const [requesting, setRequesting] = useState(false);
 
   useEffect(() => {
@@ -28,9 +31,7 @@ export default function Member({ id }) {
         if (err.status === 403) setDenied(true);
       })
       .finally(() => setLoading(false));
-    api.listConnections().then((rows) => {
-      if (rows.some((c) => c.target_user_id === id)) setConnected(true);
-    }).catch(() => {});
+    api.listConnections().then((rows) => setConnectedIds(new Set(rows.map((c) => c.target_user_id)))).catch(() => {});
   }, [id]);
 
   async function requestReferral() {
@@ -69,6 +70,8 @@ export default function Member({ id }) {
     );
   }
 
+  const isMe = !!member && member.user_id === myId;
+  const connected = !!member && connectedIds.has(member.user_id);
   const tier = trustTier(member.trust_score || 0);
   const interests = (member.interests || '').split(',').map((s) => s.trim()).filter(Boolean);
 
@@ -114,6 +117,20 @@ export default function Member({ id }) {
                       {member.city || 'Bengaluru'}
                     </span>
                   </div>
+                  {isMe ? (
+                    <>
+                      <p style={{ margin: '0 0 12px', fontSize: 13, lineHeight: 1.55, color: 'rgba(246,238,223,0.72)' }}>This is how other members see you.</p>
+                      <button
+                        type="button"
+                        className="tglp-gold"
+                        onClick={() => go('/app/profile')}
+                        style={{ width: '100%', padding: 15, border: 'none', borderRadius: 999, background: 'linear-gradient(135deg,#EFCB77,#E0B558 45%,#C08D2E)', color: '#22103A', fontSize: 11.5, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                      >
+                        Edit your profile
+                      </button>
+                    </>
+                  ) : (
+                    <>
                   <button
                     type="button"
                     className="tglp-gold"
@@ -145,6 +162,8 @@ export default function Member({ id }) {
                       {requesting ? 'Sending…' : 'Request Referral'}
                     </button>
                   </div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
