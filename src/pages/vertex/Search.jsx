@@ -88,7 +88,7 @@ export default function VertexSearch() {
             <h1 style={{ margin: 0, fontSize: 'clamp(26px,3vw,36px)', fontWeight: 800, letterSpacing: '-0.03em', color: '#2B1740' }}>Here&apos;s what could help</h1>
             <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, color: 'rgba(43,23,64,0.65)' }}>
               Sort
-              <select style={{ padding: '9px 12px', border: '1px solid rgba(53,26,78,0.16)', borderRadius: 10, background: '#FFFCF5', fontSize: 13, color: '#2B1740' }}>
+              <select style={{ padding: '9px 38px 9px 12px', border: '1px solid rgba(53,26,78,0.16)', borderRadius: 10, background: '#FFFCF5', fontSize: 13, color: '#2B1740' }}>
                 <option>Relevance</option>
                 <option>Recently active</option>
               </select>

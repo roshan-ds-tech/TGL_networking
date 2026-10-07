@@ -311,3 +311,15 @@
 @media (max-width: 480px) {
   .urgency { right: 12px; left: 12px; bottom: 12px; width: auto; }
 }
+
+
+/* Registration form selects: same fix as the product app — custom chevron with
+   room to breathe instead of the native arrow jammed against the edge. */
+#tgl-category, #tgl-employees, #tgl-age {
+  -webkit-appearance: none; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23C08D2E' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 16px center !important;
+  background-size: 12px 8px !important;
+  padding-right: 44px !important;
+}
