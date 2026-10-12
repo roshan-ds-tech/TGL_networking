@@ -34,6 +34,8 @@ export default function RenewalPanel() {
   const [step, setStep] = useState('view'); // view | calc | done
   const [busy, setBusy] = useState(false);
   const [outcome, setOutcome] = useState(null);
+  const [chosen, setChosen] = useState(null); // how many points the member wants to use (null = not chosen yet: the most allowed)
+  const [draft, setDraft] = useState('');
 
   useEffect(() => {
     let live = true;
@@ -42,9 +44,9 @@ export default function RenewalPanel() {
   }, []);
   useEffect(() => {
     let live = true;
-    api.renewalQuote(plan).then((r) => live && setQ(r)).catch(() => live && setQ(null));
+    api.renewalQuote(plan, chosen).then((r) => live && setQ(r)).catch(() => live && setQ(null));
     return () => { live = false; };
-  }, [plan, sub]);
+  }, [plan, sub, chosen]);
 
   if (sub && sub.status === 'PENDING' && sub.is_renewal && sub.invoice) {
     return (
@@ -64,14 +66,23 @@ export default function RenewalPanel() {
   const eligible = q.eligible_old_cycle_points;
   const canRedeem = (mode === 'REAL' && q.can_redeem && inWindow) || (mode === 'SIMULATION' && q.can_simulate && inWindow);
   const price = q.new_plan_price_minor;
-  const body = { plan_code: plan, redeem: points > 0, expected_points: points > 0 ? points : null, expected_discount_minor: points > 0 ? q.hypothetical_discount_paise : null };
+  const maxUsable = q.max_points_usable ?? points;
+  const body = { plan_code: plan, redeem: points > 0, expected_points: points > 0 ? points : null, expected_discount_minor: points > 0 ? q.hypothetical_discount_paise : null, ...(points > 0 && chosen ? { points: chosen } : {}) };
+  const applyDraft = () => {
+    const n = Math.floor(Number(draft));
+    if (!Number.isFinite(n) || n < 1) { setDraft(String(points)); return; }
+    const clamped = Math.min(n, maxUsable);
+    setDraft(String(clamped));
+    setChosen(clamped === maxUsable ? null : clamped);
+  };
+  const removeDiscount = () => { setChosen(null); setDraft(''); setStep('view'); };
 
   async function run(fn, onOk) {
     setBusy(true);
     try { await fn(); onOk?.(); } catch (err) {
       showToast(err.message || 'Something went wrong. Please try again.');
       setStep('view');
-      api.renewalQuote(plan).then(setQ).catch(() => {});
+      api.renewalQuote(plan, chosen).then(setQ).catch(() => {});
     } finally { setBusy(false); }
   }
   const confirmReal = () => run(async () => {
@@ -101,7 +112,7 @@ export default function RenewalPanel() {
       </p>
       <div role="group" aria-label="Choose your next plan" style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
         {PLANS.map(([code, name]) => (
-          <button key={code} type="button" aria-pressed={plan === code} onClick={() => { setPlan(code); setStep('view'); setOutcome(null); }}
+          <button key={code} type="button" aria-pressed={plan === code} onClick={() => { setPlan(code); setStep('view'); setOutcome(null); setChosen(null); setDraft(''); }}
             style={{ padding: '9px 18px', borderRadius: 999, border: '1px solid rgba(53,26,78,0.25)', background: plan === code ? '#35194E' : 'transparent', color: plan === code ? '#fff' : '#35194E', fontWeight: 700, cursor: 'pointer' }}>{name}</button>
         ))}
       </div>
@@ -112,7 +123,7 @@ export default function RenewalPanel() {
           <p style={{ margin: '2px 0 0', fontSize: 22, fontWeight: 800, color: '#2B1740' }}>{formatInrMinor(price)}</p>
         </div>
         {canRedeem && step === 'view' && (
-          <button type="button" onClick={() => setStep('calc')} style={goldBtn(true)}>{mode === 'SIMULATION' ? 'Redeem Growth Points (simulation)' : 'Redeem Growth Points'}</button>
+          <button type="button" onClick={() => { setDraft(String(points)); setStep('calc'); }} style={goldBtn(true)}>{mode === 'SIMULATION' ? 'Redeem Growth Points (simulation)' : 'Redeem Growth Points'}</button>
         )}
       </div>
 
@@ -128,7 +139,18 @@ export default function RenewalPanel() {
         <div style={{ marginTop: 14 }}>
           <Row name="Eligible Growth Points available to redeem" value={`${pts(eligible)} points`} />
           <Row name="Most that can be applied to this invoice" value={`${pts(q.new_plan_redemption_ceiling_points)} points`} note={`15% of the ${q.new_plan} price · 10 points = ₹1`} />
-          <Row name="Growth Points you will use" value={`${pts(points)} points`} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, padding: '7px 0', borderBottom: '1px solid rgba(53,26,78,0.07)', flexWrap: 'wrap' }}>
+            <label htmlFor="rp-points" style={{ fontSize: 13.5, color: 'rgba(43,23,64,0.75)' }}>
+              Growth Points you will use
+              <span style={{ display: 'block', fontSize: 11.5, color: 'rgba(43,23,64,0.55)' }}>Choose 1 to {pts(maxUsable)}. The discount below updates when you leave the box or press Enter.</span>
+            </label>
+            <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input id="rp-points" type="number" inputMode="numeric" min={1} max={maxUsable} step={1} value={draft} disabled={busy}
+                onChange={(e) => setDraft(e.target.value)} onBlur={applyDraft} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); applyDraft(); } }}
+                style={{ width: 110, padding: '8px 10px', borderRadius: 10, border: '1px solid rgba(53,26,78,0.3)', fontSize: 14, fontWeight: 700, color: '#2B1740', textAlign: 'right' }} />
+              {chosen !== null && <button type="button" onClick={() => { setChosen(null); setDraft(String(maxUsable)); }} style={{ border: 'none', background: 'none', textDecoration: 'underline', cursor: 'pointer', color: '#35194E', fontSize: 12.5 }}>Use the most</button>}
+            </span>
+          </div>
           <Row name="Original subscription price" value={formatInrMinor(price)} />
           <Row name="Growth Points discount" value={`− ${formatInrMinor(q.hypothetical_discount_paise)}`} />
           <Row name="Points left after this renewal" value={pts(q.remaining_old_cycle_points)} note={q.remaining_old_cycle_points ? 'They expire when your renewal window closes.' : null} />
@@ -139,7 +161,7 @@ export default function RenewalPanel() {
               {mode === 'SIMULATION' ? `SIMULATION: you would use ${pts(points)} Growth Points for a ${formatInrMinor(q.hypothetical_discount_paise)} subscription discount.` : `You are using ${pts(points)} Growth Points for a ${formatInrMinor(q.hypothetical_discount_paise)} subscription discount.`}
             </p>
             <button type="button" disabled={busy} onClick={mode === 'SIMULATION' ? simulate : confirmReal} style={darkBtn}>{busy ? 'Working…' : mode === 'SIMULATION' ? 'Run simulation' : 'Confirm redemption'}</button>{' '}
-            <button type="button" disabled={busy} onClick={() => setStep('view')} style={{ border: 'none', background: 'none', textDecoration: 'underline', cursor: 'pointer', color: '#35194E' }}>Back</button>
+            <button type="button" disabled={busy} onClick={removeDiscount} style={{ border: 'none', background: 'none', textDecoration: 'underline', cursor: 'pointer', color: '#35194E' }}>Remove discount</button>
           </div>
         </div>
       )}

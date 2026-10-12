@@ -50,8 +50,11 @@ async def _plan_code_of(db: AsyncSession, term: dict) -> str:
 
 
 async def compute(db: AsyncSession, member_id: str, *, to_plan: str, new_price_minor: int, new_term_months: int, at: datetime,
-                  exclude_subscription_id: str | None = None, new_starts_at: datetime | None = None, from_plan: str | None = None, lot_filter=None) -> dict:
-    """The renewal calculation, with no writes. `at` is the moment the renewal invoice was raised."""
+                  exclude_subscription_id: str | None = None, new_starts_at: datetime | None = None, from_plan: str | None = None, lot_filter=None,
+                  requested_points: int | None = None) -> dict:
+    """The renewal calculation, with no writes. `at` is the moment the renewal invoice was raised.
+    `requested_points` (optional) is how many points the member CHOSE to use; it can only lower the amount, never raise it above the eligible
+    points or the cap. None = the most allowed (the original behaviour)."""
     at = rules.aware(at)
     cap_points = rules.redemption_cap_points(new_price_minor)
     out = {
@@ -88,6 +91,8 @@ async def compute(db: AsyncSession, member_id: str, *, to_plan: str, new_price_m
     lots = [l for l in await ledger.lots(db, member_id=member_id, now=at) if l.row.cycle_id == old.id and l.state == "AVAILABLE" and l.remaining > 0 and (lot_filter is None or lot_filter(l))]
     eligible = sum(l.remaining for l in lots)
     redeem = min(eligible, cap_points)
+    if requested_points is not None:
+        redeem = min(redeem, max(0, int(requested_points)))
     out.update(eligible_old_cycle_points=eligible, points_to_be_redeemed=redeem, remaining_old_cycle_points=eligible - redeem,
                hypothetical_discount_paise=rules.points_to_paise(redeem), hypothetical_amount_payable_paise=new_price_minor - rules.points_to_paise(redeem))
     need = redeem

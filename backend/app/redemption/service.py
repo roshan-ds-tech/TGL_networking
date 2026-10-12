@@ -144,12 +144,14 @@ async def _live_renewal(db: AsyncSession, old_id: str) -> Subscription | None:
     return await db.scalar(select(Subscription).where(Subscription.renews_subscription_id == old_id, Subscription.status.in_(("PENDING", "ACTIVE"))))
 
 
-async def quote(db: AsyncSession, user: User, plan_code: str, now: datetime | None = None, simulate: bool = False) -> dict:
+async def quote(db: AsyncSession, user: User, plan_code: str, now: datetime | None = None, simulate: bool = False, points: int | None = None) -> dict:
     """What renewing into `plan_code` would cost this member, with the points that would be used. No writes."""
     now = now or utcnow()
     plan = await _plan(db, plan_code)
-    calc = await renewal.compute(db, user.id, to_plan=plan.code, new_price_minor=plan.price_minor, new_term_months=plan.period_months, at=now, lot_filter=await _lot_filter(db, simulate))
+    calc = await renewal.compute(db, user.id, to_plan=plan.code, new_price_minor=plan.price_minor, new_term_months=plan.period_months, at=now, lot_filter=await _lot_filter(db, simulate),
+                                 requested_points=points)
     out = renewal.public(calc)
+    out["max_points_usable"] = min(calc["eligible_old_cycle_points"], calc["new_plan_redemption_ceiling_points"])
     old = await _renewed_term(db, user.id)
     cutoff, why = (parse_cutoff(settings.growth_points_demo_cutoff), "simulation") if simulate else await cutoff_status(db)
     # How many of the member's otherwise-usable old-cycle points are excluded because they were earned BEFORE the cutoff (shadow-period points).
@@ -174,7 +176,7 @@ def _fail(code: str, message: str, **extra) -> HTTPException:
 
 
 async def confirm(db: AsyncSession, user: User, plan_code: str, *, redeem: bool, expected_points: int | None, expected_discount_minor: int | None, now: datetime | None = None,
-                  simulate: bool = False) -> dict:
+                  simulate: bool = False, points: int | None = None) -> dict:
     """Create the renewal subscription and invoice (with the points discount when redeeming), in ONE transaction. The caller commits.
     simulate=True (synthetic demo members in development only) runs this exact code with the demo cutoff; the caller MUST roll back."""
     now = now or utcnow()
@@ -196,7 +198,8 @@ async def confirm(db: AsyncSession, user: User, plan_code: str, *, redeem: bool,
         if (await db.get(Plan, live.plan_id)).code != plan.code:
             raise _fail("renewal_in_progress", "You already have a renewal in progress for a different plan.")
         return await _result(db, live, replay=True)
-    calc = await renewal.compute(db, user.id, to_plan=plan.code, new_price_minor=plan.price_minor, new_term_months=plan.period_months, at=now, lot_filter=await _lot_filter(db, simulate))
+    calc = await renewal.compute(db, user.id, to_plan=plan.code, new_price_minor=plan.price_minor, new_term_months=plan.period_months, at=now, lot_filter=await _lot_filter(db, simulate),
+                                 requested_points=points)
     points = calc["points_to_be_redeemed"] if redeem else 0
     discount = rules.points_to_paise(points)
     if redeem and (expected_points != points or expected_discount_minor != discount):
@@ -227,6 +230,12 @@ async def confirm(db: AsyncSession, user: User, plan_code: str, *, redeem: bool,
                  after={"plan": plan.code, "price_minor": plan.price_minor, "period_months": plan.period_months, "status": "PENDING", "renews": old.id})
     audit.record(db, actor=user, action="invoice.issued", resource_type="invoice", resource_id=invoice.id,
                  after={"number": invoice.number, "amount_due_minor": invoice.amount_due_minor, "discount_minor": discount, "points_redeemed": points, "status": "ISSUED"})
+    if points and not simulate:
+        # Re-check EVERY gate now, under the member lock and just before the redemption row is written: an emergency stop (or any gate closing)
+        # committed after the first check above must stop this redemption too. The whole transaction is rolled back by the caller on this error.
+        ok, why = await allowed(db, user)
+        if not ok:
+            raise _fail("redemption_unavailable", "Using Growth Points is not available.", reason=why)
     if points:
         await reward_engine.ensure_rule_version(db)
         redemption = GrowthPointRedemption(

@@ -340,7 +340,12 @@ def body() -> int:
     fg = case("growth", "fg")
     qf = quote(fg, "connect")
     forged = [fg["c"].post("/api/v1/renewal/confirm", json={"plan_code": "connect", "redeem": True, **extra}, headers=H(fg["c"])).status_code
-              for extra in ({"points": 99999}, {"discount_minor": 90000}, {"member_id": c0["mid"]}, {"invoice_id": "x"}, {"amount_due_minor": 1}, {"price": 1})]
+              for extra in ({"points_redeemed": 99999}, {"discount_minor": 90000}, {"member_id": c0["mid"]}, {"invoice_id": "x"}, {"amount_due_minor": 1}, {"price": 1})]
+    clear()
+    # `points` IS a field now (the member may choose fewer points): an oversized one, without the figures the member saw, is refused and writes nothing
+    big_points = fg["c"].post("/api/v1/renewal/confirm", json={"plan_code": "connect", "redeem": True, "points": 99999}, headers=H(fg["c"]))
+    check("FORGERY: an oversized chosen `points` without the quoted figures is refused (calculation_changed): the server clamps and re-checks, it never trusts the client",
+          big_points.status_code == 409 and big_points.json()["detail"]["code"] == "calculation_changed" and scalar("select count(*) from growth_point_redemptions where member_id = :m", m=fg["mid"]) == 0, big_points.text[:200])
     clear()
     badcalc = fg["c"].post("/api/v1/renewal/confirm", json={"plan_code": "connect", "redeem": True, "expected_points": 99999, "expected_discount_minor": 999990}, headers=H(fg["c"]))
     clear()
@@ -349,7 +354,7 @@ def body() -> int:
     anon = new_client().post("/api/v1/renewal/confirm", json={"plan_code": "connect", "redeem": False})
     clear()
     badplan = fg["c"].post("/api/v1/renewal/confirm", json={"plan_code": "platinum", "redeem": False}, headers=H(fg["c"]))
-    check("FORGERY: extra fields (points, discount, member, invoice, amount, price) are rejected outright; a figure the member did not see changes nothing; no CSRF, no session and an unknown plan are refused",
+    check("FORGERY: extra fields (points_redeemed, discount, member, invoice, amount, price) are rejected outright; a figure the member did not see changes nothing; no CSRF, no session and an unknown plan are refused",
           set(forged) == {422} and badcalc.status_code == 409 and badcalc.json()["detail"]["code"] == "calculation_changed" and nocsrf.status_code == 403 and anon.status_code == 401 and badplan.status_code == 422
           and scalar("select count(*) from growth_point_redemptions where member_id = :m", m=fg["mid"]) == 0)
     check("OLD ROUTE: POST /api/v1/growth-points/redeem is still a permanent refusal", (lambda r: r.status_code == 409 and r.json()["detail"]["code"] == "redemption_disabled")((clear(), early["c"].post("/api/v1/growth-points/redeem", json={"points": 100}, headers=H(early["c"])))[1]))
@@ -409,23 +414,91 @@ def body() -> int:
     db(mk_ops)
     assert ops.post("/api/auth/login", json={"email": "ops2@tglseason.com", "password": PASSWORD}).status_code == 200
     OH = {"X-CSRF-Token": ops.cookies.get("tgl_csrf") or ""}
-    check("KILL SWITCH: an ordinary admin, a member and an anonymous visitor can not use it", ops.post("/api/admin/growth-points/redemption/kill", json={"reason": "Trying"}, headers=OH).status_code == 403
-          and ks["c"].post("/api/admin/growth-points/redemption/kill", json={"reason": "Trying"}, headers=H(ks["c"])).status_code in (401, 403) and new_client().post("/api/admin/growth-points/redemption/kill", json={"reason": "x y z"}).status_code in (401, 403)
-          and admin.post("/api/admin/growth-points/redemption/kill", json={"reason": "No token"}).status_code == 403)
-    before_cnt = (scalar("select count(*) from growth_point_redemptions"), scalar("select coalesce(sum(discount_minor), 0) from invoices"), scalar("select count(*) from growth_point_ledger"), scalar("select coalesce(sum(total_points), 0) from growth_point_balances"))
-    kill = admin.post("/api/admin/growth-points/redemption/kill", json={"reason": "Rehearsal of the emergency stop"}, headers=AH)
+    KILL, RESUME = "/api/admin/growth-points/redemption/kill", "/api/admin/growth-points/redemption/resume"
+    STOP_OK = {"reason": "Rehearsal of the emergency stop", "confirm": "STOP REDEMPTION"}
+    check("EMERGENCY STOP: a member, an anonymous visitor and a request without the admin CSRF token are refused, and change nothing",
+          ks["c"].post(KILL, json=STOP_OK, headers=H(ks["c"])).status_code in (401, 403) and new_client().post(KILL, json=STOP_OK).status_code in (401, 403)
+          and admin.post(KILL, json=STOP_OK).status_code == 403 and scalar("select count(*) from growth_point_controls") == 0)
+    bad = [admin.post(KILL, json=b, headers=AH).status_code for b in ({"reason": "Rehearsal of the emergency stop"}, {"reason": "Rehearsal of the emergency stop", "confirm": "stop"},
+                                                                       {"reason": "Rehearsal of the emergency stop", "confirm": "STOP REDEMPTIONS"}, {"reason": "short", "confirm": "STOP REDEMPTION"}, {"confirm": "STOP REDEMPTION"})]
+    check("EMERGENCY STOP: a missing or wrong typed phrase, or a missing / too short reason, is refused (422) and stops nothing", bad == [422] * 5 and scalar("select count(*) from growth_point_controls") == 0
+          and admin.get("/api/admin/growth-points/redemption/state").json()["kill_switch_on"] is False, str(bad))
+    before_cnt = (scalar("select count(*) from growth_point_redemptions"), scalar("select coalesce(sum(discount_minor), 0) from invoices"), scalar("select count(*) from growth_point_ledger"),
+                  scalar("select coalesce(sum(total_points), 0) from growth_point_balances"), scalar("select count(*) from invoices"), scalar("select count(*) from payments"),
+                  scalar("select count(*) from subscriptions"), scalar("select count(*) from growth_point_redemption_epoch"))
+
+    # IN-FLIGHT: the stop is committed AFTER the member's request passed the first check (simulated by making that first check say "open").
+    # The re-check under the member lock, just before the discount is written, must refuse it and the whole renewal must roll back.
+    real_allowed, calls = service.allowed, {"n": 0}
+    async def first_check_passes(db_, user_):
+        calls["n"] += 1
+        return (True, "open") if calls["n"] == 1 else await real_allowed(db_, user_)
+    q_inflight = quote(ks, "connect")
+    kill = ops.post(KILL, json={"reason": "Ordinary admin presses the emergency stop", "confirm": " STOP REDEMPTION "}, headers=OH)
+    service.allowed = first_check_passes
+    try:
+        rin = confirm(ks, "connect", q=q_inflight)
+    finally:
+        service.allowed = real_allowed
+    check("EMERGENCY STOP: an ORDINARY signed-in admin may press it (stopping is the safe direction); the typed phrase is checked on the server", kill.status_code == 200 and kill.json()["kill_switch_on"] is True
+          and kill.json()["already_stopped"] is False, kill.text[:200])
+    check("IN-FLIGHT: a redemption that passed the first check before the stop is refused at the re-check under the member lock; no subscription, invoice or redemption is left behind",
+          calls["n"] == 2 and rin.status_code == 409 and rin.json()["detail"]["reason"] == "kill_switch" and scalar("select count(*) from growth_point_redemptions where member_id = :m", m=ks["mid"]) == 0
+          and scalar("select count(*) from subscriptions where user_id = :m and status = 'PENDING'", m=ks["mid"]) == 0, rin.text[:200])
     rk = confirm(ks, "connect", q=quote(ks, "connect"))
-    check("KILL SWITCH: the programme owner stops NEW redemptions at once (no restart); the attempt fails safely with the reason", kill.status_code == 200 and rk.status_code == 409 and rk.json()["detail"]["reason"] == "kill_switch"
-          and scalar("select count(*) from growth_point_redemptions where member_id = :m", m=ks["mid"]) == 0)
-    check("KILL SWITCH: nothing already done changes: redemptions, invoice discounts, ledger rows and balances are exactly as before", before_cnt == (scalar("select count(*) from growth_point_redemptions"), scalar("select coalesce(sum(discount_minor), 0) from invoices"),
-          scalar("select count(*) from growth_point_ledger"), scalar("select coalesce(sum(total_points), 0) from growth_point_balances")))
+    check("EMERGENCY STOP: new redemptions are refused at once (no restart) with the reason", rk.status_code == 409 and rk.json()["detail"]["reason"] == "kill_switch")
+    again = admin.post(KILL, json={"reason": "Pressed a second time by the owner", "confirm": "STOP REDEMPTION"}, headers=AH)
+    check("EMERGENCY STOP: pressing it again is safe and idempotent: still stopped, no second control row, but the attempt is audited", again.status_code == 200 and again.json()["already_stopped"] is True
+          and scalar("select count(*) from growth_point_controls where value = 'on'") == 1 and scalar("select count(*) from audit_log where action = 'growth_points.kill_switch_on'") == 2)
+    after_cnt = (scalar("select count(*) from growth_point_redemptions"), scalar("select coalesce(sum(discount_minor), 0) from invoices"), scalar("select count(*) from growth_point_ledger"),
+                 scalar("select coalesce(sum(total_points), 0) from growth_point_balances"), scalar("select count(*) from invoices"), scalar("select count(*) from payments"),
+                 scalar("select count(*) from subscriptions"), scalar("select count(*) from growth_point_redemption_epoch"))
+    check("EMERGENCY STOP: it deletes and reverses nothing: redemptions, invoice discounts, invoices, payments, subscriptions, ledger rows, balances and the cutoff are exactly as before",
+          before_cnt == after_cnt, f"{before_cnt} -> {after_cnt}")
+    st_ = admin.get("/api/admin/growth-points/redemption/state").json()
+    check("EMERGENCY STOP: the state shows it, who pressed it, when and why, with the history", st_["kill_switch_on"] is True and st_["last_stop"]["by"] == "ops2@tglseason.com"
+          and st_["last_stop"]["reason"] == "Ordinary admin presses the emergency stop" and [h["action"] for h in st_["history"]] == ["STOPPED"], str(st_.get("last_stop")))
+    async def fresh_instance_sees_stop(_s):
+        from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+        from sqlalchemy.pool import NullPool
+        eng = create_async_engine(os.environ["DATABASE_URL"], poolclass=NullPool)
+        try:
+            async with async_sessionmaker(eng)() as other:
+                return await service.killed(other)
+        finally:
+            await eng.dispose()
+    check("EMERGENCY STOP: it is stored in the database, so a restarted process or a second instance (a separate engine here) sees it", db(fresh_instance_sees_stop) is True)
     plain_ks = confirm(ks, "connect", redeem=False)
-    check("KILL SWITCH: a plain renewal (no points) still works, at full price; members keep every point", plain_ks.status_code == 201 and plain_ks.json()["amount_due_minor"] == 300000 and scalar("select total_points from growth_point_balances where member_id = :m", m=ks["mid"]) == 6000)
-    check("KILL SWITCH: it is recorded (audit and an append-only control row) and the state endpoint shows it", scalar("select count(*) from audit_log where action = 'growth_points.kill_switch_on'") == 1 and scalar("select count(*) from growth_point_controls where value = 'on'") == 1
-          and admin.get("/api/admin/growth-points/redemption/state").json()["kill_switch_on"] is True and sql_fails("update growth_point_controls set value = 'off'") and sql_fails("delete from growth_point_controls"))
-    resume = admin.post("/api/admin/growth-points/redemption/resume", json={"reason": "Rehearsal over, resuming"}, headers=AH)
+    check("EMERGENCY STOP: a plain renewal (no points) still works, at full price; members keep every point", plain_ks.status_code == 201 and plain_ks.json()["amount_due_minor"] == 300000 and scalar("select total_points from growth_point_balances where member_id = :m", m=ks["mid"]) == 6000)
+    check("EMERGENCY STOP: recorded in the audit log and an append-only control row (UPDATE and DELETE refused)", scalar("select count(*) from audit_log where action = 'growth_points.kill_switch_on'") == 2
+          and sql_fails("update growth_point_controls set value = 'off'") and sql_fails("delete from growth_point_controls"))
+    r_ops = ops.post(RESUME, json={"reason": "Ordinary admin tries to resume", "confirm": "RESUME REDEMPTION"}, headers=OH)
+    r_phrase = admin.post(RESUME, json={"reason": "Owner resumes with the stop phrase", "confirm": "STOP REDEMPTION"}, headers=AH)
+    check("RESUME is a SEPARATE action: an ordinary admin can not (403) and the owner must type its own phrase (422); the stop stays on", r_ops.status_code == 403 and r_phrase.status_code == 422
+          and admin.get("/api/admin/growth-points/redemption/state").json()["kill_switch_on"] is True)
+    resume = admin.post(RESUME, json={"reason": "Rehearsal over, resuming", "confirm": "RESUME REDEMPTION"}, headers=AH)
     ks2 = case("growth", "ks2")
-    check("KILL SWITCH: resuming (programme owner only) opens the gate again", resume.status_code == 200 and confirm(ks2, "connect", q=quote(ks2, "connect")).status_code == 201)
+    check("RESUME: the programme owner lifts it; the other gates still decide (here they are open, so a redemption works again)", resume.status_code == 200 and resume.json()["kill_switch_on"] is False
+          and confirm(ks2, "connect", q=quote(ks2, "connect")).status_code == 201)
+
+    # ======================================================================================== 9b. THE MEMBER CHOOSES HOW MANY POINTS
+    pc = case("growth", "pc")
+    q500 = pc["c"].get("/api/v1/renewal/quote", params={"plan_code": "connect", "points": 500}).json()
+    check("CHOSEN POINTS: a 500-point quote is a Rs50 discount (10 points = Rs1), payable = price - Rs50, and the most usable is shown",
+          q500["points_to_be_redeemed"] == 500 and q500["hypothetical_discount_paise"] == 5000 and q500["hypothetical_amount_payable_paise"] == 300000 - 5000 and q500["max_points_usable"] == 4500, str({k: q500.get(k) for k in ("points_to_be_redeemed", "hypothetical_discount_paise", "max_points_usable")}))
+    qbig = pc["c"].get("/api/v1/renewal/quote", params={"plan_code": "connect", "points": 999999}).json()
+    check("CHOSEN POINTS: asking for more than allowed is clamped by the server to the 15% cap (4,500 points = Rs450 on Connect), never above", qbig["points_to_be_redeemed"] == 4500 and qbig["hypothetical_discount_paise"] == 45000)
+    check("CHOSEN POINTS: 0 or a negative amount is refused (422)", pc["c"].get("/api/v1/renewal/quote", params={"plan_code": "connect", "points": 0}).status_code == 422
+          and pc["c"].get("/api/v1/renewal/quote", params={"plan_code": "connect", "points": -5}).status_code == 422)
+    forged = confirm(pc, "connect", q=q500, points=600)
+    check("CHOSEN POINTS: confirming a different amount than the one quoted is refused (calculation_changed); nothing is written", forged.status_code == 409 and forged.json()["detail"]["code"] == "calculation_changed"
+          and scalar("select count(*) from growth_point_redemptions where member_id = :m", m=pc["mid"]) == 0, forged.text[:200])
+    bal_before = scalar("select total_points from growth_point_balances where member_id = :m", m=pc["mid"])
+    r500 = confirm(pc, "connect", q=q500, points=500)
+    inv = rows("select discount_minor, points_redeemed, amount_due_minor from invoices where id = (select invoice_id from growth_point_redemptions where member_id = :m)", m=pc["mid"])
+    check("CHOSEN POINTS: confirming 500 points writes exactly 500 points, a Rs50 discount and a matching invoice (list - discount = amount due), and takes exactly 500 from the balance",
+          r500.status_code == 201 and inv and tuple(inv[0]) == (5000, 500, 295000) and scalar("select points from growth_point_redemptions where member_id = :m", m=pc["mid"]) == 500
+          and scalar("select total_points from growth_point_balances where member_id = :m", m=pc["mid"]) == bal_before - 500, f"{r500.text[:160]} {inv}")
     open_gates("internal")
     stg = case("growth", "stg")
     r_int = confirm(stg, "connect", q=quote(stg, "connect"))

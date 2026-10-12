@@ -19,7 +19,7 @@ from .. import audit
 from ..database import get_db
 from ..config import settings
 from ..storage import is_demo_photo, read_profile_photo
-from ..models import Admin, AuditLog, DealClosure, GrowthPointFlag, GrowthPointLedger, GrowthPointRedemption, GrowthPointRedemptionEpoch, GrowthPointRenewal, User, utcnow
+from ..models import Admin, AuditLog, DealClosure, GrowthPointControl, GrowthPointFlag, GrowthPointLedger, GrowthPointRedemption, GrowthPointRedemptionEpoch, GrowthPointRenewal, User, utcnow
 from ..redemption import finance as redemption_finance
 from ..redemption import service as redemption_service
 from ..rewards import analytics, engine, events, firewall, fraud, gates, jobs, ledger, reconcile, renewal, review, rules, simulation
@@ -168,31 +168,67 @@ async def record_epoch(payload: EpochIn, admin: Admin = Depends(get_current_admi
     return {"cutoff_at": cutoff.isoformat(), "note": "Recorded. Set GROWTH_POINTS_REDEEMABLE_FROM to this exact instant for it to take effect; redemption itself stays gated."}
 
 
+STOP_PHRASE = "STOP REDEMPTION"
+RESUME_PHRASE = "RESUME REDEMPTION"
+
+
+class EmergencyStopIn(BaseModel):
+    reason: str = Field(min_length=10, max_length=240)
+    confirm: str = Field(max_length=40)                 # the administrator must TYPE the phrase: checked here, never trusted from the UI
+
+
+async def _control_history(db: AsyncSession, limit: int = 20) -> list[dict]:
+    rows = (await db.execute(
+        select(GrowthPointControl, Admin.email).outerjoin(Admin, Admin.id == GrowthPointControl.actor_id)
+        .where(GrowthPointControl.key == redemption_service.KILL_KEY)
+        .order_by(GrowthPointControl.created_at.desc(), GrowthPointControl.id.desc()).limit(limit))).all()
+    return [{"at": c.created_at, "action": "STOPPED" if c.value == "on" else "RESUMED", "by": email, "reason": c.reason} for c, email in rows]
+
+
 @router.get("/redemption/state")
 async def redemption_state(_: Admin = Depends(get_current_admin), db: AsyncSession = Depends(get_db)) -> dict:
     cutoff, why = await redemption_service.cutoff_status(db)
-    return {"effective_cutoff": cutoff, "cutoff_status": why, "recorded_epoch": await db.scalar(select(GrowthPointRedemptionEpoch.cutoff_at).limit(1)),"flag_enabled": firewall.redemption_enabled(), "kill_switch_on": await redemption_service.killed(db), "rollout_stage": settings.growth_points_rollout_stage,
-            "redeemable_from": settings.growth_points_redeemable_from or None, "approvals_recorded": sorted(settings.growth_points_approval_codes())}
+    history = await _control_history(db)
+    last_stop = next((h for h in history if h["action"] == "STOPPED"), None)
+    return {"effective_cutoff": cutoff, "cutoff_status": why, "recorded_epoch": await db.scalar(select(GrowthPointRedemptionEpoch.cutoff_at).limit(1)),
+            "flag_enabled": firewall.redemption_enabled(), "kill_switch_on": await redemption_service.killed(db), "rollout_stage": settings.growth_points_rollout_stage,
+            "redeemable_from": settings.growth_points_redeemable_from or None, "approvals_recorded": sorted(settings.growth_points_approval_codes()),
+            "last_stop": last_stop, "history": history, "stop_phrase": STOP_PHRASE, "resume_phrase": RESUME_PHRASE}
 
 
 @router.post("/redemption/kill")
-async def kill_switch(payload: ReasonIn, admin: Admin = Depends(get_current_admin), __: None = Depends(require_csrf), db: AsyncSession = Depends(get_db)) -> dict:
-    """EMERGENCY: stop NEW redemptions now, no restart. Existing invoices, redemptions, points and history are untouched. Programme owner only."""
-    _need_programme_owner(admin)
-    await redemption_service.set_kill(db, True, admin.id, payload.reason)
-    audit.record(db, actor=admin, action="growth_points.kill_switch_on", resource_type="growth_points", resource_id=None, reason=payload.reason)
+async def kill_switch(payload: EmergencyStopIn, admin: Admin = Depends(get_current_admin), __: None = Depends(require_csrf), db: AsyncSession = Depends(get_db)) -> dict:
+    """EMERGENCY STOP & RESET REDEMPTION: block NEW redemptions now, on every instance, with no restart (the switch is a database row, read on every
+    redemption and re-read under the member lock just before a discount is written). It deletes nothing: points, ledgers, redemptions, invoices,
+    payments, subscriptions, the cutoff and the audit log are untouched, and nothing already invoiced is reversed. Stopping is the SAFE direction, so
+    any signed-in admin may press it; lifting it is a separate, programme-owner-only action. Pressing it again while stopped changes nothing."""
+    if payload.confirm.strip() != STOP_PHRASE:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, f"Type {STOP_PHRASE} exactly to confirm.")
+    already = await redemption_service.killed(db)
+    if not already:
+        await redemption_service.set_kill(db, True, admin.id, payload.reason)
+    audit.record(db, actor=admin, action="growth_points.kill_switch_on", resource_type="growth_points", resource_id=None,
+                 before={"kill_switch_on": already}, after={"kill_switch_on": True, "already_stopped": already}, reason=payload.reason)
     await db.commit()
-    return {"kill_switch_on": True}
+    if not await redemption_service.killed(db):                      # read back what is now committed: never report a stop that did not happen
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "The emergency stop could not be confirmed. Redemption may still be open: try again.")
+    return {"kill_switch_on": True, "already_stopped": already, "stopped_at": (await _control_history(db, 1))[0]["at"]}
 
 
 @router.post("/redemption/resume")
-async def kill_switch_resume(payload: ReasonIn, admin: Admin = Depends(get_current_admin), __: None = Depends(require_csrf), db: AsyncSession = Depends(get_db)) -> dict:
-    """Lift the kill switch (the other gates still apply). Programme owner only."""
+async def kill_switch_resume(payload: EmergencyStopIn, admin: Admin = Depends(get_current_admin), __: None = Depends(require_csrf), db: AsyncSession = Depends(get_db)) -> dict:
+    """Lift the emergency stop. A separate action from the stop: programme owner only, its own typed phrase and reason. It opens nothing by itself:
+    the flag, all approvals, Gate A, the rollout stage and the recorded cutoff are still checked on every redemption."""
     _need_programme_owner(admin)
+    if payload.confirm.strip() != RESUME_PHRASE:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, f"Type {RESUME_PHRASE} exactly to confirm.")
+    if not await redemption_service.killed(db):
+        return {"kill_switch_on": False, "already_resumed": True}
     await redemption_service.set_kill(db, False, admin.id, payload.reason)
-    audit.record(db, actor=admin, action="growth_points.kill_switch_off", resource_type="growth_points", resource_id=None, reason=payload.reason)
+    audit.record(db, actor=admin, action="growth_points.kill_switch_off", resource_type="growth_points", resource_id=None,
+                 before={"kill_switch_on": True}, after={"kill_switch_on": False}, reason=payload.reason)
     await db.commit()
-    return {"kill_switch_on": False}
+    return {"kill_switch_on": await redemption_service.killed(db), "already_resumed": False}
 
 
 @router.get("/gates")

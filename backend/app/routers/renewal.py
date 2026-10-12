@@ -6,7 +6,7 @@ only while the member preview is on or redemption is open; otherwise they get "c
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,16 +31,18 @@ class RenewalConfirm(BaseModel):
     redeem: bool = False
     expected_points: int | None = Field(default=None, ge=0, le=1_000_000)           # what the member SAW; the server recomputes everything
     expected_discount_minor: int | None = Field(default=None, ge=0, le=100_000_000)
+    points: int | None = Field(default=None, ge=1, le=1_000_000)                     # how many points the member chose; the server clamps it to what is allowed
 
 
 @router.get("/renewal/quote")
-async def renewal_quote(plan_code: str, user: User = Depends(require_verified_user), db: AsyncSession = Depends(get_db)) -> dict:
+async def renewal_quote(plan_code: str, points: int | None = Query(default=None, ge=1, le=1_000_000), user: User = Depends(require_verified_user),
+                        db: AsyncSession = Depends(get_db)) -> dict:
     """The exact calculation the member will confirm. REAL when redemption is open for them, otherwise a labelled preview, otherwise nothing."""
     ok, why = await service.allowed(db, user)
     sim = (not ok) and service.simulation_allowed(user)
     if not ok and not sim and not firewall.member_preview_enabled():
         return {"enabled": False, "message": NOT_ACTIVE}
-    q = await service.quote(db, user, plan_code, simulate=sim)
+    q = await service.quote(db, user, plan_code, simulate=sim, points=points)
     q.update(enabled=True, mode="REAL" if ok else ("SIMULATION" if sim else "PREVIEW"), applies_to_invoice=ok, can_redeem=bool(ok and q["points_to_be_redeemed"] > 0), terms=TERMS,
              explanation="These points were earned during your previous subscription cycle and are being used against this renewal. They do not count toward your new cycle's earning limit.")
     if sim:
@@ -53,7 +55,8 @@ async def renewal_quote(plan_code: str, user: User = Depends(require_verified_us
 @router.post("/renewal/confirm", status_code=status.HTTP_201_CREATED)
 async def renewal_confirm(payload: RenewalConfirm, user: User = Depends(require_verified_user), __: None = Depends(require_customer_csrf), db: AsyncSession = Depends(get_db)) -> dict:
     enforce(f"renew:{user.id}", 10, 3600, "Too many attempts. Please try again later.")
-    result = await service.confirm(db, user, payload.plan_code, redeem=payload.redeem, expected_points=payload.expected_points, expected_discount_minor=payload.expected_discount_minor)
+    result = await service.confirm(db, user, payload.plan_code, redeem=payload.redeem, expected_points=payload.expected_points, expected_discount_minor=payload.expected_discount_minor,
+                                   points=payload.points)
     await db.commit()
     return result
 
@@ -66,7 +69,8 @@ async def renewal_simulate(payload: RenewalConfirm, user: User = Depends(require
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found")
     enforce(f"renew-sim:{user.id}", 30, 3600, "Too many attempts. Please try again later.")
     try:
-        result = await service.confirm(db, user, payload.plan_code, redeem=payload.redeem, expected_points=payload.expected_points, expected_discount_minor=payload.expected_discount_minor, simulate=True)
+        result = await service.confirm(db, user, payload.plan_code, redeem=payload.redeem, expected_points=payload.expected_points, expected_discount_minor=payload.expected_discount_minor,
+                                       simulate=True, points=payload.points)
     finally:
         await db.rollback()                                               # unconditionally: a simulation is never committed
     return {"simulated": True, "applied": False, "points_would_be_used": result["points_redeemed"], "discount_minor": result["growth_points_discount_minor"],
