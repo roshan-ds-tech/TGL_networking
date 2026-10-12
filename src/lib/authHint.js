@@ -62,3 +62,10 @@ export const getAuthHint = read;
 // The prerendered page and the first hydration pass have no storage: they
 // must agree with each other, so the server snapshot is always "unknown".
 export const getServerAuthHint = () => '';
+
+// Who is signed in, for this tab only (never persisted). Set whenever the API
+// returns the account, so shared widgets can tell "my" side of a relationship
+// without every page passing the id down.
+let currentUserId = null;
+export const setCurrentUserId = (id) => { currentUserId = id || null; };
+export const getCurrentUserId = () => currentUserId;

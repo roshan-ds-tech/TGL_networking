@@ -13,17 +13,28 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from sqlalchemy import text
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DBAPIError, IntegrityError
 
 from .config import settings
 from .observability import timing_middleware
 from . import http_client, legacy_sync, outbox
-from .database import Base, engine, lock_down_postgres, sync_schema
+from .database import Base, SessionLocal, engine, install_audit_triggers, install_community_triggers, install_ledger_triggers, lock_down_postgres, sync_schema
 from .routers import admin as admin_router
 from .routers import auth as auth_router
 from .routers import customer as customer_router
+from .routers import referrals as referrals_router
+from .routers import closures as closures_router
+from .routers import admin_referrals as admin_referrals_router
+from .routers import subscriptions as subscriptions_router
+from .routers import growth_points as growth_points_router
+from .routers import admin_growth_points as admin_growth_points_router
+from .routers import renewal as renewal_router
+from .routers import community as community_router
+from .routers import admin_community as admin_community_router
+from . import rewards  # noqa: F401  (registers the shadow-ledger and financial-write guards)
 from .routers import public as public_router
 from .storage import init_storage
+from .subscriptions import ensure_default_plans
 
 logger = logging.getLogger("tgl")
 # One plain line per event on stdout (Render captures it). Uvicorn configures
@@ -51,7 +62,13 @@ async def lifespan(_: FastAPI):
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
             await conn.run_sync(sync_schema)
+            await conn.run_sync(install_audit_triggers)
+            await conn.run_sync(install_ledger_triggers)
+            await conn.run_sync(install_community_triggers)
             await conn.run_sync(lock_down_postgres)
+        async with SessionLocal() as db:
+            await ensure_default_plans(db)  # dev/tests only: production gets the plans from migration 0008
+            await db.commit()
     outbox.start()  # sends queued emails in the background (outbox.py)
     legacy_sync.start()  # mirrors legacy (PythonAnywhere) registrations, if configured
     yield
@@ -187,6 +204,19 @@ async def integrity_error_handler(request: Request, exc: IntegrityError):
     return JSONResponse(status_code=409, content={"detail": "This was already submitted. Please refresh and try again."})
 
 
+@app.exception_handler(DBAPIError)
+async def database_error_handler(request: Request, exc: DBAPIError):
+    # SQLSTATE class 22 = "data exception": the client sent a value the database cannot store (PostgreSQL
+    # rejects a NUL character in text, an out-of-range number, ...). SQLite stores such values, so only
+    # Postgres shows it; it is the client's fault, not a server fault.
+    cause = getattr(exc.orig, "__cause__", None) or exc.orig
+    if str(getattr(cause, "sqlstate", "") or "").startswith("22"):
+        logger.warning("Unstorable value on %s %s", request.method, request.url.path)
+        return JSONResponse(status_code=422, content={"detail": "The request contains a value that cannot be stored."})
+    logger.exception("Database error on %s %s", request.method, request.url.path)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+
+
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
     # Log the detail server-side; never leak stack traces to the client.
@@ -198,6 +228,16 @@ app.include_router(auth_router.router)
 app.include_router(public_router.router)
 app.include_router(admin_router.router)
 app.include_router(customer_router.router)
+app.include_router(referrals_router.router)
+app.include_router(closures_router.router)
+app.include_router(subscriptions_router.router)
+app.include_router(growth_points_router.router)
+app.include_router(admin_growth_points_router.router)
+app.include_router(renewal_router.router)
+app.include_router(subscriptions_router.admin_router)
+app.include_router(admin_referrals_router.router)
+app.include_router(community_router.router)
+app.include_router(admin_community_router.router)
 
 
 @app.get("/api/health", tags=["ops"])

@@ -102,3 +102,37 @@ def _code_html(heading: str, lede: str, code: str, expires_minutes: int) -> str:
         f"This code expires in {expires_minutes} minutes. If you did not request this, "
         "you can ignore this email.</p></div>"
     )
+
+
+def referral_received_email(
+    *, referrer: str, referrer_business: str | None, prospect: str, urgency: str,
+    intro: str, summary: str, link: str,
+) -> tuple[str, str, str]:
+    """Heads-up for the member receiving a referral. Carries the headline only:
+    the prospect's phone/email stay behind the member's login."""
+    from html import escape
+
+    who = f"{referrer} ({referrer_business})" if referrer_business else referrer
+    subject = f"{referrer} sent you a referral on TGL"
+    rows = "".join(
+        f'<tr><td style="padding:4px 12px 4px 0;color:#8a8a8a;font-size:13px;">{escape(k)}</td>'
+        f'<td style="padding:4px 0;color:#2B1740;font-size:13.5px;font-weight:600;">{escape(v)}</td></tr>'
+        for k, v in (("Prospect", prospect), ("Timing", urgency), ("Introduction", intro))
+    )
+    html = (
+        '<div style="font-family:-apple-system,Helvetica,Arial,sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;">'
+        '<h2 style="margin:0 0 12px;color:#2B1740;">You have a new referral</h2>'
+        f'<p style="margin:0 0 16px;color:#4a4a4a;font-size:14px;">{escape(who)} referred a business opportunity to you.</p>'
+        f'<table style="margin:0 0 16px;border-collapse:collapse;">{rows}</table>'
+        f'<p style="margin:0 0 20px;padding:12px 14px;border-left:3px solid #C08D2E;background:#FBF3E1;color:#2B1740;font-size:14px;line-height:1.5;">{escape(summary)}</p>'
+        f'<a href="{escape(link)}" style="display:inline-block;padding:14px 24px;border-radius:999px;background:#C08D2E;'
+        'color:#22103A;font-weight:700;text-decoration:none;">View referral</a>'
+        '<p style="margin:20px 0 0;color:#8a8a8a;font-size:12.5px;">Sign in to see the prospect\'s contact details '
+        "and accept or decline the referral.</p></div>"
+    )
+    text = (
+        f"{who} referred a business opportunity to you on TGL.\n\n"
+        f"Prospect: {prospect}\nTiming: {urgency}\nIntroduction: {intro}\n\n{summary}\n\n"
+        f"View it (sign in required): {link}"
+    )
+    return subject, html, text

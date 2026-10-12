@@ -1,4 +1,4 @@
-import { setAuthHint } from './authHint';
+import { setAuthHint, setCurrentUserId } from './authHint';
 import { API_BASE, WAKING_STATUSES, markAwake, markMaybeAsleep, wakeBackend } from './apiBase';
 
 const REQUEST_TIMEOUT_MS = 20000;
@@ -96,6 +96,8 @@ async function request(path, options = {}) {
     let message = res.status >= 500 ? 'Something went wrong on our side. Please try again in a moment.' : 'Request failed.';
     if (typeof detail === 'string') {
       message = detail;
+    } else if (detail && !Array.isArray(detail) && typeof detail.message === 'string') {
+      message = detail.message; // structured conflicts, e.g. { code: 'duplicate_referral', message, ... }
     } else if (Array.isArray(detail) && detail.length) {
       // FastAPI/Pydantic validation errors: [{field, message}, ...]
       message = detail.map((d) => d.message || d.msg).filter(Boolean).join(' ') || message;
@@ -108,10 +110,10 @@ async function request(path, options = {}) {
 export const api = {
   signup: (details) => request('/api/v1/auth/register', { method: 'POST', body: JSON.stringify(details) }),
   login: (email, password) => request('/api/v1/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }).then((r) => { setAuthHint(true); return r; }),
-  logout: () => request('/api/v1/auth/logout', { method: 'POST' }).finally(() => setAuthHint(false)),
+  logout: () => request('/api/v1/auth/logout', { method: 'POST' }).finally(() => { setAuthHint(false); setCurrentUserId(null); }),
   me: () => request('/api/v1/auth/me'),
   // 200 either way: { authenticated, user? }. For pages that work signed out.
-  session: () => request('/api/v1/auth/session').then((r) => { setAuthHint(!!r?.authenticated, r?.user ? r.user.photo_url : undefined); return r; }),
+  session: () => request('/api/v1/auth/session').then((r) => { setAuthHint(!!r?.authenticated, r?.user ? r.user.photo_url : undefined); setCurrentUserId(r?.user?.id); return r; }),
   // Full status when signed in, null when not — without a 401 round trip.
   optionalStatus: async () => ((await api.session())?.authenticated ? api.status() : null),
   verifyEmail: (token) => {
@@ -125,7 +127,7 @@ export const api = {
   forgotPassword: (email) => request('/api/v1/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
   resetPassword: (token, newPassword) => request('/api/v1/auth/reset-password', { method: 'POST', body: JSON.stringify({ token, new_password: newPassword }) }),
   status: () => request('/api/v1/status').then(
-    (r) => { setAuthHint(true, r?.user ? r.user.photo_url : undefined); return r; },
+    (r) => { setAuthHint(true, r?.user ? r.user.photo_url : undefined); setCurrentUserId(r?.user?.id); return r; },
     (err) => { if (err?.status === 401) setAuthHint(false); throw err; },
   ),
   uploadPhoto: (blob) => {
@@ -141,14 +143,72 @@ export const api = {
     return request(`/api/v1/networking/members${qs.size ? `?${qs}` : ''}`);
   },
   member: (id) => request(`/api/v1/networking/members/${id}`),
-  referrals: () => request('/api/v1/referrals'),
+  // Typeahead for the referral recipient: server-side filtered, paged, no contact data.
+  searchMembers: ({ q = '', limit = 8, offset = 0 } = {}, signal) => {
+    const qs = new URLSearchParams({ q, limit, offset });
+    return request(`/api/v1/networking/members/search?${qs}`, { signal });
+  },
+  referrals: ({ view = 'all', stage = '', limit = 20, offset = 0 } = {}) => {
+    const qs = new URLSearchParams({ view, limit, offset });
+    if (stage) qs.set('stage', stage);
+    return request(`/api/v1/referrals?${qs}`);
+  },
+  referralSummary: () => request('/api/v1/referrals/summary'),
+  referral: (id) => request(`/api/v1/referrals/${id}`),
   createReferral: (payload) => request('/api/v1/referrals', { method: 'POST', body: JSON.stringify(payload) }),
+  // Two-party meeting confirmation and verified deal closure (Phase 0).
+  confirmMeeting: (id) => request(`/api/v1/referrals/${id}/meeting/confirm`, { method: 'POST' }),
+  withdrawMeeting: (id) => request(`/api/v1/referrals/${id}/meeting/withdraw`, { method: 'POST' }),
+  disputeMeeting: (id, reason) => request(`/api/v1/referrals/${id}/meeting/dispute`, { method: 'POST', body: JSON.stringify({ reason }) }),
+  reportClosure: (id, payload) => request(`/api/v1/referrals/${id}/closure`, { method: 'POST', body: JSON.stringify(payload) }),
+  editClosure: (id, payload) => request(`/api/v1/referrals/${id}/closure`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  confirmClosure: (id, expectedValueMinor) => request(`/api/v1/referrals/${id}/closure/confirm`, { method: 'POST', body: JSON.stringify({ expected_value_minor: expectedValueMinor }) }),
+  disputeClosure: (id, reason) => request(`/api/v1/referrals/${id}/closure/dispute`, { method: 'POST', body: JSON.stringify({ reason }) }),
+  cancelClosure: (id) => request(`/api/v1/referrals/${id}/closure/cancel`, { method: 'POST' }),
+  addEvidence: (id, { evidenceType, note, file }) => {
+    const fd = new FormData();
+    fd.set('evidence_type', evidenceType);
+    if (note) fd.set('note', note);
+    fd.set('file', file);
+    return request(`/api/v1/referrals/${id}/closure/evidence`, { method: 'POST', body: fd });
+  },
+  evidenceUrl: (id, evidenceId) => `${API_BASE}/api/v1/referrals/${id}/closure/evidence/${evidenceId}/file`,
+  // Subscriptions: plan -> subscription -> invoice -> payment (manual proof an admin verifies).
+  plans: () => request('/api/v1/plans'),
+  currentSubscription: () => request('/api/v1/subscriptions/current'),
+  dealRules: () => request('/api/v1/deal-rules'),
+  paymentInstructions: () => request('/api/v1/subscriptions/payment-instructions'),
+  createSubscription: (planCode) => request('/api/v1/subscriptions', { method: 'POST', body: JSON.stringify({ plan_code: planCode }) }),
+  submitPaymentProof: (subscriptionId, file) => {
+    const fd = new FormData();
+    fd.set('proof', file);
+    return request(`/api/v1/subscriptions/${subscriptionId}/payment-proof`, { method: 'POST', body: fd });
+  },
+  // Renewal: the exact calculation, and the confirmation. The server recomputes everything; these numbers are only what the member saw.
+  renewalQuote: (planCode) => request(`/api/v1/renewal/quote?plan_code=${encodeURIComponent(planCode)}`),
+  renewalSimulate: (body) => request('/api/v1/renewal/simulate', { method: 'POST', body: JSON.stringify(body) }),
+  renewalConfirm: (body) => request('/api/v1/renewal/confirm', { method: 'POST', body: JSON.stringify(body) }),
+  growthPointsOverview: () => request('/api/v1/growth-points/overview'),
+  growthPointsHistory: () => request('/api/v1/growth-points/history'),
+  // Growth Points, SHADOW MODE: a labelled preview of the member's own simulated points. Read-only; nothing here changes what anyone pays.
+  growthPointsPreview: () => request('/api/v1/growth-points/preview'),
+  cancelSubscription: (subscriptionId) => request(`/api/v1/subscriptions/${subscriptionId}/cancel`, { method: 'POST' }),
   updateReferral: (id, status) => request(`/api/v1/referrals/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
   needs: () => request('/api/v1/networking/needs'),
+  // Phase A: my own needs in every status, the offers on a need, and the lifecycle actions. These record facts only; nothing here earns anything.
+  needsMine: () => request('/api/v1/networking/needs?mine=true'),
+  needOffers: (id) => request(`/api/v1/networking/needs/${id}/offers`),
+  actOnOffer: (offerId, action) => request(`/api/v1/networking/needs/offers/${offerId}`, { method: 'PATCH', body: JSON.stringify({ action }) }),
+  cancelNeed: (id) => request(`/api/v1/networking/needs/${id}/cancel`, { method: 'POST' }),
+  resolveNeed: (id, offerId) => request(`/api/v1/networking/needs/${id}/resolve`, { method: 'POST', body: JSON.stringify({ offer_id: offerId || null }) }),
   createNeed: (payload) => request('/api/v1/networking/needs', { method: 'POST', body: JSON.stringify(payload) }),
-  helpNeed: (id) => request(`/api/v1/networking/needs/${id}/help`, { method: 'POST' }),
+  helpNeed: (id, message) => request(`/api/v1/networking/needs/${id}/help`, { method: 'POST', body: message ? JSON.stringify({ message }) : undefined }),
   listConnections: () => request('/api/v1/networking/connections'),
   createConnection: (payload) => request('/api/v1/networking/connections', { method: 'POST', body: JSON.stringify(payload) }),
+  // action: 'accept' | 'decline' (decline is silent: the sender is not told).
+  respondConnection: (id, action) => request(`/api/v1/networking/connections/${id}`, { method: 'PATCH', body: JSON.stringify({ action }) }),
+  // Withdraw a request you sent, or remove a connection.
+  removeConnection: (id) => request(`/api/v1/networking/connections/${id}`, { method: 'DELETE' }),
   createReferralRequest: (payload) => request('/api/v1/networking/referral-requests', { method: 'POST', body: JSON.stringify(payload) }),
   startVerification: () => request('/api/v1/business/verification/start', { method: 'POST' }),
   notifications: () => request('/api/v1/notifications'),

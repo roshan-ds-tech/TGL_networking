@@ -37,12 +37,12 @@ const MODULE_DATA = {
         desc: 'Give, request, track, and close referrals with category alerts, status updates, and confirmed win tracking.',
       },
       {
-        title: 'Trust Score & Growth Points',
-        desc: 'Transparent, non-resetting points model reflecting active community contribution, verified closures, and ethical conduct.',
+        title: 'Trust Score & Growth Points (Coming Soon)',
+        desc: 'A transparent, non-resetting model for recognising active community contribution, verified closures, and ethical conduct. Growth Points are coming soon and are not being awarded yet.',
       },
       {
         title: 'Leaderboards & Community Feed',
-        desc: 'Weekly, monthly, and annual rankings recognizing top contributors, alongside weekly business updates and member directory.',
+        desc: 'Rankings recognizing top contributors are coming soon, alongside weekly business updates and the member directory.',
       },
     ],
     primaryAction: { label: 'Join via Season 1', href: '/#register-form' },
@@ -87,8 +87,8 @@ const MODULE_DATA = {
         desc: 'Real-time alerts regarding Season 1 registration confirmation, shortlist announcements, and jury schedules.',
       },
       {
-        title: 'Reputation & Leaderboard Updates',
-        desc: 'Stay informed on earned badges, Growth Points transactions, and leaderboard positioning.',
+        title: 'Reputation Updates',
+        desc: 'Stay informed on badges and recognition. Growth Points and leaderboards are coming soon.',
       },
     ],
     primaryAction: { label: 'Get Started with Season 1', href: '/#register-form' },
@@ -111,7 +111,7 @@ const MODULE_DATA = {
       },
       {
         title: 'Networking Reputation Record',
-        desc: 'View personal Trust Score, cumulative Growth Points, referral ledger, and past event achievements.',
+        desc: 'View your Trust Score, referral history, and past event achievements. Growth Points are coming soon.',
       },
     ],
     primaryAction: { label: 'Register Your Business', href: '/#register-form' },

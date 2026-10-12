@@ -8,10 +8,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response,
 from sqlalchemy import Integer, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .. import audit
 from ..config import settings
 from ..ratelimit import client_ip
 from ..database import get_db
-from ..models import Admin, Business, EventRegistration, PersonalProfile, Registration, TGLMembership, User, utcnow
+from ..models import (
+    Admin, Business, BusinessReferral, DealClosure, EventRegistration, GrowthPointBalance, GrowthPointCycle, GrowthPointLedger, Invoice, PersonalProfile, Registration, Subscription,
+    TGLMembership, User, utcnow,
+)
 from ..schemas import (
     BusinessVerificationUpdate,
     CategoryCount,
@@ -235,6 +239,8 @@ async def undo_complete_season_1(
     again and finale-activated memberships return to PENDING."""
     event = await get_or_create_season_1(db)
     result = await revert_finale(db, event)
+    audit.record(db, actor=admin, action="finale.undone", resource_type="event", resource_id=event.id,
+                 after={"reverted": result["reverted"], "was_completed": result["was_completed"]})
     await db.commit()
     invalidate_event_cache()
     await db.refresh(event)
@@ -259,8 +265,26 @@ async def delete_customer(
     user = await db.get(User, user_id)
     if user is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Account not found")
+    # Money and verified-deal records are never destroyed by deleting an account: the database refuses
+    # too (ON DELETE RESTRICT). Suspend the account instead.
+    has_money = await db.scalar(select(Subscription.id).where(Subscription.user_id == user_id).limit(1)) or \
+        await db.scalar(select(Invoice.id).where(Invoice.user_id == user_id).limit(1))
+    has_deal = await db.scalar(
+        select(DealClosure.id).join(BusinessReferral, BusinessReferral.id == DealClosure.referral_id)
+        .where(or_(BusinessReferral.giver_user_id == user_id, BusinessReferral.receiver_user_id == user_id)).limit(1)
+    )
+    # The Growth Points shadow ledger is append-only history that the whole experiment is explained from.
+    has_points = await db.scalar(select(GrowthPointLedger.id).where(GrowthPointLedger.member_id == user_id).limit(1)) or \
+        await db.scalar(select(GrowthPointCycle.id).where(GrowthPointCycle.member_id == user_id).limit(1)) or \
+        await db.scalar(select(GrowthPointBalance.member_id).where(GrowthPointBalance.member_id == user_id).limit(1))
+    if has_money or has_deal or has_points:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "This account has subscription, invoice, closed-business or Growth Points records, which must be kept. Suspend the account instead of deleting it.",
+        )
     email = user.email
     photo_key = user.photo_key
+    audit.record(db, actor=admin, action="account.deleted", resource_type="user", resource_id=user_id, metadata={"email_domain": email.rsplit("@", 1)[-1]})
     await db.delete(user)
     await db.commit()
     await delete_profile_photo(photo_key)  # the account's photo goes with it
@@ -275,7 +299,7 @@ _VERIFICATION_STATUSES = {"NOT_STARTED", "PENDING", "NEEDS_INFO", "VERIFIED", "R
 async def update_business_verification(
     user_id: str,
     payload: BusinessVerificationUpdate,
-    _: Admin = Depends(get_current_admin),
+    admin: Admin = Depends(get_current_admin),
     __: None = Depends(require_csrf),
     db: AsyncSession = Depends(get_db),
 ) -> CustomerListItem:
@@ -287,7 +311,10 @@ async def update_business_verification(
     ).scalar_one_or_none()
     if business is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "This account has no business profile.")
+    before_status = business.verification_status
     business.verification_status = new_status
+    audit.record(db, actor=admin, action="business.verification_changed", resource_type="business", resource_id=business.id,
+                 before={"status": before_status}, after={"status": new_status}, metadata={"user_id": user_id})
     business.tgl_verified = new_status == "VERIFIED"
     business.tgl_verified_at = utcnow() if new_status == "VERIFIED" else None
     user = await db.get(User, user_id)
@@ -352,6 +379,8 @@ async def set_verified(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Registration not found")
     _refuse_if_mirrored(reg)
 
+    audit.record(db, actor=admin, action="registration.verified" if payload.verified else "registration.unverified",
+                 resource_type="registration", resource_id=reg.id, before={"verified": bool(reg.verified)}, after={"verified": payload.verified})
     reg.verified = payload.verified
     reg.verified_at = utcnow() if payload.verified else None
     reg.verified_by_id = admin.id if payload.verified else None
@@ -385,6 +414,8 @@ async def complete_season_1(
     event = await get_or_create_season_1(db)
     result = await activate_memberships_for_event(db, event, utcnow())
     await notify_finale_open(db, event)
+    audit.record(db, actor=admin, action="finale.completed", resource_type="event", resource_id=event.id,
+                 after={"activated": result["activated"], "already_active": result["already_active"]})
     await db.commit()
     invalidate_event_cache()  # after commit: no request can re-cache the old state
     await db.refresh(event)
@@ -421,6 +452,8 @@ async def delete_registration(
     proof_filename = reg.proof_filename
     business = reg.business_name
 
+    audit.record(db, actor=admin, action="registration.deleted", resource_type="registration", resource_id=reg.id,
+                 before={"verified": bool(reg.verified), "had_proof": bool(proof_filename)})
     await db.delete(reg)
     await db.commit()
 
@@ -465,3 +498,46 @@ async def get_proof(
             "Cache-Control": "private, no-store",
         },
     )
+
+
+@router.get("/referrals/stats")
+async def referral_stats(
+    _: Admin = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Referral health at a glance: volume, status mix, conversion and how fast
+    recipients first reach out. Counts only — no prospect contact details."""
+    by_status = dict((await db.execute(select(BusinessReferral.status, func.count()).group_by(BusinessReferral.status))).all())
+    by_category = dict((await db.execute(
+        select(func.coalesce(BusinessReferral.category, "none"), func.count()).group_by(BusinessReferral.category)
+    )).all())
+    total = sum(by_status.values())
+    converted = by_status.get("BUSINESS_CLOSED", 0) + by_status.get("REVENUE_GENERATED", 0)
+    # Resolved referrals are the denominator: open ones haven't had a chance to convert yet.
+    resolved = converted + by_status.get("CLOSED", 0) + by_status.get("DECLINED", 0)
+    stamps = (await db.execute(
+        select(BusinessReferral.created_at, BusinessReferral.contacted_at)
+        .where(BusinessReferral.contacted_at.is_not(None)).limit(5000)
+    )).all()
+    hours = [max((c - a).total_seconds(), 0) / 3600 for a, c in stamps]
+
+    async def top(col):
+        rows = (await db.execute(
+            select(col, func.count().label("n")).group_by(col).order_by(func.count().desc()).limit(5)
+        )).all()
+        names = dict((await db.execute(
+            select(PersonalProfile.user_id, PersonalProfile.full_name).where(PersonalProfile.user_id.in_([r[0] for r in rows]))
+        )).all()) if rows else {}
+        return [{"user_id": uid, "name": names.get(uid), "referrals": n} for uid, n in rows]
+
+    return {
+        "total": total,
+        "by_status": by_status,
+        "by_category": by_category,
+        "converted": converted,
+        "conversion_rate": round(converted / resolved, 3) if resolved else None,
+        "avg_hours_to_first_contact": round(sum(hours) / len(hours), 1) if hours else None,
+        "closed_or_declined": by_status.get("CLOSED", 0) + by_status.get("DECLINED", 0) + by_status.get("CANCELLED", 0),
+        "top_referrers": await top(BusinessReferral.giver_user_id),
+        "top_recipients": await top(BusinessReferral.receiver_user_id),
+    }

@@ -3,6 +3,7 @@ import IconSprite from './IconSprite';
 import ModuleModal from './ModuleModal';
 import SiteHeader from './SiteHeader';
 import { api } from '../lib/customerApi';
+import { connectionsChanged } from '../lib/connections';
 
 /* -------------------------------------------------------------------------
    Toast — a tiny global registry rather than React context, matching this
@@ -107,11 +108,14 @@ function ModalHost() {
     setSubmitting(true);
     setError('');
     try {
-      await api.createConnection({ target_user_id: modal.targetUserId, note: note || null });
+      const made = await api.createConnection({ target_user_id: modal.targetUserId, note: note || null });
       close();
-      showToast(`Connection request sent to ${modal.target}.`);
+      // Asking someone who already asked you simply connects the two of you.
+      showToast(made?.status === 'ACCEPTED' ? `You're now connected with ${modal.target}.` : `Connection request sent to ${modal.target}.`);
+      connectionsChanged();
     } catch (err) {
       setError(err.message || 'Could not send the request.');
+      if (err.status === 409) connectionsChanged(); // our view was stale: show the real state
     } finally {
       setSubmitting(false);
     }

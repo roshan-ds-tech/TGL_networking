@@ -9,6 +9,7 @@ const CATEGORY_MAP = {
   referral_requested: 'referrals',
   need_help_offered: 'networking',
   connection_request: 'networking',
+  connection_accepted: 'networking',
   membership_activated: 'membership',
   registration_confirmed: 'membership',
   registration_submitted: 'membership',
@@ -25,6 +26,7 @@ const ICON_MAP = {
 // What kind of message this is, in words — shown as the detail view's eyebrow.
 const KIND_LABEL = {
   connection_request: 'Connection request',
+  connection_accepted: 'Connection accepted',
   referral_requested: 'Referral request',
   referral_received: 'Referral received',
   referral_accepted: 'Referral accepted',
@@ -38,11 +40,13 @@ const KIND_LABEL = {
 const REF_STATUS = {
   GIVEN: 'Awaiting response',
   ACCEPTED: 'Accepted',
+  CONTACTED: 'Prospect contacted',
   MEETING_DONE: 'Meeting done',
   BUSINESS_CLOSED: 'Business closed',
   REVENUE_GENERATED: 'Revenue generated',
   DECLINED: 'Declined',
   CANCELLED: 'Cancelled',
+  CLOSED: 'Closed',
 };
 
 const TABS = [
@@ -88,7 +92,9 @@ function actionsFor(n) {
     : null;
   switch (n.type) {
     case 'connection_request':
-      return [profile].filter(Boolean);
+      return [{ label: 'Review request', to: '/app/networking/connections' }, profile].filter(Boolean);
+    case 'connection_accepted':
+      return [profile, { label: 'My network', to: '/app/networking/connections' }].filter(Boolean);
     case 'referral_requested':
       return [{ label: 'Give a referral', to: '/app/referrals/new' }, profile].filter(Boolean);
     case 'referral_received':
@@ -110,6 +116,7 @@ function actionsFor(n) {
 function DetailRows({ n }) {
   const d = n.detail || {};
   const rows = [];
+  if (d.prospect_company) rows.push(['Prospect', d.prospect_company]);
   if (d.business_need) rows.push(['Business need', d.business_need]);
   if (d.status) rows.push(['Referral status', REF_STATUS[d.status] || d.status]);
   if (d.you_are) rows.push(['Your role', d.you_are === 'receiver' ? 'You received this referral' : 'You gave this referral']);

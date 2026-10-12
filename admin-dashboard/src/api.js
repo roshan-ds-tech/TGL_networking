@@ -51,6 +51,17 @@ async function request(path, { method = 'GET', body, signal } = {}) {
   return payload;
 }
 
+function qs(params) {
+  const q = new URLSearchParams();
+  Object.entries(params || {}).forEach(([k, v]) => {
+    if (v !== '' && v !== null && v !== undefined) q.set(k, v);
+  });
+  return q.toString();
+}
+
+const post = (path, body) => request(path, { method: 'POST', body: body || {} });
+const enc = encodeURIComponent;
+
 export const api = {
   login: (email, password) =>
     request('/api/auth/login', { method: 'POST', body: { email, password } }),
@@ -84,6 +95,66 @@ export const api = {
   removeCustomer: (id) =>
     request(`/api/admin/customers/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   proofUrl: (id) => `/api/admin/registrations/${encodeURIComponent(id)}/proof`,
+
+  // Referral review (Phase 0). Every mutating action carries a reason; the server refuses without one.
+  referrals: (params, signal) => request(`/api/admin/referrals?${qs(params)}`, { signal }),
+  referral: (id) => request(`/api/admin/referrals/${enc(id)}`),
+  referralEvidenceUrl: (id, evidenceId) => `/api/admin/referrals/${enc(id)}/closure/evidence/${enc(evidenceId)}/file`,
+  verifyEvidence: (id, evidenceId, reason) => post(`/api/admin/referrals/${enc(id)}/closure/evidence/${enc(evidenceId)}/verify`, { reason }),
+  rejectEvidence: (id, evidenceId, reason) => post(`/api/admin/referrals/${enc(id)}/closure/evidence/${enc(evidenceId)}/reject`, { reason }),
+  verifyClosure: (id, reason) => post(`/api/admin/referrals/${enc(id)}/closure/verify`, { reason }),
+  rejectClosure: (id, reason) => post(`/api/admin/referrals/${enc(id)}/closure/reject`, { reason }),
+  invalidateClosure: (id, reason) => post(`/api/admin/referrals/${enc(id)}/closure/invalidate`, { reason }),
+  resolveDispute: (id, outcome, reason) => post(`/api/admin/referrals/${enc(id)}/closure/resolve-dispute`, { outcome, reason }),
+  flagReferral: (id, flagged, reason) => post(`/api/admin/referrals/${enc(id)}/flag`, { flagged, reason }),
+  correctReferralStatus: (id, status, reason) => post(`/api/admin/referrals/${enc(id)}/status`, { status, reason }),
+  addReferralNote: (id, reason) => post(`/api/admin/referrals/${enc(id)}/notes`, { reason }),
+
+  // Subscriptions: payment review.
+  subscriptions: (params, signal) => request(`/api/admin/subscriptions?${qs(params)}`, { signal }),
+  subscriptionProofUrl: (id) => `/api/admin/subscriptions/${enc(id)}/proof`,
+  verifyPayment: (id, reason) => post(`/api/admin/subscriptions/${enc(id)}/payment/verify`, { reason }),
+  rejectPayment: (id, reason) => post(`/api/admin/subscriptions/${enc(id)}/payment/reject`, { reason }),
+  refundSubscription: (id, reason) => post(`/api/admin/subscriptions/${enc(id)}/refund`, { reason }),
+
+  // Growth Points, SHADOW MODE (Phase 1): analytics are read-only; the actions only add review rows or shadow ledger rows. None touches money.
+  gpStatus: () => request('/api/admin/growth-points/status'),
+  gpDemoMembers: () => request('/api/admin/growth-points/demo-members'),
+  gpSummary: () => request('/api/admin/growth-points/summary'),
+  gpFinance: () => request('/api/admin/growth-points/finance'),
+  gpRedemptionState: () => request('/api/admin/growth-points/redemption/state'),
+  gpKill: (reason) => post('/api/admin/growth-points/redemption/kill', { reason }),
+  gpResume: (reason) => post('/api/admin/growth-points/redemption/resume', { reason }),
+  gpGates: () => request('/api/admin/growth-points/gates'),
+  gpReview: () => request('/api/admin/growth-points/review'),
+  gpReviewUrl: () => '/api/admin/growth-points/review?format=markdown',
+  gpObservation: () => request('/api/admin/growth-points/observation'),
+  gpExceptions: () => request('/api/admin/growth-points/exceptions'),
+  gpEconomics: () => request('/api/admin/growth-points/economics'),
+  gpMembers: (params, signal) => request(`/api/admin/growth-points/members?${qs(params)}`, { signal }),
+  gpMember: (id) => request(`/api/admin/growth-points/members/${enc(id)}`),
+  gpLedger: (params, signal) => request(`/api/admin/growth-points/ledger?${qs(params)}`, { signal }),
+  gpFlags: (params, signal) => request(`/api/admin/growth-points/flags?${qs(params)}`, { signal }),
+  gpReconcileReport: () => request('/api/admin/growth-points/reconcile'),
+  gpExportUrl: (format) => `/api/admin/growth-points/export?format=${format}`,
+  gpReviewFlag: (id, outcome, reason) => post(`/api/admin/growth-points/flags/${enc(id)}/review?outcome=${outcome}`, { reason }),
+  gpApplyReversal: (id, reason) => post(`/api/admin/growth-points/flags/${enc(id)}/apply-reversal`, { reason }),
+  // Phase A: community activity (connections, needs, help offers). Records facts only; awards nothing.
+  communityReport: (days) => request(`/api/admin/community/report${days ? `?days=${days}` : ''}`),
+  communityNeeds: (params) => request(`/api/admin/community/needs?${qs(params)}`),
+  communityRemoveNeed: (id, reason) => post(`/api/admin/community/needs/${id}/remove`, { reason }),
+  communityRestoreNeed: (id, reason) => post(`/api/admin/community/needs/${id}/restore`, { reason }),
+  gpScan: (reason) => post('/api/admin/growth-points/scan', { reason }),
+  gpSweep: (reason) => post('/api/admin/growth-points/sweep', { reason }),
+  gpReconcile: (reason) => post('/api/admin/growth-points/reconcile', { reason }),
+};
+
+export const inr = (minor) => {
+  if (minor == null) return '—';
+  // Integer arithmetic only: paise are whole numbers, so no floating-point rounding can creep into a shown amount.
+  const whole = Math.trunc(minor / 100);
+  const paise = Math.abs(minor % 100);
+  return `₹${whole.toLocaleString('en-IN')}${paise ? `.${String(paise).padStart(2, '0')}` : ''}`;
 };
 
 export const CATEGORIES = {

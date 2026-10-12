@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AGES, api, ApiError, CATEGORIES, EMPLOYEES } from './api';
 import Accounts from './Accounts';
+import Referrals from './Referrals';
+import Subscriptions from './Subscriptions';
+import GrowthPoints from './GrowthPoints';
+import DemoMembers from './DemoMembers';
+import Community from './Community';
 import DeleteModal from './DeleteModal';
 import Login from './Login';
 import ProofModal from './ProofModal';
@@ -234,10 +239,65 @@ export default function App() {
           >
             Accounts
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === 'referrals'}
+            className={`tab${view === 'referrals' ? ' tab--active' : ''}`}
+            onClick={() => setView('referrals')}
+          >
+            Referrals
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === 'subscriptions'}
+            className={`tab${view === 'subscriptions' ? ' tab--active' : ''}`}
+            onClick={() => setView('subscriptions')}
+          >
+            Subscriptions
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === 'growth-points'}
+            className={`tab${view === 'growth-points' ? ' tab--active' : ''}`}
+            onClick={() => setView('growth-points')}
+          >
+            Growth Points
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === 'demo'}
+            className={`tab${view === 'demo' ? ' tab--active' : ''}`}
+            onClick={() => setView('demo')}
+          >
+            Demo members
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === 'community'}
+            className={`tab${view === 'community' ? ' tab--active' : ''}`}
+            onClick={() => setView('community')}
+          >
+            Community activity
+          </button>
         </div>
 
         {view === 'accounts' ? (
           <Accounts onUnauthorized={() => setAdmin(null)} />
+        ) : view === 'referrals' ? (
+          <Referrals onUnauthorized={() => setAdmin(null)} />
+        ) : view === 'subscriptions' ? (
+          <Subscriptions onUnauthorized={() => setAdmin(null)} />
+        ) : view === 'growth-points' ? (
+          <GrowthPoints onUnauthorized={() => setAdmin(null)} />
+        ) : view === 'demo' ? (
+          <DemoMembers onUnauthorized={() => setAdmin(null)} />
+        ) : view === 'community' ? (
+          <Community onUnauthorized={() => setAdmin(null)} />
         ) : (
           <>
         {stats && (

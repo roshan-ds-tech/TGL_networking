@@ -15,6 +15,24 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 DEV_SECRET_SENTINEL = "dev-only-change-me"
 
 
+def parse_cutoff(raw: str):
+    """The ONE reader of an eligibility cutoff. An ISO-8601 datetime with an explicit offset (or Z); anything else raises ValueError."""
+    from datetime import datetime, timezone
+    text = (raw or "").strip()
+    if not text:
+        raise ValueError("empty")
+    try:
+        moment = datetime.fromisoformat(text)
+    except ValueError as exc:
+        raise ValueError(f"not an ISO-8601 datetime ({text!r})") from exc
+    if moment.tzinfo is None or moment.utcoffset() is None:
+        raise ValueError(f"{text!r} has no UTC offset: write it like 2027-01-01T00:00:00+05:30 (a date alone, or a time without an offset, is ambiguous)")
+    return moment.astimezone(timezone.utc)
+
+
+REQUIRED_APPROVALS = frozenset({"MANAGEMENT_MODEL", "ACCOUNTING_GST", "PRODUCTION_BACKUP", "ROLLBACK_TESTED", "MEMBER_TERMS", "MONITORING_OWNER"})
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
@@ -112,6 +130,63 @@ class Settings(BaseSettings):
     # when nothing trusted is in front, since the header is client-supplied.
     trusted_proxy_hops: int = 0
 
+    # FINANCIAL SAFETY GATE (Phase 0). Management must confirm in writing that the
+    # Connect / Growth / Elite prices and terms (Rs 3,000 / 3 months, Rs 5,000 / 6 months,
+    # Rs 10,000 / 12 months) are correct. No discount or redemption exists today.
+    # Code must NEVER read this setting directly: the only sanctioned reader is
+    # app/pricing_gate.py (`pricing_confirmed()` / `require_pricing_confirmed()`),
+    # and test_phase0.py fails if any other module touches it. Any future feature
+    # that lets points reduce an invoice MUST call require_pricing_confirmed().
+    subscription_pricing_confirmed: bool = False
+
+    # How a member pays a subscription invoice (bank/UPI details). Plain text shown
+    # on the invoice. EMPTY until management supplies the official text: the UI then
+    # says instructions are pending and shows no payment details at all.
+    subscription_payment_instructions: str = Field(default="", max_length=1000)
+
+    # GROWTH POINTS, PHASE 1 = SHADOW MODE ONLY (app/rewards/). Points are recorded in a shadow ledger and can be inspected,
+    # simulated and analysed; they have NO monetary effect: no invoice, payment, subscription or price is read for writing,
+    # and no redemption path exists. Only app/rewards/firewall.py reads these two flags.
+    #   GROWTH_POINTS_SHADOW_MODE         true  -> reward events are recorded in the shadow ledger (default off: opt in per environment)
+    #   GROWTH_POINTS_REDEMPTION_ENABLED  must stay false. The application REFUSES TO START with it true: redemption is not
+    #                                     implemented and is a future, separately approved phase (specification gates G1-G5).
+    #   GROWTH_POINTS_MEMBER_PREVIEW      true  -> members see a clearly labelled "shadow preview" of their points. Off by default:
+    #                                     whether members see it at all is an open management decision.
+    growth_points_shadow_mode: bool = False
+    growth_points_redemption_enabled: bool = False
+    growth_points_member_preview: bool = False
+
+    # PROGRAMME_OWNER_EMAILS: comma-separated emails of the admin accounts that hold the highest-trust role (the programme owners).
+    # Only they may approve a Growth Points pair-concentration exception and own the daily reconciliation. The project has no admin
+    # roles table, so this is the role: EMPTY BY DEFAULT, which means nobody can approve an exception until it is set deliberately.
+    programme_owner_emails: str = ""
+
+    # GROWTH_POINTS_APPROVALS: comma-separated codes of EXTERNAL approvals that a human has recorded (MANAGEMENT_MODEL, ACCOUNTING_GST,
+    # PRODUCTION_BACKUP, ROLLBACK_TESTED, MEMBER_TERMS, MONITORING_OWNER). Empty by default. The gates report treats a code as an attestation
+    # by whoever set it, never as verified, and nothing is ever inferred as approved.
+    growth_points_approvals: str = ""
+    # Phase 3 rollout, same backend logic at every stage: "internal" (only the programme owners), "cohort" (owners + GROWTH_POINTS_ROLLOUT_EMAILS), "all".
+    growth_points_rollout_stage: str = "internal"
+    growth_points_rollout_emails: str = ""
+    # THE ELIGIBILITY CUTOFF. Shadow-period points NEVER carry over (management decision, final): only points whose event_at is AT OR AFTER this
+    # instant can ever be redeemed (boundary inclusive; compared in UTC). FORMAT: an ISO-8601 datetime WITH an explicit UTC offset or Z, e.g.
+    # 2027-01-01T00:00:00+05:30. A bare date or a datetime without an offset is REFUSED at startup (its timezone would be a guess).
+    # EMPTY = nothing is redeemable. It is only honoured when it equals the cutoff recorded, once and immutably, in the database
+    # (growth_point_redemption_epoch, set by the programme owner after management approval); any mismatch, or a value that can not be read at
+    # runtime, means NOTHING is redeemable. Never set it without an officially approved cutoff.
+    growth_points_redeemable_from: str = ""
+    # DEVELOPMENT / TEST ONLY: lets @demo.example.com demo members run a rolled-back redemption SIMULATION. Same format as above. Refused in production.
+    growth_points_demo_cutoff: str = ""
+
+    # Deal-verification thresholds, in whole rupees. AWAITING MANAGEMENT CONFIRMATION:
+    # these defaults are engineering assumptions, not approved business rules.
+    # deal_thresholds_confirmed records whether management has signed them off; it
+    # changes nothing at runtime and is shown to admins so the status is never silent.
+    deal_evidence_threshold_inr: int = Field(default=100_000, ge=1)      # evidence required from here
+    deal_admin_approval_threshold_inr: int = Field(default=500_000, ge=1)  # an admin must also approve from here
+    deal_quick_close_hours: int = Field(default=24, ge=0, le=24 * 30)    # flag closures reported sooner after acceptance
+    deal_thresholds_confirmed: bool = False
+
     # Brute-force controls
     login_max_attempts: int = 5
     login_window_seconds: int = 900  # 15 min
@@ -177,6 +252,42 @@ class Settings(BaseSettings):
                     "print(secrets.token_urlsafe(48))\""
                 )
         return v or secrets.token_urlsafe(48)
+
+    @model_validator(mode="after")
+    def _cutoffs_are_unambiguous(self) -> "Settings":
+        for name in ("growth_points_redeemable_from", "growth_points_demo_cutoff"):
+            raw = getattr(self, name)
+            if raw.strip():
+                try:
+                    parse_cutoff(raw)
+                except ValueError as exc:
+                    raise ValueError(f"{name.upper()} is invalid: {exc}") from exc
+        if self.growth_points_demo_cutoff.strip() and self.environment.strip().lower() == "production":
+            raise ValueError("GROWTH_POINTS_DEMO_CUTOFF must be empty in production: the redemption simulation is for development and test only.")
+        return self
+
+    def growth_points_approval_codes(self) -> set[str]:
+        return {e.strip().upper() for e in self.growth_points_approvals.split(",") if e.strip()}
+
+    def programme_owners(self) -> set[str]:
+        return {e.strip().lower() for e in self.programme_owner_emails.split(",") if e.strip()}
+
+    @model_validator(mode="after")
+    def _redemption_needs_every_approval(self) -> "Settings":
+        """Real redemption can not even be switched on at boot unless every external approval is recorded (an attestation, not a verification;
+        the runtime gates, including Gate A and the kill switch, are checked on every redemption as well)."""
+        missing = sorted(REQUIRED_APPROVALS - self.growth_points_approval_codes())
+        if self.growth_points_redemption_enabled and missing:
+            raise ValueError(
+                "GROWTH_POINTS_REDEMPTION_ENABLED=true is refused: these approvals are not recorded in GROWTH_POINTS_APPROVALS: " + ", ".join(missing) + "."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_deal_thresholds(self) -> "Settings":
+        if self.deal_admin_approval_threshold_inr < self.deal_evidence_threshold_inr:
+            raise ValueError("DEAL_ADMIN_APPROVAL_THRESHOLD_INR must be at least DEAL_EVIDENCE_THRESHOLD_INR.")
+        return self
 
     @model_validator(mode="after")
     def _validate_storage(self) -> "Settings":

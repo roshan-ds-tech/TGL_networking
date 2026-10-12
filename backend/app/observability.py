@@ -36,7 +36,13 @@ CRITICAL_MS = 2500
 
 
 def _new_metrics() -> dict:
-    return {"db_ms": 0.0, "db_count": 0, "ext_ms": 0.0, "ext_count": 0, "hash_ms": 0.0}
+    return {"db_ms": 0.0, "db_count": 0, "ext_ms": 0.0, "ext_count": 0, "hash_ms": 0.0, "request_id": None}
+
+
+def current_request_id() -> str | None:
+    """The id of the request being served (also sent back as X-Request-ID), for audit entries."""
+    m = _metrics.get()
+    return m.get("request_id") if m else None
 
 
 def add(kind: str, ms: float) -> None:
@@ -76,6 +82,7 @@ def install_db_timing(engine) -> None:
 async def timing_middleware(request: Request, call_next):
     request_id = request.headers.get("x-request-id", "")[:64] or uuid.uuid4().hex[:12]
     metrics = _new_metrics()
+    metrics["request_id"] = request_id
     token = _metrics.set(metrics)
     start = time.perf_counter()
     status = 500

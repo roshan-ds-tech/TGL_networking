@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CATEGORIES } from '../../data/categories';
 import { api, go } from '../../lib/customerApi';
-import { openConnectModal } from '../../components/AppShell';
+import ConnectionButton from '../../components/ConnectionButton';
+import { useConnections } from '../../lib/connections';
 import ImageSlot from '../../components/ImageSlot';
 import NetTabs from './NetTabs';
 
@@ -67,11 +68,7 @@ export default function Directory({ status }) {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [denied, setDenied] = useState(false);
-  const [connections, setConnections] = useState(new Set());
-
-  useEffect(() => {
-    api.listConnections().then((rows) => setConnections(new Set(rows.map((c) => c.target_user_id)))).catch(() => {});
-  }, []);
+  const net = useConnections();
 
   // Wait for a pause in typing before asking the server, and keep the old
   // results on screen meanwhile so the grid doesn't flash empty per keystroke.
@@ -126,21 +123,12 @@ export default function Directory({ status }) {
   }
 
   function Actions({ m }) {
-    const isMe = m.user_id === me;
-    const requested = connections.has(m.user_id);
     return (
       <div className="nd-actions" onClick={(e) => e.stopPropagation()}>
-        {isMe ? (
+        {m.user_id === me ? (
           <span className="nd-you">This is you</span>
         ) : (
-          <button
-            type="button"
-            className={`nd-btn ${requested ? 'is-done' : 'nd-btn--dark'}`}
-            disabled={requested}
-            onClick={() => openConnectModal(m.business_name, m.user_id)}
-          >
-            {requested ? <><Icon id="i-check" size={13} /> Requested</> : 'Connect'}
-          </button>
+          <ConnectionButton prefix="nd" relation={net.relation(m.user_id)} userId={m.user_id} name={m.founder_name} businessName={m.business_name} />
         )}
       </div>
     );

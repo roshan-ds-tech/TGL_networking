@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { CATEGORIES } from '../../data/categories';
 import { api, go } from '../../lib/customerApi';
 import { shortAgo, shortDate, trustTier } from '../../lib/format';
-import { openConnectModal, showToast } from '../../components/AppShell';
+import { showToast } from '../../components/AppShell';
+import ConnectionButton from '../../components/ConnectionButton';
+import { useConnections } from '../../lib/connections';
 import ImageSlot from '../../components/ImageSlot';
 import NetTabs from './NetTabs';
 
@@ -74,7 +76,8 @@ export default function NetworkingHome({ status }) {
   const [members, setMembers] = useState(null);
   const [needs, setNeeds] = useState(null);
   const [referrals, setReferrals] = useState(null);
-  const [connections, setConnections] = useState(new Set());
+  const [gp, setGp] = useState(null);
+  const net = useConnections();
   const [helped, setHelped] = useState(new Set());
   const [now] = useState(Date.now); // one clock per visit keeps render pure
 
@@ -82,12 +85,15 @@ export default function NetworkingHome({ status }) {
 
   useEffect(() => {
     // Never suggest the signed-in member to themselves.
-    api.members({}).then((rows) => setMembers(rows.filter((m) => m.user_id !== me).slice(0, 4))).catch(() => setMembers([]));
+    api.members({}).then((rows) => setMembers(rows.filter((m) => m.user_id !== me))).catch(() => setMembers([]));
     api.needs().then((rows) => setNeeds(rows.slice(0, 4))).catch(() => setNeeds([]));
     api.referrals().then(setReferrals).catch(() => setReferrals([]));
-    api.listConnections().then((rows) => setConnections(new Set(rows.map((c) => c.target_user_id)))).catch(() => {});
+    api.growthPointsOverview().then(setGp).catch(() => setGp(null));
   }, [me]);
 
+  const byUser = new Map((members || []).map((m) => [m.user_id, m]));
+  const toMeet = (members || []).filter((m) => net.relation(m.user_id).kind !== 'connected').slice(0, 4);
+  const invites = net.invitations.filter((c) => byUser.has(c.requester_user_id));
   const firstName = (status.personal_profile?.full_name || '').split(/\s+/)[0];
   const profile = status.networking_profile;
   const tier = trustTier(profile?.trust_score || 0);
@@ -142,11 +148,13 @@ export default function NetworkingHome({ status }) {
         </div>
 
         <div className="nh-stats">
-          <div className="nh-stat">
-            <span className="nh-stat-label"><Icon id="i-chart" size={14} /> Growth points</span>
-            <span className="nh-stat-value nh-stat-value--gold">{profile?.growth_points || 0}</span>
-            <span className="nh-stat-note">From referrals and closed business</span>
-          </div>
+          <button type="button" className="nh-stat nh-stat--link" onClick={() => go('/app/growth-points')} aria-label="Open your Growth Points">
+            <span className="nh-stat-label"><Icon id="i-chart" size={14} /> Growth Points</span>
+            {/* The number comes from the server's overview (the points ledger), only when Growth Points are visible to this member. */}
+            <span className="nh-stat-value nh-stat-value--gold">{gp?.visible ? gp.balance.total.toLocaleString('en-IN') : '0'}</span>
+            <span className="nh-stat-note">{gp?.visible ? (gp.preview_only ? 'Preview: not redeemable yet' : 'Available to use at renewal') : 'Coming soon. Not being awarded yet'}</span>
+            <span className="nh-stat-go">View how you earn and where they came from →</span>
+          </button>
           <div className="nh-stat">
             <span className="nh-stat-label"><Icon id="i-shield" size={14} /> Trust</span>
             <span className="nh-stat-value nh-stat-value--text">{tier.label}</span>
@@ -161,20 +169,40 @@ export default function NetworkingHome({ status }) {
           </div>
           <div className="nh-stat">
             <span className="nh-stat-label"><Icon id="i-users" size={14} /> Connections</span>
-            <span className="nh-stat-value">{connections.size}</span>
-            <span className="nh-stat-note">Introductions you&apos;ve requested</span>
+            <span className="nh-stat-value">{net.loaded ? net.connected.length : '–'}</span>
+            <span className="nh-stat-note">{net.invitations.length > 0 ? `${net.invitations.length} waiting on you` : 'People you\'re connected with'}</span>
           </div>
         </div>
 
         <div className="nh-grid">
           <div className="nh-col">
+            {invites.length > 0 && (
+              <Panel title="Connection requests" sub={`${invites.length} ${invites.length === 1 ? 'member wants' : 'members want'} to connect with you`} link={{ to: '/app/networking/connections', label: invites.length > 3 ? 'See all' : 'My network' }}>
+                <ul className="nh-list">
+                  {invites.slice(0, 3).map((c) => {
+                    const mb = byUser.get(c.requester_user_id);
+                    return (
+                      <li key={c.id} className="nh-row">
+                        <a className="nh-person" href={`/app/networking/members/${mb.member_id}`} onClick={nav(`/app/networking/members/${mb.member_id}`)}>
+                          <ImageSlot shape="circle" initial={mb.founder_name} src={mb.photo_url} style={{ width: 48, height: 48 }} fontSize={18} />
+                          <span className="nh-person-text">
+                            <span className="nh-name">{mb.founder_name}</span>
+                            <span className="nh-meta">{mb.business_name}{c.note ? ` · “${c.note}”` : ''}</span>
+                          </span>
+                        </a>
+                        <ConnectionButton prefix="nh" extra="nh-btn--sm" relation={net.relation(mb.user_id)} userId={mb.user_id} name={mb.founder_name} businessName={mb.business_name} />
+                      </li>
+                    );
+                  })}
+                </ul>
+              </Panel>
+            )}
             <Panel title="People to meet" sub="Founders in the Season 1 network" link={{ to: '/app/networking/members', label: 'All members' }}>
-              {members === null ? <SkeletonRows /> : members.length === 0 ? (
-                <Empty icon="i-users" title="No other members yet" body="Check back as more Season 1 founders activate their membership." />
+              {members === null ? <SkeletonRows /> : toMeet.length === 0 ? (
+                <Empty icon="i-users" title={members.length === 0 ? 'No other members yet' : "You've met everyone for now"} body={members.length === 0 ? 'Check back as more Season 1 founders activate their membership.' : 'New members will show up here as they join.'} />
               ) : (
                 <ul className="nh-list">
-                  {members.map((mb) => {
-                    const requested = connections.has(mb.user_id);
+                  {toMeet.map((mb) => {
                     const meta = [mb.business_name, CATEGORY_MAP.get(mb.category) || mb.category, mb.city].filter(Boolean).join(' · ');
                     return (
                       <li key={mb.member_id} className="nh-row">
@@ -190,14 +218,7 @@ export default function NetworkingHome({ status }) {
                             {mb.headline && <span className="nh-headline">{mb.headline}</span>}
                           </span>
                         </a>
-                        <button
-                          type="button"
-                          className={`nh-btn nh-btn--sm ${requested ? 'is-done' : 'nh-btn--dark'}`}
-                          disabled={requested}
-                          onClick={() => openConnectModal(mb.business_name, mb.user_id)}
-                        >
-                          {requested ? <><Icon id="i-check" size={13} /> Requested</> : 'Connect'}
-                        </button>
+                        <ConnectionButton prefix="nh" extra="nh-btn--sm" relation={net.relation(mb.user_id)} userId={mb.user_id} name={mb.founder_name} businessName={mb.business_name} />
                       </li>
                     );
                   })}
@@ -261,7 +282,7 @@ export default function NetworkingHome({ status }) {
                 <Empty
                   icon="i-send"
                   title="No referrals yet"
-                  body="Your first referral starts your Growth Points and Trust history."
+                  body="Your first referral starts your Trust history. Growth Points are coming soon."
                   action={<button type="button" className="nh-btn nh-btn--sm nh-btn--primary" onClick={() => go('/app/referrals/new')}>Give a referral</button>}
                 />
               ) : (

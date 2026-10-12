@@ -1,197 +1,145 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, go } from '../../lib/customerApi';
 import { shortDate, shortAgo } from '../../lib/format';
 import { showToast } from '../../components/AppShell';
 import NetTabs from './NetTabs';
 import ImageSlot from '../../components/ImageSlot';
+import GiveReferral from './GiveReferral';
+import VerificationStrip from './ReferralVerification';
+import {
+  ACTION_LABEL, CONTACT_METHOD_LABEL, INTRO_LABEL, PERMISSION_LABEL, PRIMARY_ACTIONS, QUALITY_LABEL, RELATIONSHIP_LABEL,
+  STAGES, STAGE_HELP, STATUS_LABEL, URGENCY_LABEL, VALUE_LABEL, VIEWS, formatPhone,
+} from '../../lib/referralMeta';
+import { CATEGORIES } from '../../data/categories';
 
-const STAGES = ['GIVEN', 'ACCEPTED', 'MEETING_DONE', 'BUSINESS_CLOSED', 'REVENUE_GENERATED'];
-const STAGE_LABELS = ['Given', 'Accepted', 'Meeting done', 'Business closed', 'Revenue generated'];
-const STAGE_HELP = [
-  'You send an introduction with the opportunity.',
-  'The member accepts and takes it forward.',
-  'You or they confirm the first meeting happened.',
-  'The introduction turns into a deal.',
-  'Revenue is logged and Growth Points are earned.',
-];
-const DEAD = new Set(['DECLINED', 'CANCELLED']);
-
-// The choice is carried at the top of the note: a referral has no dedicated
-// field for it and the receiver reads the note first.
-const INTRO_OPTIONS = [
-  "I'll make an email introduction",
-  "I'll set up a call",
-  'Share contact details only',
-];
+const PAGE = 20;
+const DEAD = new Set(['DECLINED', 'CANCELLED', 'CLOSED']);
+const CATEGORY_NAME = Object.fromEntries(CATEGORIES.map((c) => [c.code, c.name]));
 
 function Icon({ id, size = 16 }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true"><use href={`#${id}`} /></svg>;
 }
 
-function stageIndex(status) {
-  const i = STAGES.indexOf(status);
-  return i === -1 ? 0 : i;
-}
-
-function nextAction(r, myId) {
-  const iAmReceiver = r.receiver_user_id === myId;
-  if (r.status === 'GIVEN') return iAmReceiver ? { label: 'Accept', status: 'ACCEPTED' } : null;
-  if (r.status === 'ACCEPTED') return { label: 'Mark meeting done', status: 'MEETING_DONE' };
-  if (r.status === 'MEETING_DONE') return { label: 'Mark business closed', status: 'BUSINESS_CLOSED' };
-  if (r.status === 'BUSINESS_CLOSED') return { label: 'Log revenue', status: 'REVENUE_GENERATED' };
-  return null;
-}
-
-/* ------------------------------ Give a referral ------------------------------ */
-
-function GiveReferralModal({ initialTarget, onClose, onSent }) {
-  const [target, setTarget] = useState(initialTarget || null);
-  const [q, setQ] = useState('');
-  const [results, setResults] = useState([]);
-  const [searching, setSearching] = useState(false);
-  const [businessNeed, setBusinessNeed] = useState('');
-  const [intro, setIntro] = useState(INTRO_OPTIONS[0]);
-  const [error, setError] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (target || !q.trim()) {
-      setResults([]);
-      setSearching(false);
-      return undefined;
-    }
-    setSearching(true);
-    let live = true;
-    const id = setTimeout(() => {
-      api.members({ q }).then((r) => live && setResults(r.slice(0, 5))).catch(() => live && setResults([])).finally(() => live && setSearching(false));
-    }, 300);
-    return () => { live = false; clearTimeout(id); };
-  }, [q, target]);
-
-  useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape' && !submitting) onClose(); };
-    window.addEventListener('keydown', onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prev;
-    };
-  }, [onClose, submitting]);
-
-  async function submit(ev) {
-    ev.preventDefault();
-    if (!target) {
-      setError('Search for and select the member you are referring.');
-      return;
-    }
-    setError('');
-    setSubmitting(true);
-    try {
-      await api.createReferral({ receiver_user_id: target.user_id, business_need: businessNeed.trim(), note: `Expected introduction: ${intro}` });
-      onSent();
-    } catch (err) {
-      setError(err.message || 'Could not send the referral.');
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  const ready = !!target && businessNeed.trim().length > 0;
-
-  return (
-    <div className="rf-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget && !submitting) onClose(); }}>
-      <form className="rf-modal" role="dialog" aria-modal="true" aria-labelledby="rf-title" onSubmit={submit}>
-        <header className="rf-modal-head">
-          <div>
-            <h2 id="rf-title">Give a referral</h2>
-            <p>Introduce a member to an opportunity. They are notified straight away.</p>
-          </div>
-          <button type="button" className="rf-x" onClick={onClose} aria-label="Close"><Icon id="i-x" size={16} /></button>
-        </header>
-
-        <div className="rf-field">
-          <label htmlFor="rf-who"><span>1</span> Who are you referring?</label>
-          {target ? (
-            <div className="rf-picked">
-              <ImageSlot shape="circle" initial={target.founder_name || target.business_name} src={target.photo_url} style={{ width: 40, height: 40 }} fontSize={15} />
-              <span><strong>{target.founder_name || target.business_name}</strong><small>{target.business_name}</small></span>
-              <button type="button" onClick={() => setTarget(null)}>Change</button>
-            </div>
-          ) : (
-            <>
-              <div className="rf-input"><Icon id="i-search" size={16} /><input id="rf-who" placeholder="Search a member or business" value={q} onChange={(e) => setQ(e.target.value)} autoComplete="off" autoFocus /></div>
-              {(results.length > 0 || (q.trim() && !searching)) && (
-                <ul className="rf-results">
-                  {results.map((m) => (
-                    <li key={m.member_id}>
-                      <button type="button" onClick={() => { setTarget({ user_id: m.user_id, business_name: m.business_name, founder_name: m.founder_name, photo_url: m.photo_url }); setQ(''); }}>
-                        <ImageSlot shape="circle" initial={m.founder_name} src={m.photo_url} style={{ width: 34, height: 34 }} fontSize={13} />
-                        <span><strong>{m.founder_name}</strong><small>{m.business_name}</small></span>
-                      </button>
-                    </li>
-                  ))}
-                  {results.length === 0 && <li className="rf-none">No members found for “{q.trim()}”.</li>}
-                </ul>
-              )}
-            </>
-          )}
-        </div>
-
-        <div className="rf-field">
-          <label htmlFor="rf-need"><span>2</span> What is the opportunity?</label>
-          <textarea id="rf-need" rows={3} maxLength={500} placeholder="Who needs what, and why this member is a good fit." value={businessNeed} onChange={(e) => setBusinessNeed(e.target.value)} />
-          <small className="rf-count">{businessNeed.length}/500</small>
-        </div>
-
-        <fieldset className="rf-field rf-intro">
-          <legend><span>3</span> How will you introduce them?</legend>
-          <div className="rf-choices">
-            {INTRO_OPTIONS.map((o) => (
-              <label key={o} className={intro === o ? 'is-on' : ''}>
-                <input type="radio" name="intro" checked={intro === o} onChange={() => setIntro(o)} />
-                {o}
-              </label>
-            ))}
-          </div>
-        </fieldset>
-
-        {error && <p className="rf-error" role="alert">{error}</p>}
-
-        <footer className="rf-modal-foot">
-          <button type="button" className="rf-btn" onClick={onClose} disabled={submitting}>Cancel</button>
-          <button type="submit" className="rf-btn rf-btn--primary" disabled={submitting || !ready}>{submitting ? 'Sending…' : 'Send referral'}<Icon id="i-send" size={14} /></button>
-        </footer>
-      </form>
-    </div>
-  );
-}
-
-/* ---------------------------------- Page ---------------------------------- */
-
 function Stepper({ status }) {
   if (DEAD.has(status)) {
-    return <span className={`rf-state rf-state--${status === 'DECLINED' ? 'danger' : 'muted'}`}>{status === 'DECLINED' ? 'Declined' : 'Withdrawn'}</span>;
+    return <span className={`rf-state rf-state--${status === 'DECLINED' ? 'danger' : 'muted'}`}>{STATUS_LABEL[status]}</span>;
   }
-  const idx = stageIndex(status);
+  const idx = Math.max(0, STAGES.indexOf(status));
   return (
-    <div className="rf-steps" role="img" aria-label={`Stage ${idx + 1} of 5: ${STAGE_LABELS[idx]}`}>
-      <ol>
-        {STAGES.map((s, i) => <li key={s} className={i < idx ? 'done' : i === idx ? 'now' : ''} />)}
-      </ol>
-      <span>{STAGE_LABELS[idx]}</span>
+    <div className="rf-steps" role="img" aria-label={`Stage ${idx + 1} of ${STAGES.length}: ${STATUS_LABEL[status]}`}>
+      <ol>{STAGES.map((s, i) => <li key={s} className={i < idx ? 'done' : i === idx ? 'now' : ''} />)}</ol>
+      <span>{STATUS_LABEL[status]}</span>
     </div>
   );
 }
 
-export default function Referrals({ status, openGiveOnMount }) {
+function Detail({ d }) {
+  const rows = [
+    ['Contact', d.prospect_name],
+    ['Phone', d.prospect_phone && <a key="tel" href={`tel:${d.prospect_phone}`}>{formatPhone(d.prospect_phone)}</a>],
+    ['Email', d.prospect_email && <a key="mail" href={`mailto:${d.prospect_email}`}>{d.prospect_email}</a>],
+    ['Business', d.prospect_company],
+    ['Role', d.prospect_role],
+    ['Location', d.prospect_location],
+    ['Prefers', CONTACT_METHOD_LABEL[d.preferred_contact_method]],
+    ['Known as', d.relationship === 'OTHER' && d.relationship_other ? `Other — ${d.relationship_other}` : RELATIONSHIP_LABEL[d.relationship]],
+    ['May be contacted', PERMISSION_LABEL[d.contact_permission]],
+  ].filter(([, v]) => v);
+  const meta = [
+    ['Type', CATEGORY_NAME[d.category]],
+    ['Timing', URGENCY_LABEL[d.urgency]],
+    ['Value', d.value_range && d.value_range !== 'UNKNOWN' ? VALUE_LABEL[d.value_range] : null],
+    ['Introduction', [INTRO_LABEL[d.intro_method], d.intro_call_preference].filter(Boolean).join(' — ')],
+    ['Referral quality', QUALITY_LABEL[d.quality]],
+    ['Submitted', shortDate(d.created_at)],
+    ['Last update', d.last_action_at ? shortDate(d.last_action_at) : null],
+  ].filter(([, v]) => v);
+  return (
+    <div className="rf-detail">
+      <div>
+        <h4>Prospective customer</h4>
+        <dl>{rows.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
+      </div>
+      <div>
+        <h4>Opportunity</h4>
+        <p className="rf-detail-text">{d.opportunity_description || d.business_need}</p>
+        {d.note && <p className="rf-detail-note"><strong>Note:</strong> {d.note}</p>}
+        <dl>{meta.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
+      </div>
+    </div>
+  );
+}
+
+function ReferralCard({ r, expanded, onToggle, busy, onAct, onRefresh }) {
+  const iAmRecipient = r.my_role === 'receiver';
+  const name = (iAmRecipient ? r.giver_name : r.receiver_name) || 'TGL member';
+  const business = iAmRecipient ? r.giver_business : r.receiver_business;
+  const photo = iAmRecipient ? r.giver_photo_url : r.receiver_photo_url;
+  const allowed = r.allowed_actions || [];
+  const primary = PRIMARY_ACTIONS.find((a) => allowed.includes(a));
+  const secondary = allowed.filter((a) => a !== primary);
+  const [detail, setDetail] = useState(null);
+  const [loadError, setLoadError] = useState(false);
+
+  useEffect(() => {
+    if (!expanded) return undefined;
+    let live = true;
+    setLoadError(false);
+    api.referral(r.id).then((d) => live && setDetail(d)).catch(() => live && setLoadError(true));
+    return () => { live = false; };
+  }, [expanded, r.id, r.updated_at]);
+
+  const prospect = [r.prospect_name, r.prospect_company].filter(Boolean).join(' · ');
+  return (
+    <li className={`rf-card ${primary && !DEAD.has(r.status) ? 'has-action' : ''}`} id={`referral-${r.id}`}>
+      <div className="rf-card-head">
+        <ImageSlot shape="circle" initial={name} src={photo} style={{ width: 44, height: 44 }} fontSize={16} />
+        <div className="rf-who">
+          <p className="rf-dir">{iAmRecipient ? 'Referred to you by' : 'Referred to'}</p>
+          <h3>{name}</h3>
+          <p className="rf-biz">{business}</p>
+        </div>
+        <span className="rf-when" title={shortDate(r.created_at)}>{shortAgo(r.updated_at)} ago</span>
+      </div>
+      {prospect && <p className="rf-prospect"><span>Prospect</span> {prospect}</p>}
+      <p className="rf-need">{r.business_need}</p>
+      <div className="rf-chips">
+        {r.urgency && <span className="rf-chip">{URGENCY_LABEL[r.urgency]}</span>}
+        {r.intro_method && <span className="rf-chip">{INTRO_LABEL[r.intro_method]}</span>}
+        {r.quality && <span className="rf-chip rf-chip--q">{QUALITY_LABEL[r.quality]}</span>}
+        {r.category && CATEGORY_NAME[r.category] && <span className="rf-chip">{CATEGORY_NAME[r.category]}</span>}
+      </div>
+      <VerificationStrip r={r} onChanged={() => onRefresh(r.id)} />
+      <div className="rf-card-foot">
+        <Stepper status={r.status} />
+        <div className="rf-card-actions">
+          {secondary.map((a) => (
+            <button key={a} type="button" className="rf-link-btn" disabled={busy} onClick={() => onAct(r, a)}>{ACTION_LABEL[a]}</button>
+          ))}
+          {primary && <button type="button" className="rf-btn rf-btn--dark" disabled={busy} onClick={() => onAct(r, primary)}>{busy ? 'Updating…' : ACTION_LABEL[primary]}</button>}
+          {!primary && r.status === 'GIVEN' && !iAmRecipient && <span className="rf-wait">Waiting for {name.split(' ')[0]} to respond</span>}
+          <button type="button" className="rf-link-btn rf-toggle" aria-expanded={expanded} onClick={onToggle}>{expanded ? 'Hide details' : 'View details'}</button>
+        </div>
+      </div>
+      {expanded && (loadError ? <p className="rf-error">Couldn’t load the details. Try again.</p> : detail ? <Detail d={detail} /> : <p className="rf-wait">Loading details…</p>)}
+    </li>
+  );
+}
+
+export default function Referrals({ openGiveOnMount }) {
+  const [view, setView] = useState('all');
+  const [stage, setStage] = useState('');
   const [items, setItems] = useState([]);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState('received');
-  const [stageFilter, setStageFilter] = useState('');
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [summary, setSummary] = useState(null);
+  const [expandedId, setExpandedId] = useState('');
   const [giveOpen, setGiveOpen] = useState(!!openGiveOnMount);
   const [stashedTarget, setStashedTarget] = useState(null);
   const [busyId, setBusyId] = useState('');
+  const seq = useRef(0);
 
   useEffect(() => {
     const stashed = sessionStorage.getItem('tgl_referral_target');
@@ -206,44 +154,70 @@ export default function Referrals({ status, openGiveOnMount }) {
     }
   }, []);
 
-  function load(silent) {
-    if (!silent) setLoading(true);
-    api.referrals().then(setItems).catch(() => setItems([])).finally(() => setLoading(false));
-  }
-  useEffect(() => { load(false); }, []);
+  const loadSummary = useCallback(() => api.referralSummary().then(setSummary).catch(() => {}), []);
 
-  const myId = status?.user?.id;
-  const counts = useMemo(() => STAGES.map((s) => items.filter((r) => r.status === s).length), [items]);
+  // One page at a time: PAGE + 1 rows are requested so "is there more?" needs no count query.
+  const loadPage = useCallback((offset) => {
+    const mine = ++seq.current;
+    if (offset === 0) setLoading(true); else setLoadingMore(true);
+    setFailed(false);
+    return api.referrals({ view, stage, limit: PAGE + 1, offset })
+      .then((rows) => {
+        if (mine !== seq.current) return;
+        setHasMore(rows.length > PAGE);
+        setItems((prev) => (offset === 0 ? rows.slice(0, PAGE) : [...prev, ...rows.slice(0, PAGE)]));
+      })
+      .catch(() => { if (mine === seq.current) { setFailed(true); if (offset === 0) setItems([]); } })
+      .finally(() => { if (mine === seq.current) { setLoading(false); setLoadingMore(false); } });
+  }, [view, stage]);
 
-  const lists = useMemo(() => {
-    const isMine = (r) => r.receiver_user_id === myId;
-    const received = items.filter(isMine);
-    const given = items.filter((r) => r.giver_user_id === myId);
-    const closed = items.filter((r) => r.status === 'BUSINESS_CLOSED' || r.status === 'REVENUE_GENERATED');
-    return { received, given, closed };
-  }, [items, myId]);
+  useEffect(() => { loadPage(0); }, [loadPage]);
+  useEffect(() => { loadSummary(); }, [loadSummary]);
 
-  const actionable = (r) => !!nextAction(r, myId);
-  const tabs = [['received', 'Received'], ['given', 'Given'], ['closed', 'Closed']];
-  const rows = useMemo(() => lists[tab]
-    .filter((r) => !stageFilter || r.status === stageFilter)
-    .sort((a, b) => (actionable(b) - actionable(a)) || (new Date(b.updated_at) - new Date(a.updated_at))),
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  [lists, tab, stageFilter, myId]);
-  const waitingOnMe = items.filter((r) => nextAction(r, myId) && !DEAD.has(r.status)).length;
-  const total = items.length;
-
-  async function act(r, nextStatus, okMsg = 'Referral updated.') {
+  async function act(r, nextStatus) {
     setBusyId(r.id);
     try {
-      await api.updateReferral(r.id, nextStatus);
-      showToast(okMsg);
-      load(true);
+      const updated = await api.updateReferral(r.id, nextStatus);
+      setItems((prev) => prev.map((x) => (x.id === r.id ? { ...x, ...updated } : x)));
+      showToast(`Referral ${STATUS_LABEL[updated.status].toLowerCase()}.`);
+      loadSummary();
     } catch (err) {
       showToast(err.message || 'Could not update this referral.');
+      loadPage(0);
     } finally {
       setBusyId('');
     }
+  }
+
+  // After a meeting or closure action: take the server's fresh copy of that one referral.
+  const refreshOne = useCallback(async (id) => {
+    const fresh = await api.referral(id);
+    setItems((prev) => prev.map((x) => (x.id === id ? { ...x, ...fresh } : x)));
+    loadSummary();
+  }, [loadSummary]);
+
+  const counts = summary ? { all: summary.total, sent: summary.sent, received: summary.received, in_progress: summary.in_progress, converted: summary.converted, closed: summary.closed } : {};
+  const byStatus = summary?.by_status || {};
+  const awaiting = summary?.awaiting_response || 0;
+  const filtered = view !== 'all' || stage;
+
+  function backToList() {
+    setGiveOpen(false);
+    if (window.location.pathname !== '/app/networking/referrals') go('/app/networking/referrals', { replace: true });
+  }
+
+  function viewReferral(ref) {
+    backToList();
+    setView('all');
+    setStage('');
+    setExpandedId(ref.id);
+    // The referral may sit beyond the first page (e.g. an older duplicate): make sure it is on screen.
+    loadPage(0)
+      .then(() => api.referral(ref.id))
+      .then((d) => setItems((prev) => (prev.some((x) => x.id === d.id) ? prev : [d, ...prev])))
+      .catch(() => {});
+    loadSummary();
+    requestAnimationFrame(() => setTimeout(() => document.getElementById(`referral-${ref.id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 400));
   }
 
   return (
@@ -253,105 +227,97 @@ export default function Referrals({ status, openGiveOnMount }) {
         <div className="rf-top">
           <div>
             <h1>Referrals</h1>
-            <p>Introductions you give and receive, tracked from the first hello to revenue.</p>
+            <p>Business you refer to fellow members, and business they refer to you — tracked from the first hello to revenue.</p>
           </div>
           <button type="button" className="rf-btn rf-btn--primary" onClick={() => setGiveOpen(true)}>
             <Icon id="i-plus" size={15} /> Give referral
           </button>
         </div>
 
-        {/* The pipeline doubles as the stage filter: one band instead of five dead tiles. */}
         <nav className="rf-pipeline" aria-label="Filter by stage">
-          {STAGES.map((s, i) => (
-            <button key={s} type="button" className={`${stageFilter === s ? 'is-on' : ''} ${counts[i] === 0 ? 'is-zero' : ''}`} aria-pressed={stageFilter === s} onClick={() => setStageFilter(stageFilter === s ? '' : s)}>
-              <span className="rf-node">{counts[i]}</span>
-              <span className="rf-stage">{STAGE_LABELS[i]}</span>
+          {STAGES.map((s) => (
+            <button key={s} type="button" className={`${stage === s ? 'is-on' : ''} ${!byStatus[s] ? 'is-zero' : ''}`} aria-pressed={stage === s} onClick={() => setStage(stage === s ? '' : s)}>
+              <span className="rf-node">{byStatus[s] || 0}</span>
+              <span className="rf-stage">{STATUS_LABEL[s]}</span>
             </button>
           ))}
         </nav>
 
         <div className="rf-layout">
           <section className="rf-main">
-            <div className="rf-tabs" role="tablist">
-              {tabs.map(([key, label]) => (
-                <button key={key} type="button" role="tab" aria-selected={tab === key} className={tab === key ? 'is-on' : ''} onClick={() => setTab(key)}>
-                  {label}<span>{lists[key].length}</span>
+            <div className="rf-tabs" role="tablist" aria-label="Referral lists">
+              {VIEWS.map(([key, label]) => (
+                <button key={key} type="button" role="tab" aria-selected={view === key} className={view === key ? 'is-on' : ''} onClick={() => setView(key)}>
+                  {label}{summary && <span>{counts[key]}</span>}
                 </button>
               ))}
-              {stageFilter && (
-                <button type="button" className="rf-filter-chip" onClick={() => setStageFilter('')}>
-                  {STAGE_LABELS[STAGES.indexOf(stageFilter)]} <Icon id="i-x" size={12} />
+              {stage && (
+                <button type="button" className="rf-filter-chip" onClick={() => setStage('')}>
+                  {STATUS_LABEL[stage]} <Icon id="i-x" size={12} />
                 </button>
               )}
             </div>
 
-            {waitingOnMe > 0 && !loading && (
-              <p className="rf-nudge"><Icon id="i-bell" size={15} /> <strong>{waitingOnMe}</strong> {waitingOnMe === 1 ? 'referral is' : 'referrals are'} waiting on you.</p>
+            {awaiting > 0 && (
+              <p className="rf-nudge"><Icon id="i-bell" size={15} /> <strong>{awaiting}</strong> {awaiting === 1 ? 'referral is' : 'referrals are'} waiting for your response.</p>
             )}
 
             {loading ? (
               <div className="rf-list">{[0, 1].map((i) => <div key={i} className="rf-card rf-card--sk" aria-hidden="true"><span className="rf-sk rf-sk--a" /><span className="rf-sk-l"><span className="rf-sk" /><span className="rf-sk rf-sk--s" /></span></div>)}</div>
-            ) : rows.length === 0 ? (
-              total === 0 ? (
+            ) : failed && items.length === 0 ? (
+              <div className="rf-empty rf-empty--sm" role="alert">
+                <h2>Couldn’t load referrals</h2>
+                <p>Check your connection and try again.</p>
+                <button type="button" className="rf-btn" onClick={() => loadPage(0)}>Try again</button>
+              </div>
+            ) : items.length === 0 ? (
+              !filtered && summary?.total === 0 ? (
                 <div className="rf-empty">
                   <span className="rf-empty-icon"><Icon id="i-send" size={24} /></span>
                   <h2>Your first referral starts here</h2>
-                  <p>Introduce a member to a real opportunity. When it turns into business, you both build Trust and earn Growth Points.</p>
+                  <p>Introduce a business opportunity to a fellow member. When it turns into business, you both build Trust. Growth Points are coming soon.</p>
                   <button type="button" className="rf-btn rf-btn--primary" onClick={() => setGiveOpen(true)}><Icon id="i-plus" size={15} /> Give a referral</button>
                 </div>
               ) : (
                 <div className="rf-empty rf-empty--sm">
-                  <h2>{stageFilter ? 'Nothing at this stage' : `No ${tab} referrals`}</h2>
-                  <p>{stageFilter ? 'Try another stage, or clear the filter.' : tab === 'received' ? 'When a member refers business to you, it shows up here.' : tab === 'given' ? 'Referrals you send show up here with their progress.' : 'Referrals that turn into business are collected here.'}</p>
-                  {stageFilter && <button type="button" className="rf-btn" onClick={() => setStageFilter('')}>Clear filter</button>}
+                  <h2>Nothing here</h2>
+                  <p>{stage ? 'No referrals at this stage. Try another, or clear the filter.' : 'No referrals match this list yet.'}</p>
+                  {filtered && <button type="button" className="rf-btn" onClick={() => { setView('all'); setStage(''); }}>Show all referrals</button>}
                 </div>
               )
             ) : (
-              <ul className="rf-list">
-                {rows.map((r) => {
-                  const iAmReceiver = r.receiver_user_id === myId;
-                  const name = (iAmReceiver ? r.giver_name : r.receiver_name) || 'TGL member';
-                  const business = iAmReceiver ? r.giver_business : r.receiver_business;
-                  const photo = iAmReceiver ? r.giver_photo_url : r.receiver_photo_url;
-                  const action = DEAD.has(r.status) ? null : nextAction(r, myId);
-                  const busy = busyId === r.id;
-                  const awaiting = !action && r.status === 'GIVEN';
-                  return (
-                    <li key={r.id} className={`rf-card ${action ? 'has-action' : ''}`}>
-                      <div className="rf-card-head">
-                        <ImageSlot shape="circle" initial={name} src={photo} style={{ width: 44, height: 44 }} fontSize={16} />
-                        <div className="rf-who">
-                          <p className="rf-dir">{iAmReceiver ? 'From' : 'To'}</p>
-                          <h3>{name}</h3>
-                          <p className="rf-biz">{business}</p>
-                        </div>
-                        <span className="rf-when" title={shortDate(r.created_at)}>{shortAgo(r.updated_at)} ago</span>
-                      </div>
-                      <p className="rf-need">{r.business_need}</p>
-                      <div className="rf-card-foot">
-                        <Stepper status={r.status} />
-                        <div className="rf-card-actions">
-                          {action && <button type="button" className="rf-btn rf-btn--dark" disabled={busy} onClick={() => act(r, action.status)}>{busy ? 'Updating…' : action.label}</button>}
-                          {r.status === 'GIVEN' && iAmReceiver && <button type="button" className="rf-link-btn" disabled={busy} onClick={() => act(r, 'DECLINED', 'Referral declined.')}>Decline</button>}
-                          {r.status === 'GIVEN' && !iAmReceiver && <button type="button" className="rf-link-btn" disabled={busy} onClick={() => act(r, 'CANCELLED', 'Referral withdrawn.')}>Withdraw</button>}
-                          {awaiting && !iAmReceiver && <span className="rf-wait">Waiting for {name.split(' ')[0]} to accept</span>}
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
+              <>
+                <ul className="rf-list">
+                  {items.map((r) => (
+                    <ReferralCard key={r.id} r={r} expanded={expandedId === r.id} onToggle={() => setExpandedId(expandedId === r.id ? '' : r.id)} busy={busyId === r.id} onAct={act} onRefresh={refreshOne} />
+                  ))}
+                </ul>
+                {hasMore && (
+                  <div className="rf-more-wrap">
+                    <button type="button" className="rf-btn" disabled={loadingMore} onClick={() => loadPage(items.length)}>{loadingMore ? 'Loading…' : 'Load more'}</button>
+                  </div>
+                )}
+                {failed && <p className="rf-error" role="alert">Couldn’t load more. Try again.</p>}
+              </>
             )}
           </section>
 
           <aside className="rf-side">
             <section className="rf-panel">
-              <h2>How referrals work</h2>
+              <h2>Who’s who in a referral</h2>
+              <ul className="rf-roles">
+                <li><b>You</b><span>give the referral</span></li>
+                <li><b>TGL member</b><span>receives the referral</span></li>
+                <li><b>Prospect</b><span>is the business opportunity — a customer who needs the product or service</span></li>
+              </ul>
+            </section>
+            <section className="rf-panel">
+              <h2>How referrals progress</h2>
               <ol className="rf-how">
-                {STAGE_LABELS.map((l, i) => (
-                  <li key={l}>
+                {STAGES.map((s, i) => (
+                  <li key={s}>
                     <span className="rf-how-n">{i + 1}</span>
-                    <span><strong>{l}</strong><small>{STAGE_HELP[i]}</small></span>
+                    <span><strong>{STATUS_LABEL[s]}</strong><small>{STAGE_HELP[s]}</small></span>
                   </li>
                 ))}
               </ol>
@@ -365,17 +331,11 @@ export default function Referrals({ status, openGiveOnMount }) {
       </main>
 
       {giveOpen && (
-        <GiveReferralModal
+        <GiveReferral
           initialTarget={stashedTarget}
-          onClose={() => { setGiveOpen(false); if (window.location.pathname !== '/app/networking/referrals') go('/app/networking/referrals', { replace: true }); }}
-          onSent={() => {
-            setGiveOpen(false);
-            if (window.location.pathname !== '/app/networking/referrals') go('/app/networking/referrals', { replace: true });
-            showToast("Referral submitted. We'll notify you when it's accepted.");
-            setTab('given');
-            setStageFilter('');
-            load(true);
-          }}
+          onClose={backToList}
+          onSent={() => { loadPage(0); loadSummary(); }}
+          onViewReferral={viewReferral}
         />
       )}
     </>

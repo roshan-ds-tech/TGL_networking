@@ -160,14 +160,19 @@ async def init_storage() -> None:
 
 # ------------------------------------------------------------------ public ---
 
-async def save_payment_proof(upload: UploadFile) -> tuple[str, str, int]:
-    """Validate and persist an upload. Returns (filename, mime, size)."""
+async def save_document(upload: UploadFile, label: str = "Payment proof") -> tuple[str, str, int, str]:
+    """Validate and persist a private document. Returns (filename, mime, size, sha256).
+
+    The same hardening for every private upload (payment proofs, deal evidence): the real
+    bytes are sniffed, the size is bounded while reading, the stored name is a server UUID."""
+    import hashlib
+
     head = await upload.read(32)
     sniffed = _sniff(head)
     if sniffed is None:
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail="Payment proof must be a PNG, JPG, WEBP, GIF or PDF file.",
+            detail=f"{label} must be a PNG, JPG, WEBP, GIF or PDF file.",
         )
     mime, ext = sniffed
     filename = f"{uuid.uuid4().hex}{ext}"
@@ -180,16 +185,22 @@ async def save_payment_proof(upload: UploadFile) -> tuple[str, str, int]:
         if len(buf) > settings.max_upload_bytes:
             raise HTTPException(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                detail=f"Payment proof exceeds {settings.max_upload_bytes // (1024 * 1024)} MB.",
+                detail=f"{label} exceeds {settings.max_upload_bytes // (1024 * 1024)} MB.",
             )
     if not buf:
-        raise HTTPException(status_code=400, detail="Payment proof file is empty.")
+        raise HTTPException(status_code=400, detail=f"{label} file is empty.")
 
     if _use_supabase():
         await _sb_put(filename, bytes(buf), mime)
     else:
         (upload_root() / filename).write_bytes(buf)
-    return filename, mime, len(buf)
+    return filename, mime, len(buf), hashlib.sha256(buf).hexdigest()
+
+
+async def save_payment_proof(upload: UploadFile) -> tuple[str, str, int]:
+    """Validate and persist a payment proof. Returns (filename, mime, size)."""
+    filename, mime, size, _ = await save_document(upload, "Payment proof")
+    return filename, mime, size
 
 
 def _checked(filename: str) -> str | None:
@@ -242,12 +253,28 @@ PHOTO_STORED_MAX_BYTES = 1024 * 1024
 PHOTO_SIZE = 512
 _PHOTO_MAX_PIXELS = 40_000_000
 _PHOTO_NAME_RE = re.compile(r"^[0-9a-f]{32}\.jpg$")
+# Synthetic demo photos live in their OWN namespace and directory: a stored name `demo-<32 hex>.jpg` is kept under <upload_dir>/demo_photos/,
+# never under <upload_dir>/photos/. save_profile_photo (the member upload path) can only ever produce a plain name, so a demo name can not collide
+# with, overwrite or delete a genuine member's photo, and removing the demo photos can not reach a genuine one. Local storage only: demo photos
+# are never written to, or read from, a Supabase bucket.
+DEMO_PHOTO_PREFIX = "demo-"
+_DEMO_PHOTO_NAME_RE = re.compile(r"^demo-[0-9a-f]{32}\.jpg$")
 
 
 def photo_root() -> Path:
     root = (Path(settings.upload_dir) / "photos").resolve()
     root.mkdir(parents=True, exist_ok=True)
     return root
+
+
+def demo_photo_root() -> Path:
+    root = (Path(settings.upload_dir) / "demo_photos").resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def is_demo_photo(name: str | None) -> bool:
+    return bool(name) and _DEMO_PHOTO_NAME_RE.fullmatch(name) is not None
 
 
 def _process_photo(raw: bytes) -> bytes:
@@ -275,8 +302,9 @@ def _process_photo(raw: bytes) -> bytes:
     return out.getvalue()
 
 
-async def save_profile_photo(upload: UploadFile) -> str:
-    """Validate, re-encode and store a profile photo. Returns its stored name."""
+async def save_profile_photo(upload: UploadFile, *, demo: bool = False) -> str:
+    """Validate, re-encode and store a profile photo. Returns its stored name.
+    `demo=True` (the synthetic demo seeder only) stores it in the separate demo directory under a `demo-` name; it is refused on Supabase storage."""
     import anyio
 
     head = await upload.read(32)
@@ -289,6 +317,12 @@ async def save_profile_photo(upload: UploadFile) -> str:
         if len(buf) > PHOTO_UPLOAD_MAX_BYTES:
             raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Photo must be under 5 MB.")
     data = await anyio.to_thread.run_sync(_process_photo, bytes(buf))  # CPU work off the event loop
+    if demo:
+        if _use_supabase():
+            raise RuntimeError("Demo photos are never stored in a Supabase bucket.")
+        name = f"{DEMO_PHOTO_PREFIX}{uuid.uuid4().hex}.jpg"
+        (demo_photo_root() / name).write_bytes(data)
+        return name
     name = f"{uuid.uuid4().hex}.jpg"
     if _use_supabase():
         await _sb_put(name, data, "image/jpeg", settings.supabase_photos_bucket)
@@ -298,6 +332,13 @@ async def save_profile_photo(upload: UploadFile) -> str:
 
 
 async def read_profile_photo(name: str) -> bytes:
+    if is_demo_photo(name):
+        if _use_supabase():
+            raise HTTPException(status_code=404, detail="Photo not found")
+        candidate = (demo_photo_root() / name).resolve()
+        if not candidate.is_file() or demo_photo_root() not in candidate.parents:
+            raise HTTPException(status_code=404, detail="Photo not found")
+        return candidate.read_bytes()
     if not _PHOTO_NAME_RE.fullmatch(name or ""):
         raise HTTPException(status_code=404, detail="Photo not found")
     if _use_supabase():
@@ -309,6 +350,12 @@ async def read_profile_photo(name: str) -> bytes:
 
 
 async def delete_profile_photo(name: str | None) -> bool:
+    if is_demo_photo(name):                        # only ever inside the demo directory
+        candidate = (demo_photo_root() / name).resolve()
+        if _use_supabase() or demo_photo_root() not in candidate.parents or not candidate.is_file():
+            return False
+        candidate.unlink(missing_ok=True)
+        return True
     if not name or not _PHOTO_NAME_RE.fullmatch(name):
         return False
     if _use_supabase():

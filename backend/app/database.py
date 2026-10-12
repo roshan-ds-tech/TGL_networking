@@ -185,6 +185,13 @@ class Base(DeclarativeBase):
 # can never be added here with a type that drifts from the one create_all()
 # would have produced — and so the DDL is correct on both SQLite and Postgres.
 _ADDED_COLUMNS: dict[str, dict[str, str | None]] = {
+    # Phase 2 (migration 0011): a development database created before it gets the columns here, so the admin Subscriptions view and the
+    # renewal flow work without running Alembic. Existing invoices have no points discount.
+    "subscriptions": {"renews_subscription_id": None},
+    # Phase A (migration 0013): the need lifecycle. All nullable: a need that predates it stays valid and is simply an OPEN, legacy need.
+    "business_needs": {"published_at": None, "resolved_at": None, "cancelled_at": None, "removed_at": None, "removed_by_admin_id": None, "removed_reason": None,
+                       "resolved_offer_id": None, "title_hash": None, "description_hash": None, "publish_month_key": None, "qualifies_for_future_reward": None, "quality_note": None},
+    "invoices": {"points_redeemed": "0", "points_discount_minor": "0"},
     "registrations": {
         "source": "'local'",
         # Nullable bridge fields for authenticated P0 registrations. Legacy
@@ -206,6 +213,43 @@ _ADDED_COLUMNS: dict[str, dict[str, str | None]] = {
         "photo_key": None,
         "full_name": None,
         "phone": None,
+    },
+    "connections": {
+        # Request lifecycle (PENDING / ACCEPTED / DECLINED). Every request made
+        # before it existed was, by definition, still pending.
+        "status": "'PENDING'",
+        "responded_at": None,
+        "pair_key": None,                      # Phase A (migration 0013); rows that predate it keep NULL
+    },
+    "business_referrals": {
+        # Prospect snapshot, opportunity context and lifecycle stamps (migration
+        # 0006). All nullable: referrals made before it simply have none.
+        "contacted_at": None,
+        "closed_at": None,
+        "prospect_name": None,
+        "prospect_phone": None,
+        "prospect_email": None,
+        "prospect_company": None,
+        "prospect_role": None,
+        "prospect_location": None,
+        "preferred_contact_method": None,
+        "relationship": None,
+        "relationship_other": None,
+        "opportunity_description": None,
+        "category": None,
+        "urgency": None,
+        "value_range": None,
+        "intro_method": None,
+        "intro_call_preference": None,
+        "contact_permission": None,
+        "consent_confirmed_at": None,
+        "quality": None,
+        "last_action_at": None,
+        # Admin review marker (Phase 0). Existing referrals start unflagged.
+        "flagged": "false",
+        "flag_reason": None,
+        "flagged_at": None,
+        "flagged_by": None,
     },
     "businesses": {
         # KYB submission workflow, added after the tgl_verified badge it sets.
@@ -238,6 +282,154 @@ def sync_schema(sync_conn) -> None:
             if backfill is not None:
                 ddl += f" NOT NULL DEFAULT {backfill}"
             sync_conn.exec_driver_sql(ddl)
+    _sync_referral_indexes(sync_conn, inspector)
+    _sync_connections(sync_conn, inspector)
+    _sync_subscription_indexes(sync_conn, inspector)
+    _sync_need_indexes(sync_conn, inspector)
+
+
+def _sync_subscription_indexes(sync_conn, inspector) -> None:
+    """Development databases: make the live-subscription indexes the Phase 2 shape (an early renewal may coexist with the running term)."""
+    fresh = inspect(sync_conn)                           # the inspector above predates the ALTER TABLE that added the column
+    if not fresh.has_table("subscriptions") or "renews_subscription_id" not in {c["name"] for c in fresh.get_columns("subscriptions")}:
+        return
+    dialect = sync_conn.dialect.name
+    if dialect == "sqlite":
+        row = sync_conn.exec_driver_sql("SELECT sql FROM sqlite_master WHERE type = 'index' AND name = 'uq_subscription_live_user'").first()
+    elif dialect == "postgresql":
+        row = sync_conn.exec_driver_sql("SELECT indexdef FROM pg_indexes WHERE indexname = 'uq_subscription_live_user'").first()
+    else:
+        return
+    if row is not None and "renews_subscription_id" not in (row[0] or ""):
+        sync_conn.exec_driver_sql("DROP INDEX uq_subscription_live_user")
+        row = None
+    if row is None:
+        sync_conn.exec_driver_sql("CREATE UNIQUE INDEX uq_subscription_live_user ON subscriptions (user_id) WHERE status IN ('PENDING','ACTIVE') AND renews_subscription_id IS NULL")
+    sync_conn.exec_driver_sql("CREATE UNIQUE INDEX IF NOT EXISTS uq_subscription_live_renewal ON subscriptions (renews_subscription_id) WHERE status IN ('PENDING','ACTIVE') AND renews_subscription_id IS NOT NULL")
+
+
+def install_audit_triggers(sync_conn) -> None:
+    """Make audit_log append-only at the database level (idempotent, safe every boot).
+
+    The application never updates or deletes audit rows, and an ORM guard refuses to;
+    these triggers close the remaining gap: raw SQL, a bug, or a mistaken script.
+    They apply to SQLite and Postgres, the two engines this project runs on."""
+    dialect = sync_conn.dialect.name
+    if dialect == "sqlite":
+        for name, op in (("audit_log_no_update", "UPDATE"), ("audit_log_no_delete", "DELETE")):
+            sync_conn.exec_driver_sql(
+                f"CREATE TRIGGER IF NOT EXISTS {name} BEFORE {op} ON audit_log "
+                "BEGIN SELECT RAISE(ABORT, 'audit_log is append-only'); END"
+            )
+    elif dialect == "postgresql":
+        sync_conn.exec_driver_sql(
+            "CREATE OR REPLACE FUNCTION tgl_audit_log_immutable() RETURNS trigger AS $$ "
+            "BEGIN RAISE EXCEPTION 'audit_log is append-only'; END; $$ LANGUAGE plpgsql"
+        )
+        sync_conn.exec_driver_sql("DROP TRIGGER IF EXISTS audit_log_no_change ON audit_log")
+        sync_conn.exec_driver_sql(
+            "CREATE TRIGGER audit_log_no_change BEFORE UPDATE OR DELETE ON audit_log "
+            "FOR EACH ROW EXECUTE FUNCTION tgl_audit_log_immutable()"
+        )
+        sync_conn.exec_driver_sql("DROP TRIGGER IF EXISTS audit_log_no_truncate ON audit_log")
+        sync_conn.exec_driver_sql(
+            "CREATE TRIGGER audit_log_no_truncate BEFORE TRUNCATE ON audit_log "
+            "FOR EACH STATEMENT EXECUTE FUNCTION tgl_audit_log_immutable()"
+        )
+
+
+def install_ledger_triggers(sync_conn) -> None:
+    """Make the shadow ledger and the shadow renewal records append-only at the database level (idempotent, safe every boot), exactly as
+    audit_log is. They are the record every later number is explained from: never edited, only added to."""
+    dialect = sync_conn.dialect.name
+    tables = ("growth_point_ledger", "growth_point_renewals", "growth_point_redemptions", "growth_point_redemption_lots", "growth_point_controls", "growth_point_redemption_epoch")
+    from sqlalchemy import inspect as _inspect
+    existing = set(_inspect(sync_conn).get_table_names())
+    tables = tuple(t for t in tables if t in existing)
+    if dialect == "sqlite":
+        for t in tables:
+            for name, op in ((f"{t}_no_update", "UPDATE"), (f"{t}_no_delete", "DELETE")):
+                sync_conn.exec_driver_sql(
+                    f"CREATE TRIGGER IF NOT EXISTS {name} BEFORE {op} ON {t} BEGIN SELECT RAISE(ABORT, '{t} is append-only'); END"
+                )
+    elif dialect == "postgresql" and tables:
+        sync_conn.exec_driver_sql(
+            "CREATE OR REPLACE FUNCTION tgl_gp_ledger_immutable() RETURNS trigger AS $$ "
+            "BEGIN RAISE EXCEPTION 'growth point history is append-only'; END; $$ LANGUAGE plpgsql"
+        )
+        for t in tables:
+            sync_conn.exec_driver_sql(f"DROP TRIGGER IF EXISTS {t}_no_change ON {t}")
+            sync_conn.exec_driver_sql(f"CREATE TRIGGER {t}_no_change BEFORE UPDATE OR DELETE ON {t} FOR EACH ROW EXECUTE FUNCTION tgl_gp_ledger_immutable()")
+            sync_conn.exec_driver_sql(f"DROP TRIGGER IF EXISTS {t}_no_truncate ON {t}")
+            sync_conn.exec_driver_sql(f"CREATE TRIGGER {t}_no_truncate BEFORE TRUNCATE ON {t} FOR EACH STATEMENT EXECUTE FUNCTION tgl_gp_ledger_immutable()")
+
+
+def _sync_need_indexes(sync_conn, inspector) -> None:
+    """Phase A: the live-need unique index on a pre-0013 development table (create_all builds indexes only with a new table)."""
+    fresh = inspect(sync_conn)
+    if not fresh.has_table("business_needs") or "title_hash" not in {c["name"] for c in fresh.get_columns("business_needs")}:
+        return
+    have = {i["name"] for i in fresh.get_indexes("business_needs")}
+    for index in Base.metadata.tables["business_needs"].indexes:
+        if index.name not in have and index.name.startswith("uq_need_"):
+            index.create(sync_conn)
+
+
+def install_community_triggers(sync_conn) -> None:
+    """Make the Phase A community history append-only at the database level (idempotent, safe every boot), exactly as the ledger and the audit log are."""
+    from sqlalchemy import inspect as _inspect
+    if "community_events" not in set(_inspect(sync_conn).get_table_names()):
+        return
+    dialect = sync_conn.dialect.name
+    if dialect == "sqlite":
+        for name, op in (("community_events_no_update", "UPDATE"), ("community_events_no_delete", "DELETE")):
+            sync_conn.exec_driver_sql(f"CREATE TRIGGER IF NOT EXISTS {name} BEFORE {op} ON community_events BEGIN SELECT RAISE(ABORT, 'community_events is append-only'); END")
+    elif dialect == "postgresql":
+        sync_conn.exec_driver_sql("CREATE OR REPLACE FUNCTION tgl_community_immutable() RETURNS trigger AS $$ BEGIN RAISE EXCEPTION 'community activity history is append-only'; END; $$ LANGUAGE plpgsql")
+        sync_conn.exec_driver_sql("DROP TRIGGER IF EXISTS community_events_no_change ON community_events")
+        sync_conn.exec_driver_sql("CREATE TRIGGER community_events_no_change BEFORE UPDATE OR DELETE ON community_events FOR EACH ROW EXECUTE FUNCTION tgl_community_immutable()")
+        sync_conn.exec_driver_sql("DROP TRIGGER IF EXISTS community_events_no_truncate ON community_events")
+        sync_conn.exec_driver_sql("CREATE TRIGGER community_events_no_truncate BEFORE TRUNCATE ON community_events FOR EACH STATEMENT EXECUTE FUNCTION tgl_community_immutable()")
+
+
+def _sync_connections(sync_conn, inspector) -> None:
+    """Two members who each asked the other are connected: accept both rows.
+    Needed once for requests made before accepting existed (migration 0007 does
+    the same in production), and harmless afterwards - the API never leaves a
+    mutual pair pending."""
+    if not inspector.has_table("connections"):
+        return
+    sync_conn.exec_driver_sql(
+        "UPDATE connections SET status = 'ACCEPTED', responded_at = CURRENT_TIMESTAMP "
+        "WHERE status = 'PENDING' AND EXISTS ("
+        "SELECT 1 FROM connections r WHERE r.requester_user_id = connections.target_user_id "
+        "AND r.target_user_id = connections.requester_user_id)"
+    )
+    # Phase A: the live-pair unique index on a pre-0013 development table (create_all builds indexes only with a new table). It covers only rows that
+    # carry a pair_key, so existing rows, including any legacy mutual pair, can never make it fail.
+    fresh = inspect(sync_conn)
+    if "pair_key" in {c["name"] for c in fresh.get_columns("connections")}:
+        have = {i["name"] for i in fresh.get_indexes("connections")}
+        for index in Base.metadata.tables["connections"].indexes:
+            if index.name not in have:
+                index.create(sync_conn)
+
+
+def _sync_referral_indexes(sync_conn, inspector) -> None:
+    """Bring a pre-0006 local business_referrals table up to the model, the way
+    migration 0006 does in production: the composite/partial indexes (including
+    the unique one that stops a double-click creating two live referrals) and the
+    last_action_at backfill. create_all() builds these only with a new table."""
+    table_name = "business_referrals"
+    if not inspector.has_table(table_name):
+        return
+    have = {i["name"] for i in inspector.get_indexes(table_name)}
+    for index in Base.metadata.tables[table_name].indexes:
+        if index.name not in have:
+            index.create(sync_conn)
+    sync_conn.exec_driver_sql(
+        f"UPDATE {table_name} SET last_action_at = updated_at WHERE last_action_at IS NULL"
+    )
 
 
 def lock_down_postgres(sync_conn) -> None:

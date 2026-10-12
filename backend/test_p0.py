@@ -66,6 +66,41 @@ app_settings.login_max_attempts = 5
 
 
 
+_phone_seq = itertools.count(1)
+
+
+def rp(receiver_id: str, need: str = "Priya needs a responsive website with online booking before opening", **over) -> dict:
+    """A valid referral payload; each call gets a fresh prospect phone number."""
+    payload = {
+        "receiver_user_id": receiver_id,
+        "prospect_name": "Priya Sharma",
+        "prospect_phone": f"98765{next(_phone_seq):05d}",
+        "relationship": "BUSINESS_CONTACT",
+        "opportunity_description": need,
+        "urgency": "HOT",
+        "intro_method": "EMAIL",
+        "contact_permission": "EXPECTING",
+        "consent_confirmed": True,
+    }
+    payload.update(over)
+    return payload
+
+
+def confirm_meeting_both(first: TestClient, second: TestClient, ref_id: str) -> None:
+    """Both members confirm the meeting (a referral reaches MEETING_DONE only this way)."""
+    for c in (first, second):
+        r = c.post(f"/api/v1/referrals/{ref_id}/meeting/confirm", headers={"X-CSRF-Token": customer_csrf(c)})
+        assert r.status_code == 200, r.text
+
+
+def close_deal(giver: TestClient, receiver: TestClient, ref_id: str, value: float = 50_000) -> None:
+    """The recipient reports the actual value and the referrer confirms it (under Rs 1L: no evidence needed)."""
+    r = receiver.post(f"/api/v1/referrals/{ref_id}/closure", json={"actual_value": value}, headers={"X-CSRF-Token": customer_csrf(receiver)})
+    assert r.status_code == 201, r.text
+    r = giver.post(f"/api/v1/referrals/{ref_id}/closure/confirm", json={"expected_value_minor": round(value * 100)}, headers={"X-CSRF-Token": customer_csrf(giver)})
+    assert r.status_code == 200, r.text
+
+
 def check(name: str, condition: bool, detail: str = "") -> None:
     results.append((condition, f"{name}{(' — ' + detail) if detail and not condition else ''}"))
 
@@ -484,7 +519,7 @@ def main() -> int:
     # ---------- referrals ----------
     r = u1.post(
         "/api/v1/referrals",
-        json={"receiver_user_id": "no-such-user", "business_need": "Introduce a packaging supplier"},
+        json=rp("no-such-user", "Introduce a packaging supplier for our eco range"),
         headers={"X-CSRF-Token": customer_csrf(u1)},
     )
     check("referral to unknown receiver is refused", r.status_code == 404, str(r.status_code))
@@ -494,27 +529,27 @@ def main() -> int:
     u4_id = r.json().get("id") if r.status_code == 200 else ""
     r = u1.post(
         "/api/v1/referrals",
-        json={"receiver_user_id": u4_id, "business_need": "Introduce a packaging supplier"},
+        json=rp(u4_id, "Introduce a packaging supplier for our eco range"),
         headers={"X-CSRF-Token": customer_csrf(u1)},
     )
-    check("referral to a non-active member is refused", r.status_code == 400, str(r.status_code))
+    check("referral to a non-active member is refused", r.status_code == 404, str(r.status_code))
 
     r = u1.post(
         "/api/v1/referrals",
-        json={"receiver_user_id": u1_id, "business_need": "Introduce myself to myself"},
+        json=rp(u1_id, "Introduce myself to myself, which is not allowed"),
         headers={"X-CSRF-Token": customer_csrf(u1)},
     )
     check("self-referral is refused", r.status_code == 400, str(r.status_code))
 
     r = u1.post(
         "/api/v1/referrals",
-        json={"receiver_user_id": "founder2@example.com", "business_need": "Introduce a packaging supplier", "note": "They need eco packaging."},
+        json=rp("founder2@example.com", "Introduce a packaging supplier for our eco range"),
     )
     check("referral mutation without CSRF is blocked", r.status_code == 403, str(r.status_code))
 
     r = u1.post(
         "/api/v1/referrals",
-        json={"receiver_user_id": u2_me["id"], "business_need": "Introduce a packaging supplier", "note": "They need eco packaging."},
+        json=rp(u2_me["id"], "Introduce a packaging supplier for our eco range"),
         headers={"X-CSRF-Token": customer_csrf(u1)},
     )
     check("active member can create a referral", r.status_code == 201, r.text[:300])
@@ -548,13 +583,17 @@ def main() -> int:
         json={"status": "MEETING_DONE"},
         headers={"X-CSRF-Token": customer_csrf(u1)},
     )
-    check("referral can progress to MEETING_DONE", r.status_code == 200, str(r.status_code))
+    check("one member can no longer set MEETING_DONE by themselves", r.status_code == 400, str(r.status_code))
+    confirm_meeting_both(u1, u2, ref_id)
+    check("referral reaches MEETING_DONE once both members confirm", u1.get(f"/api/v1/referrals/{ref_id}").json()["status"] == "MEETING_DONE")
     r = u2.patch(
         f"/api/v1/referrals/{ref_id}",
         json={"status": "BUSINESS_CLOSED"},
         headers={"X-CSRF-Token": customer_csrf(u2)},
     )
-    check("referral can progress to BUSINESS_CLOSED", r.status_code == 200, str(r.status_code))
+    check("BUSINESS_CLOSED can no longer be set by a status update", r.status_code == 400, str(r.status_code))
+    close_deal(u1, u2, ref_id)
+    check("referral reaches BUSINESS_CLOSED through a confirmed closure", u1.get(f"/api/v1/referrals/{ref_id}").json()["status"] == "BUSINESS_CLOSED")
     r = u1.patch(
         f"/api/v1/referrals/{ref_id}",
         json={"status": "REVENUE_GENERATED"},
@@ -571,7 +610,7 @@ def main() -> int:
     # decline + cancel paths
     r = u1.post(
         "/api/v1/referrals",
-        json={"receiver_user_id": u2_me["id"], "business_need": "Second opinion on pricing"},
+        json=rp(u2_me["id"], "Second opinion on pricing for the new wholesale range"),
         headers={"X-CSRF-Token": customer_csrf(u1)},
     )
     ref2_id = r.json()["id"]
@@ -590,6 +629,325 @@ def main() -> int:
 
     r = u1.get("/api/v1/referrals")
     check("referral list returns sent and received", r.status_code == 200 and len(r.json()) >= 2, str(len(r.json() or [])))
+
+    # ---------- referral workflow v2: member search ----------
+    import time as _time
+
+    H1 = {"X-CSRF-Token": customer_csrf(u1)}
+    H2 = {"X-CSRF-Token": customer_csrf(u2)}
+    H3 = {"X-CSRF-Token": customer_csrf(u3)}
+
+    def search(c, **params):
+        return c.get("/api/v1/networking/members/search", params=params)
+
+    r = new_client().get("/api/v1/networking/members/search")
+    check("search requires authentication", r.status_code == 401, str(r.status_code))
+    r = search(u4)
+    check("search refuses a non-member account", r.status_code == 403, str(r.status_code))
+    r = search(u1)
+    items = r.json()["items"] if r.status_code == 200 else []
+    check("empty search lists suggested members", r.status_code == 200 and len(items) >= 2, r.text[:200])
+    check("search never lists the caller", u1_id not in {m["user_id"] for m in items})
+    check("search results carry no contact data", not any(k in r.text for k in ("email", "phone", "@example.com")), r.text[:200])
+    check("search items expose only recognition fields", set(items[0]) == {"member_id", "user_id", "name", "business_name", "profession", "category", "category_name", "city", "photo_url"}, str(set(items[0])))
+    check("search honours the limit and reports more", search(u1, limit=1).json() == {**search(u1, limit=1).json(), "has_more": True} and len(search(u1, limit=1).json()["items"]) == 1)
+    r = search(u1, q="second")
+    check("search by partial member name", [m["user_id"] for m in r.json()["items"]] == [u2_me["id"]], r.text[:200])
+    r = search(u1, q="biz tw")
+    check("search by partial business name", [m["business_name"] for m in r.json()["items"]] == ["Biz Two"], r.text[:200])
+    r = search(u1, q="food")
+    check("search by category name", [m["category"] for m in r.json()["items"]] == ["02"], r.text[:200])
+    r = search(u1, q="mumbai")
+    check("search by city", [m["business_name"] for m in r.json()["items"]] == ["Biz Two"], r.text[:200])
+    r = search(u1, q="FOUNDER")
+    check("search by profession is case-insensitive", len(r.json()["items"]) == 2, r.text[:200])
+    r = search(u1, q="zzzz-nobody")
+    check("search with no match returns an empty list", r.status_code == 200 and r.json() == {"items": [], "has_more": False}, r.text[:200])
+    r = search(u1, q="%")
+    check("LIKE wildcards in the query are literal", r.json()["items"] == [], r.text[:200])
+    r = search(u1, q="x" * 200)
+    check("over-long search query is rejected", r.status_code == 422, str(r.status_code))
+    r = search(u1, limit=500)
+    check("search limit is capped", r.status_code == 422, str(r.status_code))
+
+    async def set_active(uid: str, value: bool) -> None:
+        from sqlalchemy import update
+        from app.models import User
+
+        async with SessionLocal() as db:
+            await db.execute(update(User).where(User.id == uid).values(is_active=value))
+            await db.commit()
+
+    asyncio.run(set_active(u3_id, False))
+    r = search(u1, q="third")
+    check("deactivated members are not searchable", r.json()["items"] == [], r.text[:200])
+    r = u1.post("/api/v1/referrals", json=rp(u3_id), headers=H1)
+    check("referral to a deactivated member is refused", r.status_code == 404, str(r.status_code))
+    asyncio.run(set_active(u3_id, True))
+
+    # ---------- referral workflow v2: creation ----------
+    def create(client=u1, headers=None, **kw):
+        return client.post("/api/v1/referrals", json=rp(**kw), headers=headers or {"X-CSRF-Token": customer_csrf(client)})
+
+    t0 = _time.perf_counter()
+    r = create(receiver_id=u2_me["id"], prospect_name="  Priya   Sharma ", prospect_phone="+91 98765-43210",
+               prospect_email="Priya@XYZ-Restaurant.IN", prospect_company="XYZ Restaurant", category="02",
+               note="Owner is the decision maker.", prospect_role="Owner", prospect_location="Indiranagar",
+               preferred_contact_method="WHATSAPP")
+    create_ms = (_time.perf_counter() - t0) * 1000
+    v2 = r.json() if r.status_code == 201 else {}
+    check("full referral is created", r.status_code == 201, r.text[:400])
+    check("referrer is taken from the session", v2.get("giver_user_id") == u1_id and v2.get("my_role") == "giver", str(v2)[:200])
+    check("recipient is the chosen member's id", v2.get("receiver_user_id") == u2_me["id"] and v2.get("receiver_business") == "Biz Two", str(v2)[:200])
+    check("prospect is stored separately, normalised", (v2.get("prospect_name"), v2.get("prospect_phone"), v2.get("prospect_email")) == ("Priya Sharma", "+919876543210", "priya@xyz-restaurant.in"), str(v2)[:300])
+    check("new referral starts as GIVEN with derived quality", v2.get("status") == "GIVEN" and v2.get("quality") == "DIRECT_INTRO", str(v2)[:200])
+    check("giver sees no actions except withdrawing", v2.get("allowed_actions") == ["CANCELLED"], str(v2.get("allowed_actions")))
+    v2_id = v2.get("id", "")
+
+    r = u2.get(f"/api/v1/referrals/{v2_id}")
+    d = r.json() if r.status_code == 200 else {}
+    check("recipient can open the referral with prospect details", r.status_code == 200 and d.get("prospect_phone") == "+919876543210" and d.get("my_role") == "receiver", r.text[:200])
+    check("recipient may accept or decline", sorted(d.get("allowed_actions", [])) == ["ACCEPTED", "DECLINED"], str(d.get("allowed_actions")))
+    r = u3.get(f"/api/v1/referrals/{v2_id}")
+    check("IDOR: a third member cannot read the referral", r.status_code == 404, str(r.status_code))
+    r = u3.patch(f"/api/v1/referrals/{v2_id}", json={"status": "ACCEPTED"}, headers=H3)
+    check("IDOR: a third member cannot update the referral", r.status_code == 404, str(r.status_code))
+    r = u3.get("/api/v1/referrals")
+    check("a third member's list excludes it", all(x["id"] != v2_id for x in r.json()), r.text[:100])
+    r = u2.get("/api/v1/referrals", params={"view": "received"})
+    check("list items omit prospect phone and email", r.status_code == 200 and "+919876543210" not in r.text and "priya@xyz" not in r.text)
+    r = u1.get(f"/api/v1/referrals/00000000-0000-0000-0000-000000000000")
+    check("unknown referral id is a 404", r.status_code == 404, str(r.status_code))
+
+    r = create(receiver_id=u2_me["id"], prospect_phone="98765 43210", prospect_email=None, headers=H1)
+    check("duplicate: same prospect to same member is blocked", r.status_code == 409 and r.json()["detail"]["code"] == "duplicate_referral" and r.json()["detail"]["existing_referral_id"] == v2_id, r.text[:300])
+    r = create(receiver_id=u2_me["id"], prospect_phone="9123456780", prospect_email="priya@xyz-restaurant.in")
+    check("duplicate: same email to same member is blocked", r.status_code == 409, r.text[:200])
+    r = create(receiver_id=u3_id, prospect_phone="9876543210")
+    check("similar: same prospect to another member asks for review", r.status_code == 409 and r.json()["detail"]["code"] == "possible_duplicate" and r.json()["detail"]["matches"][0]["id"] == v2_id, r.text[:300])
+    check("similar-referral warning shows only the caller's own data", "9876543210" not in r.text and u2_me["id"] not in r.text, r.text[:300])
+    r = create(receiver_id=u3_id, prospect_phone="9876543210", confirm_duplicate=True)
+    check("similar: referrer may continue after reviewing", r.status_code == 201, r.text[:200])
+    r = u3.get("/api/v1/referrals", params={"view": "received"})
+    check("recipient of a confirmed duplicate is notified normally", r.status_code == 200 and len(r.json()) == 1, r.text[:200])
+
+    async def raw_dup():
+        from app.models import BusinessReferral
+        from sqlalchemy.exc import IntegrityError
+
+        async with SessionLocal() as db:
+            db.add(BusinessReferral(giver_user_id=u1_id, receiver_user_id=u2_me["id"], business_need="x", status="GIVEN", prospect_phone="+919876543210"))
+            try:
+                await db.commit()
+            except IntegrityError:
+                return True
+        return False
+
+    check("database itself rejects a live duplicate (partial unique index)", asyncio.run(raw_dup()))
+
+    async def concurrent_creates():
+        import httpx as _httpx
+
+        # Two identical submissions racing: exactly one may win.
+        async with _httpx.AsyncClient(transport=_httpx.ASGITransport(app=app), base_url="http://testserver", cookies=u1.cookies) as ac:
+            payload = rp(u3_id, prospect_phone="9000011122", confirm_duplicate=True)
+            return await asyncio.gather(*[ac.post("/api/v1/referrals", json=payload, headers=H1) for _ in range(2)])
+
+    codes = sorted(x.status_code for x in asyncio.run(concurrent_creates()))
+    check("concurrent identical submissions create exactly one referral", codes == [201, 409], str(codes))
+
+    bad = {
+        "missing prospect name": dict(prospect_name=""),
+        "one-letter prospect name": dict(prospect_name="P"),
+        "numeric-only name": dict(prospect_name="12345"),
+        "missing phone": dict(prospect_phone=""),
+        "short phone": dict(prospect_phone="12345"),
+        "letters in phone": dict(prospect_phone="98765abcde"),
+        "repeated-digit phone": dict(prospect_phone="9999999999"),
+        "Indian number starting with 1": dict(prospect_phone="1234567890"),
+        "invalid email": dict(prospect_email="not-an-email"),
+        "description too short": dict(need="Needs website."),
+        "description too long": dict(need="x" * 1001),
+        "unknown urgency": dict(urgency="URGENT!!"),
+        "unknown intro method": dict(intro_method="TELEPATHY"),
+        "unknown relationship": dict(relationship="ENEMY"),
+        "unknown category": dict(category="99"),
+        "consent not given": dict(consent_confirmed=False),
+        "forged referrer id": dict(giver_user_id=u2_me["id"]),
+        "forged status": dict(status="CONVERTED"),
+        "forged referrer name": dict(referrer_name="Someone Else"),
+    }
+    for label, over in bad.items():
+        r = create(receiver_id=u2_me["id"], **over)
+        check(f"rejected: {label}", r.status_code == 422, f"{r.status_code} {r.text[:120]}")
+    r = u1.post("/api/v1/referrals", content=b"{not json", headers={**H1, "Content-Type": "application/json"})
+    check("rejected: malformed JSON", r.status_code == 422, str(r.status_code))
+    r = u1.post("/api/v1/referrals", json=["a", "list"], headers=H1)
+    check("rejected: wrong payload shape", r.status_code == 422, str(r.status_code))
+    r = create(receiver_id=u1_id)
+    check("rejected: self-referral", r.status_code == 400, str(r.status_code))
+    r = create(receiver_id="not-a-real-id")
+    check("rejected: invalid recipient id", r.status_code == 404, str(r.status_code))
+    r = create(receiver_id=u4_id)
+    check("rejected: recipient without Networking access (same answer as unknown id)", r.status_code == 404 and r.json() == create(receiver_id="not-a-real-id").json(), r.text[:200])
+    r = create(client=u4, receiver_id=u2_me["id"])
+    check("rejected: caller without Networking access", r.status_code == 403, str(r.status_code))
+    r = create(client=new_client(), receiver_id=u2_me["id"], headers={})
+    check("rejected: unauthenticated caller", r.status_code == 401, str(r.status_code))
+    r = u1.post("/api/v1/referrals", json=rp(u2_me["id"]))
+    check("rejected: missing CSRF token", r.status_code == 403, str(r.status_code))
+
+    weird = "Café ‘Spice’ <script>alert(1)</script> & “Sons”, \x00\x07 ₹50,000\r\n\r\n\r\n\r\nline two"
+    r = create(receiver_id=u2_me["id"], need="Needs help with: " + weird, prospect_name="Zoë O'Brien-Núñez", prospect_company="  Spice & <b>Sons</b>  ", note="  \t spaced \t out  ")
+    w = r.json() if r.status_code == 201 else {}
+    check("special characters and unicode are accepted", r.status_code == 201, r.text[:200])
+    d = u1.get(f"/api/v1/referrals/{w.get('id')}").json() if w else {}
+    check("control characters are stripped, excess blank lines collapsed",
+          "\x00" not in d.get("opportunity_description", "") and "\x07" not in d.get("opportunity_description", "") and "\n\n\n" not in d.get("opportunity_description", ""), repr(d.get("opportunity_description")))
+    check("markup is kept as inert text (escaped on output, not stripped)", "<script>" in d.get("opportunity_description", "") and d.get("note") == "spaced out", repr(d.get("note")))
+    r = create(receiver_id=u2_me["id"], need="y" * 1000, prospect_phone="+44 20 7946 0958", prospect_name="Oliver Smith")
+    check("1000-character description and international number are accepted", r.status_code == 201 and r.json()["prospect_phone"] == "+442079460958", r.text[:200])
+    r = create(receiver_id=u2_me["id"], intro_method="CALL", intro_call_preference="Tuesday after 4pm", prospect_phone="9811122233")
+    check("a scheduled call is recorded as a meeting arranged", r.status_code == 201 and r.json()["quality"] == "MEETING_ARRANGED", r.text[:200])
+    r = create(receiver_id=u2_me["id"], intro_method="SHARE_DETAILS", need="Short but long enough to pass validation.", prospect_phone="9811122244")
+    check("details-only referral is contact-only quality", r.status_code == 201 and r.json()["quality"] == "CONTACT_ONLY", r.text[:200])
+    r = create(receiver_id=u2_me["id"], intro_method="ALREADY_KNOWS", prospect_company="Acme", prospect_phone="9811122255", need="Acme needs a full rebrand with new packaging and a refreshed website before their summer launch in June.")
+    check("context-rich referral is a warm referral", r.status_code == 201 and r.json()["quality"] == "WARM_REFERRAL", r.text[:200])
+
+    # ---------- notifications + outbox ----------
+    async def outbox_rows():
+        from sqlalchemy import select
+        from app.models import EmailOutbox
+
+        async with SessionLocal() as db:
+            return (await db.execute(select(EmailOutbox).where(EmailOutbox.kind == "referral_received"))).scalars().all()
+
+    rows_ob = asyncio.run(outbox_rows())
+    check("an email is queued per referral, in the outbox", len(rows_ob) >= 5 and all(x.to_email in ("founder2@example.com", "founder3@example.com") for x in rows_ob), str(len(rows_ob)))
+    pending = [x for x in rows_ob if x.html]
+    check("queued email carries no prospect phone or email", all("98765" not in (x.html + x.text) and "priya@xyz" not in (x.html + x.text).lower() for x in pending))
+    check("queued email escapes user text", all("<script>" not in x.html for x in pending))
+
+    import app.email_service as _es
+
+    async def _boom(*a, **k):
+        raise RuntimeError("email provider is down")
+
+    _orig = _es.deliver
+    _es.deliver = _boom
+    try:
+        r = create(receiver_id=u2_me["id"], prospect_phone="9811122266")
+    finally:
+        _es.deliver = _orig
+    check("referral creation does not depend on the email provider", r.status_code == 201, r.text[:200])
+
+    r = u2.get("/api/v1/notifications")
+    n = next((x for x in r.json() if x["related_entity_id"] == v2_id), None)
+    check("recipient gets an in-app notification naming referrer and prospect", bool(n) and "Test Founder" in n["title"] and "XYZ Restaurant" in n["body"] and n["detail"]["urgency"] == "HOT", str(n)[:300])
+    check("notification text omits prospect phone/email", n is not None and "98765" not in (n["body"] + n["title"]) and "@" not in n["body"])
+
+    # ---------- status lifecycle ----------
+    def move(client, ref_id, to):
+        return client.patch(f"/api/v1/referrals/{ref_id}", json={"status": to}, headers={"X-CSRF-Token": customer_csrf(client)})
+
+    r = move(u1, v2_id, "ACCEPTED")
+    check("giver cannot accept their own referral", r.status_code == 403, str(r.status_code))
+    r = move(u2, v2_id, "CANCELLED")
+    check("recipient cannot withdraw the giver's referral", r.status_code == 403, str(r.status_code))
+    r = move(u2, v2_id, "CONTACTED")
+    check("invalid jump GIVEN -> CONTACTED is refused", r.status_code == 400, str(r.status_code))
+    r = move(u2, v2_id, "CONVERTED")
+    check("unknown status is refused", r.status_code == 400, str(r.status_code))
+    r = u2.patch(f"/api/v1/referrals/{v2_id}", json={"status": "ACCEPTED", "prospect_phone": "+910000000000"}, headers=H2)
+    check("a status update cannot smuggle other fields", r.status_code == 422, str(r.status_code))
+    r = move(u2, v2_id, "ACCEPTED")
+    check("recipient accepts", r.status_code == 200 and r.json()["status"] == "ACCEPTED", r.text[:200])
+    r = move(u2, v2_id, "ACCEPTED")
+    check("accepting twice is refused", r.status_code == 400, str(r.status_code))
+    r = move(u2, v2_id, "CONTACTED")
+    cj = r.json() if r.status_code == 200 else {}
+    check("recipient records first contact", r.status_code == 200 and cj.get("contacted_at") and cj.get("last_action_at"), r.text[:200])
+    r = move(u1, v2_id, "CLOSED")
+    check("giver cannot close on the recipient's behalf", r.status_code == 403, str(r.status_code))
+    r = move(u1, v2_id, "MEETING_DONE")
+    check("a meeting cannot be recorded by one member alone", r.status_code == 400, r.text[:200])
+    confirm_meeting_both(u1, u2, v2_id)
+    close_deal(u1, u2, v2_id)
+    r = u2.get(f"/api/v1/referrals/{v2_id}")
+    check("business won through both members' confirmation", r.status_code == 200 and r.json()["status"] == "BUSINESS_CLOSED", r.text[:200])
+    r = move(u2, v2_id, "CLOSED")
+    check("converted referral cannot be closed as lost", r.status_code == 400, str(r.status_code))
+    r = move(u2, v2_id, "REVENUE_GENERATED")
+    check("revenue can be logged", r.status_code == 200 and r.json()["allowed_actions"] == [], r.text[:200])
+    r = u1.get("/api/v1/notifications")
+    check("giver is notified of progress", sum(1 for x in r.json() if x["related_entity_id"] == v2_id) >= 4, str(len(r.json())))
+
+    lost = create(receiver_id=u2_me["id"], prospect_phone="9811122277").json()["id"]
+    move(u2, lost, "ACCEPTED")
+    r = move(u2, lost, "CLOSED")
+    check("recipient can close a referral that went nowhere", r.status_code == 200 and r.json()["closed_at"], r.text[:200])
+    r = move(u2, lost, "MEETING_DONE")
+    check("closed referral is terminal", r.status_code == 400, str(r.status_code))
+    r = create(receiver_id=u2_me["id"], prospect_phone="9811122277")
+    check("a closed referral no longer blocks re-referring the prospect", r.status_code == 201, r.text[:200])
+    wd = r.json()["id"]
+    r = move(u1, wd, "CANCELLED")
+    check("giver can withdraw before acceptance", r.status_code == 200 and r.json()["status"] == "CANCELLED", r.text[:200])
+
+    async def race():
+        import httpx as _httpx
+
+        fresh = create(receiver_id=u2_me["id"], prospect_phone="9811122288").json()["id"]
+        async with _httpx.AsyncClient(transport=_httpx.ASGITransport(app=app), base_url="http://testserver", cookies=u2.cookies) as ac:
+            rs = await asyncio.gather(
+                ac.patch(f"/api/v1/referrals/{fresh}", json={"status": "ACCEPTED"}, headers=H2),
+                ac.patch(f"/api/v1/referrals/{fresh}", json={"status": "DECLINED"}, headers=H2),
+            )
+        return sorted(x.status_code for x in rs)
+
+    rc = asyncio.run(race())
+    check("racing status changes: exactly one wins", rc[0] == 200 and rc[1] in (400, 409), str(rc))
+
+    # ---------- listing, filters, pagination, summary ----------
+    r = u2.get("/api/v1/referrals/summary")
+    sm = r.json() if r.status_code == 200 else {}
+    check("summary counts add up", sm.get("total") == sm.get("sent", 0) + sm.get("received", 0) and sm.get("received", 0) >= 8 and sm.get("sent") == 0, str(sm))
+    check("summary groups statuses", sm.get("converted") == 2 and sm.get("by_status", {}).get("REVENUE_GENERATED") == 2, str(sm))
+    page1 = u2.get("/api/v1/referrals", params={"view": "received", "limit": 3}).json()
+    page2 = u2.get("/api/v1/referrals", params={"view": "received", "limit": 3, "offset": 3}).json()
+    check("pagination returns distinct pages", len(page1) == 3 and len(page2) == 3 and not {x["id"] for x in page1} & {x["id"] for x in page2}, f"{len(page1)} {len(page2)}")
+    check("sent view excludes received", u2.get("/api/v1/referrals", params={"view": "sent"}).json() == [])
+    conv = u2.get("/api/v1/referrals", params={"view": "converted"}).json()
+    check("converted view holds only won business", len(conv) == 2 and v2_id in {x["id"] for x in conv} and all(x["status"] in ("BUSINESS_CLOSED", "REVENUE_GENERATED") for x in conv), str(conv)[:200])
+    cl = u2.get("/api/v1/referrals", params={"view": "closed"}).json()
+    check("closed view holds closed, declined and withdrawn", {x["status"] for x in cl} <= {"CLOSED", "DECLINED", "CANCELLED"} and len(cl) >= 3, str([x["status"] for x in cl]))
+    check("stage filter works", all(x["status"] == "GIVEN" for x in u2.get("/api/v1/referrals", params={"stage": "given"}).json()))
+    check("bad view is rejected", u2.get("/api/v1/referrals", params={"view": "everything"}).status_code == 422)
+    check("page size is capped", u2.get("/api/v1/referrals", params={"limit": 1000}).status_code == 422)
+
+    # ---------- admin reporting ----------
+    r = u1.get("/api/admin/referrals/stats")
+    check("members cannot read admin referral stats", r.status_code == 401, str(r.status_code))
+    r = admin.get("/api/admin/referrals/stats")
+    st_a = r.json() if r.status_code == 200 else {}
+    check("admin sees referral totals, status mix and conversion", st_a.get("total", 0) >= 9 and st_a.get("converted") == 2 and st_a.get("conversion_rate") is not None and "by_category" in st_a, str(st_a)[:300])
+    check("admin stats expose no prospect contact data", "+91" not in r.text and "priya@" not in r.text)
+
+    # ---------- performance ----------
+    def timed(fn, n=15):
+        xs = []
+        for _ in range(n):
+            t = _time.perf_counter()
+            fn()
+            xs.append((_time.perf_counter() - t) * 1000)
+        xs.sort()
+        return xs[len(xs) // 2], xs[-1]
+
+    s_med, s_max = timed(lambda: search(u1, q="sec"))
+    l_med, _ = timed(lambda: u2.get("/api/v1/referrals", params={"limit": 20}))
+    print(f"  PERF  member search median {s_med:.0f} ms (max {s_max:.0f}); referral list median {l_med:.0f} ms; referral create {create_ms:.0f} ms")
+    check("member search is fast (median < 150 ms)", s_med < 150, f"{s_med:.0f} ms")
+    check("referral submit does not wait on email (< 500 ms)", create_ms < 500, f"{create_ms:.0f} ms")
 
     # ---------- notifications ----------
     r = u1.get("/api/v1/notifications")
@@ -646,7 +1004,7 @@ def main() -> int:
     check("registration keeps directory access after membership expiry", r.status_code == 200, str(r.status_code))
     r = u1.post(
         "/api/v1/referrals",
-        json={"receiver_user_id": u2_me["id"], "business_need": "Expired member should not get in"},
+        json=rp(u2_me["id"], "Expired member should not get in to the referrals"),
         headers={"X-CSRF-Token": customer_csrf(u1)},
     )
     check("registration keeps referral access after membership expiry", r.status_code == 201, str(r.status_code))
@@ -750,10 +1108,11 @@ def main() -> int:
         ("GET /auth/session", 1, lambda: u1.get("/api/v1/auth/session")),
         ("GET /networking/members", 4, lambda: u1.get("/api/v1/networking/members")),
         ("GET /notifications", 6, lambda: u1.get("/api/v1/notifications")),
-        ("GET /referrals", 4, lambda: u1.get("/api/v1/referrals")),
+        ("GET /referrals", 6, lambda: u1.get("/api/v1/referrals")),  # +2: meeting confirmations and live closures for the page
         ("GET /networking/needs", 3, lambda: u1.get("/api/v1/networking/needs")),
         ("PUT /profile/personal", 4, lambda: save_personal(u1, full_name="Founder One", city="Bengaluru")),
-        ("POST /networking/connections", 8, lambda: u2.post("/api/v1/networking/connections", json={"target_user_id": u1_id, "note": "budget"}, headers={"X-CSRF-Token": customer_csrf(u2)})),
+        # POST /networking/connections: +2 queries since Phase A (the member-pair lock and the history read), was 8
+        ("POST /networking/connections", 10, lambda: u2.post("/api/v1/networking/connections", json={"target_user_id": u1_id, "note": "budget"}, headers={"X-CSRF-Token": customer_csrf(u2)})),
     ]
     for label, cap, fn in budgets:
         r, n = queries(fn)
@@ -828,7 +1187,7 @@ def main() -> int:
     check("registrant's member page opens", r.status_code == 200 and r.json().get("tgl_verified") is True, r.text[:200])
     r = u1.post(
         "/api/v1/referrals",
-        json={"receiver_user_id": w2_id, "business_need": "Packaging partner"},
+        json=rp(w2_id, "Packaging partner for a growing food brand"),
         headers={"X-CSRF-Token": customer_csrf(u1)},
     )
     check("a member can refer a public-form registrant", r.status_code == 201, r.text[:200])
@@ -845,7 +1204,7 @@ def main() -> int:
     conn_n, ref_n, req_n = notes.get("connection_request"), notes.get("referral_received"), notes.get("referral_requested")
     check("connection notification names who sent it", bool(conn_n) and conn_n["actor"]["name"] == u1_name and u1_name in conn_n["title"], str(conn_n)[:300])
     check("connection notification links to the sender's member page", bool(conn_n) and conn_n["actor"]["member_id"] is not None and conn_n["actor"]["business_name"], str(conn_n)[:300])
-    check("referral notification carries the business need", bool(ref_n) and ref_n["detail"]["business_need"] == "Packaging partner" and ref_n["actor"]["name"] == u1_name, str(ref_n)[:300])
+    check("referral notification carries the business need", bool(ref_n) and ref_n["detail"]["business_need"] == "Packaging partner for a growing food brand" and ref_n["actor"]["name"] == u1_name, str(ref_n)[:300])
     check("referral-request notification names the requester and their note", bool(req_n) and req_n["actor"]["name"] == u1_name and req_n["detail"]["note"] == "Looking for a packaging supplier intro", str(req_n)[:300])
     check("member notifications link to their source entity", all(n and n["related_entity_id"] for n in (conn_n, ref_n, req_n)), "")
     check("notification actor exposes no email or phone", all("email" not in (n or {}).get("actor", {}) and "phone" not in (n or {}).get("actor", {}) for n in (conn_n, ref_n, req_n)), "")
@@ -938,6 +1297,61 @@ def main() -> int:
     check("non-member cannot be a connection target", r.status_code == 400, str(r.status_code))
     listing = u1.get("/api/v1/networking/members").json()
     check("non-member is not in the directory", all(m["user_id"] != outsider_id for m in listing), "")
+
+    # ---------- connections: request -> accept / decline, withdraw, remove ----------
+    H = lambda c: {"X-CSRF-Token": customer_csrf(c)}  # noqa: E731
+    u2_id = u2_me["id"]
+    pair_of = lambda c, a, b: [x for x in c.get("/api/v1/networking/connections").json() if {x["requester_user_id"], x["target_user_id"]} == {a, b}]  # noqa: E731
+    kinds = lambda c, k: [n for n in c.get("/api/v1/notifications").json() if n["type"] == k]  # noqa: E731
+
+    rows = pair_of(u1, u1_id, u2_id)
+    check("crossed requests connect the pair (one accepted row, not two pending)", len(rows) == 1 and rows[0]["status"] == "ACCEPTED", str(rows))
+    r = u1.post("/api/v1/networking/connections", json={"target_user_id": u2_id}, headers=H(u1))
+    check("asking someone you are already connected with is refused", r.status_code == 409 and "already connected" in r.text, r.text[:160])
+    check("the member whose request was crossed is told it was accepted", bool(kinds(u2, "connection_accepted")), str([n["title"] for n in u2.get("/api/v1/notifications").json()][:4]))
+    check("both members see the connection", len(pair_of(u2, u1_id, u2_id)) == 1)
+
+    r = u2.delete(f"/api/v1/networking/connections/{rows[0]['id']}", headers=H(u2))
+    check("either member can remove a connection", r.status_code == 204 and not pair_of(u1, u1_id, u2_id) and not pair_of(u2, u1_id, u2_id), str(r.status_code))
+
+    r = u1.post("/api/v1/networking/connections", json={"target_user_id": u2_id, "note": "hello again"}, headers=H(u1))
+    req = r.json()
+    check("a fresh request starts pending", r.status_code == 201 and req["status"] == "PENDING" and req["responded_at"] is None, r.text[:200])
+    check("the recipient sees it as an invitation", any(x["id"] == req["id"] and x["target_user_id"] == u2_id for x in u2.get("/api/v1/networking/connections").json()))
+    check("the sender cannot accept their own request", u1.patch(f"/api/v1/networking/connections/{req['id']}", json={"action": "accept"}, headers=H(u1)).status_code == 404)
+    check("a third member cannot answer it (404)", w2.patch(f"/api/v1/networking/connections/{req['id']}", json={"action": "accept"}, headers=H(w2)).status_code == 404)
+    check("a third member cannot withdraw it (404)", w2.delete(f"/api/v1/networking/connections/{req['id']}", headers=H(w2)).status_code == 404)
+    check("the recipient cannot 'withdraw' it - they decline", u2.delete(f"/api/v1/networking/connections/{req['id']}", headers=H(u2)).status_code == 403)
+    check("an unknown request id is a 404", u2.patch("/api/v1/networking/connections/nope", json={"action": "accept"}, headers=H(u2)).status_code == 404)
+    check("a bad action is refused", u2.patch(f"/api/v1/networking/connections/{req['id']}", json={"action": "marry"}, headers=H(u2)).status_code == 422)
+    check("answering needs the CSRF header", u2.patch(f"/api/v1/networking/connections/{req['id']}", json={"action": "accept"}).status_code in (401, 403))
+
+    before = len(u1.get("/api/v1/notifications").json())
+    r = u2.patch(f"/api/v1/networking/connections/{req['id']}", json={"action": "decline"}, headers=H(u2))
+    check("declining marks the request declined", r.status_code == 200 and r.json()["status"] == "DECLINED" and r.json()["responded_at"], r.text[:200])
+    check("declining is silent (the sender is not notified)", len(u1.get("/api/v1/notifications").json()) == before)
+    r = u1.post("/api/v1/networking/connections", json={"target_user_id": u2_id}, headers=H(u1))
+    check("a declined request cannot simply be re-sent", r.status_code == 409 and "already sent" in r.text, r.text[:160])
+
+    n_acc = len(kinds(u1, "connection_accepted"))
+    r = u2.patch(f"/api/v1/networking/connections/{req['id']}", json={"action": "accept"}, headers=H(u2))
+    check("accepting connects the two members", r.status_code == 200 and r.json()["status"] == "ACCEPTED", r.text[:200])
+    got = kinds(u1, "connection_accepted")
+    check("the sender is notified of the acceptance, by name", len(got) == n_acc + 1 and got[0]["actor"]["user_id"] == u2_id, str(got[:1]))
+    check("accepting twice is a 409, not a second notification", u2.patch(f"/api/v1/networking/connections/{req['id']}", json={"action": "accept"}, headers=H(u2)).status_code == 409 and len(kinds(u1, "connection_accepted")) == n_acc + 1)
+    check("declining an accepted connection is refused", u2.patch(f"/api/v1/networking/connections/{req['id']}", json={"action": "decline"}, headers=H(u2)).status_code == 409)
+    check("removing it clears both directions", u1.delete(f"/api/v1/networking/connections/{req['id']}", headers=H(u1)).status_code == 204 and not pair_of(u2, u1_id, u2_id))
+
+    r = u1.post("/api/v1/networking/connections", json={"target_user_id": u2_id}, headers=H(u1))
+    wid = r.json()["id"]
+    check("the sender can withdraw a pending request", u1.delete(f"/api/v1/networking/connections/{wid}", headers=H(u1)).status_code == 204 and not pair_of(u2, u1_id, u2_id))
+    r = u1.post("/api/v1/networking/connections", json={"target_user_id": u2_id}, headers=H(u1))
+    check("after withdrawing, they can ask again", r.status_code == 201 and r.json()["status"] == "PENDING", r.text[:160])
+    r = u2.post("/api/v1/networking/connections", json={"target_user_id": u1_id}, headers=H(u2))
+    check("asking someone who already asked you accepts their request", r.status_code == 201 and r.json()["status"] == "ACCEPTED" and r.json()["requester_user_id"] == u1_id, r.text[:200])
+    check("...and leaves a single connection row", len(pair_of(u1, u1_id, u2_id)) == 1)
+    check("an unauthenticated visitor cannot read connections", new_client().get("/api/v1/networking/connections").status_code == 401)
+    check("an account without Networking access cannot answer", outsider.patch(f"/api/v1/networking/connections/{req['id']}", json={"action": "accept"}, headers=H(outsider)).status_code in (403, 404))
 
     # ---------- password reset signs out existing sessions ----------
     async def plant_reset_token(email: str, raw: str) -> None:

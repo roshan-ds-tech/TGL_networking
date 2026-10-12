@@ -3,8 +3,9 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile, status
-from sqlalchemy import func, or_, select
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile, status
+from sqlalchemy import and_, case, delete, func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
@@ -16,11 +17,13 @@ from ..models import (
     BusinessReferral,
     Connection,
     EventRegistration,
+    NeedHelpOffer,
     NetworkingProfile,
     Notification,
     PersonalProfile,
     Registration,
     ReferralRequest,
+    Subscription,
     TGLMembership,
     User,
     UserVerificationToken,
@@ -28,20 +31,26 @@ from ..models import (
     utcnow,
 )
 from ..ratelimit import client_ip, enforce, reset
+from .. import community
 from ..schemas import (
+    CATEGORY_NAMES,
     AuthOut,
     BusinessIn,
     BusinessNeedCreate,
     BusinessNeedOut,
+    NeedOfferCreate,
     BusinessOut,
     ConnectionCreate,
     ConnectionOut,
+    ConnectionRespond,
     CustomerLogin,
     CustomerOut,
     CustomerSignup,
     ForgotPasswordIn,
     MemberDetail,
     MemberListItem,
+    MemberSearchItem,
+    MemberSearchOut,
     MembershipOut,
     MyStatusOut,
     NetworkingProfileOut,
@@ -52,10 +61,7 @@ from ..schemas import (
     OtpVerifyIn,
     PersonalProfileIn,
     PersonalProfileOut,
-    ReferralCreate,
-    ReferralOut,
     ReferralRequestCreate,
-    ReferralTransition,
     ResetPasswordIn,
 )
 from ..security import (
@@ -85,6 +91,7 @@ from ..security import (
     verify_password_async,
 )
 from .. import legacy_sync, outbox
+from ..rewards import hooks as reward_hooks
 from ..storage import delete_profile_photo, read_profile_photo, save_profile_photo
 from ..email_service import login_otp_email, password_reset_email, verification_email
 from ..services import ensure_networking_profile, get_or_create_season_1, season_1, new_reset_token, new_verification_token, notify, token_hash
@@ -92,15 +99,6 @@ from ..services import ensure_networking_profile, get_or_create_season_1, season
 router = APIRouter(prefix="/api/v1", tags=["customer"])
 
 _GENERIC = "Invalid email or password."
-_REFERRAL_TRANSITIONS = {
-    "GIVEN": {"ACCEPTED", "DECLINED", "CANCELLED"},
-    "ACCEPTED": {"MEETING_DONE", "CANCELLED"},
-    "MEETING_DONE": {"BUSINESS_CLOSED", "CANCELLED"},
-    "BUSINESS_CLOSED": {"REVENUE_GENERATED"},
-    "REVENUE_GENERATED": set(),
-    "DECLINED": set(),
-    "CANCELLED": set(),
-}
 
 
 def _set_customer_cookies(response: Response, token: str, csrf: str) -> None:
@@ -548,6 +546,18 @@ async def status_me(
     # Finale window itself — even when the registration came through the public
     # form and so has no membership row of its own.
     out_membership = _membership_out(membership)
+    if flags["active_membership"] and (out_membership is None or out_membership.status != "ACTIVE"):
+        # No membership row, but an active paid subscription is one.
+        sub = await db.scalar(
+            select(Subscription).where(
+                Subscription.user_id == user.id, Subscription.status == "ACTIVE", Subscription.expires_at > utcnow()
+            ).order_by(Subscription.expires_at.desc()).limit(1)
+        )
+        if sub is not None:
+            out_membership = MembershipOut(
+                id=sub.id, status="ACTIVE", membership_type="NETWORKING", pathway="SUBSCRIPTION",
+                starts_at=sub.starts_at, expires_at=sub.expires_at,
+            )
     if registered and window is not None and (out_membership is None or out_membership.status != "ACTIVE"):
         out_membership = MembershipOut(
             id=window[0].id,
@@ -600,6 +610,7 @@ async def upload_profile_photo(
         await delete_profile_photo(new_key)  # don't leak an unreferenced file
         raise
     await delete_profile_photo(old_key)  # only after the new one is committed
+    await reward_hooks.profile_changed(user.id)
     return {"photo_url": photo_url_for(user.id, new_key)}
 
 
@@ -664,6 +675,7 @@ async def upsert_personal_profile(
             setattr(profile, key, value)
         profile.completed_at = profile.completed_at or utcnow()
     await db.commit()
+    await reward_hooks.profile_changed(user.id)
     return profile
 
 
@@ -682,6 +694,7 @@ async def upsert_business(
         for key, value in payload.model_dump(exclude_unset=True).items():
             setattr(business, key, value)
     await db.commit()
+    await reward_hooks.profile_changed(user.id)
     return _business_out(business, await has_verified_registration(db, user))
 
 
@@ -733,6 +746,84 @@ async def member_directory(
     ]
 
 
+def _like_escape(term: str) -> str:
+    return term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+@router.get("/networking/members/search", response_model=MemberSearchOut)
+async def member_search(
+    q: str = Query(default="", max_length=80),
+    limit: int = Query(default=8, ge=1, le=20),
+    offset: int = Query(default=0, ge=0, le=500),
+    user: User = Depends(require_active_networking_member),
+    db: AsyncSession = Depends(get_db),
+) -> MemberSearchOut:
+    """Typeahead for choosing who receives a referral. Server-side filtered and
+    paged; returns only what is needed to recognise a member, never contact
+    details. Excludes the caller and anyone who is not an active member."""
+    enforce(f"member-search:{user.id}", 240, 60, "Searching too fast. Please wait a moment.")
+    filters = [
+        await active_member_clause(db, NetworkingProfile.user_id),
+        NetworkingProfile.user_id != user.id,
+        User.is_active.is_(True),
+    ]
+    terms = q.lower().split()[:5]
+    for term in terms:
+        like = f"%{_like_escape(term)}%"
+        codes = [c for c, name in CATEGORY_NAMES.items() if term in name.lower()]
+        options = [
+            func.lower(PersonalProfile.full_name).like(like, escape="\\"),
+            func.lower(Business.business_name).like(like, escape="\\"),
+            func.lower(PersonalProfile.role).like(like, escape="\\"),
+            func.lower(func.coalesce(NetworkingProfile.city, Business.city)).like(like, escape="\\"),
+        ]
+        if codes:
+            options.append(Business.category.in_(codes))
+        filters.append(or_(*options))
+
+    if terms:
+        # Best matches first: name/business starts with the first word, then a
+        # whole-word hit in name/business/profession, then everything else
+        # (city or category-name matches).
+        starts, word = f"{_like_escape(terms[0])}%", f"% {_like_escape(terms[0])}%"
+        fields = (PersonalProfile.full_name, Business.business_name)
+        rank = case(
+            *[(func.lower(f).like(starts, escape="\\"), 0) for f in fields],
+            *[(func.lower(f).like(word, escape="\\"), 1) for f in (*fields, PersonalProfile.role)],
+            else_=2,
+        )
+        order = [rank, Business.business_name.asc()]
+    else:
+        # Suggestions: members I have referred to before come first.
+        last = (
+            select(func.max(BusinessReferral.created_at))
+            .where(BusinessReferral.giver_user_id == user.id, BusinessReferral.receiver_user_id == NetworkingProfile.user_id)
+            .correlate(NetworkingProfile)
+            .scalar_subquery()
+        )
+        order = [last.desc().nulls_last(), Business.business_name.asc()]
+    rows = (await db.execute(
+        select(NetworkingProfile.id, NetworkingProfile.user_id, PersonalProfile.full_name, PersonalProfile.role,
+               Business.business_name, Business.category, func.coalesce(NetworkingProfile.city, Business.city), User.photo_key)
+        .join(Business, Business.id == NetworkingProfile.business_id)
+        .join(PersonalProfile, PersonalProfile.user_id == NetworkingProfile.user_id)
+        .join(User, User.id == NetworkingProfile.user_id)
+        .where(*filters)
+        .order_by(*order, NetworkingProfile.id)
+        .limit(limit + 1).offset(offset)
+    )).all()
+    return MemberSearchOut(
+        has_more=len(rows) > limit,
+        items=[
+            MemberSearchItem(
+                member_id=mid, user_id=uid, name=name, business_name=biz, profession=role, category=cat,
+                category_name=CATEGORY_NAMES.get(cat), city=city, photo_url=photo_url_for(uid, photo_key),
+            )
+            for mid, uid, name, role, biz, cat, city, photo_key in rows[:limit]
+        ],
+    )
+
+
 @router.get("/networking/members/{member_id}", response_model=MemberDetail)
 async def member_detail(
     member_id: str,
@@ -775,141 +866,22 @@ async def member_detail(
     )
 
 
-@router.get("/referrals", response_model=list[ReferralOut])
-async def list_referrals(
-    user: User = Depends(require_active_networking_member),
-    db: AsyncSession = Depends(get_db),
-) -> list[ReferralOut]:
-    rows = await db.execute(
-        select(BusinessReferral)
-        .where(or_(BusinessReferral.giver_user_id == user.id, BusinessReferral.receiver_user_id == user.id))
-        .order_by(BusinessReferral.created_at.desc())
-    )
-    refs = rows.scalars().all()
-    party_ids = {uid for r in refs for uid in (r.giver_user_id, r.receiver_user_id)}
-    names: dict[str, tuple] = {}
-    if party_ids:
-        party_rows = await db.execute(
-            select(PersonalProfile, Business, User.photo_key)
-            .join(Business, Business.user_id == PersonalProfile.user_id)
-            .join(User, User.id == PersonalProfile.user_id)
-            .where(PersonalProfile.user_id.in_(party_ids))
-            .order_by(Business.created_at.asc())
-        )
-        for profile, business, photo_key in party_rows.all():
-            names.setdefault(profile.user_id, (profile.full_name, business.business_name, photo_url_for(profile.user_id, photo_key)))
-    return [
-        ReferralOut(
-            id=r.id,
-            giver_user_id=r.giver_user_id,
-            receiver_user_id=r.receiver_user_id,
-            giver_name=names.get(r.giver_user_id, (None, None, None))[0],
-            giver_business=names.get(r.giver_user_id, (None, None, None))[1],
-            giver_photo_url=names.get(r.giver_user_id, (None, None, None))[2],
-            receiver_name=names.get(r.receiver_user_id, (None, None, None))[0],
-            receiver_business=names.get(r.receiver_user_id, (None, None, None))[1],
-            receiver_photo_url=names.get(r.receiver_user_id, (None, None, None))[2],
-            business_need=r.business_need,
-            note=r.note,
-            status=r.status,
-            accepted_at=r.accepted_at,
-            meeting_done_at=r.meeting_done_at,
-            business_closed_at=r.business_closed_at,
-            revenue_generated_at=r.revenue_generated_at,
-            cancelled_at=r.cancelled_at,
-            declined_at=r.declined_at,
-            created_at=r.created_at,
-            updated_at=r.updated_at,
-        )
-        for r in refs
-    ]
-
-
-@router.post("/referrals", response_model=ReferralOut, status_code=status.HTTP_201_CREATED)
-async def create_referral(
-    payload: ReferralCreate,
-    user: User = Depends(require_active_networking_member),
-    __: None = Depends(require_customer_csrf),
-    db: AsyncSession = Depends(get_db),
-) -> BusinessReferral:
-    if payload.receiver_user_id == user.id:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "You cannot refer yourself.")
-    receiver = await db.get(User, payload.receiver_user_id)
-    if receiver is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Receiver not found")
-    if not await is_active_member(db, receiver.id):
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Receiver is not an active Networking member.")
-    ref = BusinessReferral(giver_user_id=user.id, receiver_user_id=payload.receiver_user_id, business_need=payload.business_need, note=payload.note)
-    db.add(ref)
-    await db.flush()  # assigns ref.id, so the notification can link to it
-    notify(
-        db,
-        payload.receiver_user_id,
-        "referral_received",
-        f"{await _who(db, user.id)} sent you a referral",
-        f"Business need: {payload.business_need}",
-        "business_referral",
-        ref.id,
-        actor_user_id=user.id,
-    )
-    await db.commit()
-    return ref
-
-
-@router.patch("/referrals/{referral_id}", response_model=ReferralOut)
-async def transition_referral(
-    referral_id: str,
-    payload: ReferralTransition,
-    user: User = Depends(require_active_networking_member),
-    __: None = Depends(require_customer_csrf),
-    db: AsyncSession = Depends(get_db),
-) -> BusinessReferral:
-    ref = await db.get(BusinessReferral, referral_id)
-    if ref is None or user.id not in {ref.giver_user_id, ref.receiver_user_id}:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Referral not found")
-    next_status = payload.status.upper()
-    if next_status not in _REFERRAL_TRANSITIONS.get(ref.status, set()):
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid referral transition.")
-    ref.status = next_status
-    stamp = utcnow()
-    if next_status == "ACCEPTED":
-        ref.accepted_at = stamp
-    elif next_status == "MEETING_DONE":
-        ref.meeting_done_at = stamp
-    elif next_status == "BUSINESS_CLOSED":
-        ref.business_closed_at = stamp
-    elif next_status == "REVENUE_GENERATED":
-        ref.revenue_generated_at = stamp
-    elif next_status == "CANCELLED":
-        ref.cancelled_at = stamp
-    elif next_status == "DECLINED":
-        ref.declined_at = stamp
-    recipient = ref.giver_user_id if user.id == ref.receiver_user_id else ref.receiver_user_id
-    who = await _who(db, user.id)
-    label = next_status.replace("_", " ").lower()
-    if next_status == "ACCEPTED":
-        # One notification, not a generic "status changed" plus "accepted".
-        notify(db, ref.giver_user_id, "referral_accepted", f"{who} accepted your referral", f"Business need: {ref.business_need}", "business_referral", ref.id, actor_user_id=user.id)
-    else:
-        notify(db, recipient, "referral_status_changed", f"{who} marked a referral as {label}", f"Business need: {ref.business_need}", "business_referral", ref.id, actor_user_id=user.id)
-    await db.commit()
-    return ref
-
-
-@router.get("/networking/needs", response_model=list[BusinessNeedOut])
-async def list_needs(
-    _: User = Depends(require_active_networking_member),
-    db: AsyncSession = Depends(get_db),
-) -> list[BusinessNeedOut]:
-    rows = await db.execute(
-        select(BusinessNeed, Business, PersonalProfile, User.photo_key)
+async def _need_rows(db: AsyncSession, viewer: User, mine: bool) -> list[BusinessNeedOut]:
+    # the offer figures ride along in the same single query (correlated sub-selects), so the board costs no more round trips than before
+    offers_count = select(func.count(NeedHelpOffer.id)).where(NeedHelpOffer.need_id == BusinessNeed.id).correlate(BusinessNeed).scalar_subquery()
+    my_offer_id = select(NeedHelpOffer.id).where(NeedHelpOffer.need_id == BusinessNeed.id, NeedHelpOffer.helper_user_id == viewer.id).correlate(BusinessNeed).scalar_subquery()
+    my_offer_status = select(NeedHelpOffer.status).where(NeedHelpOffer.need_id == BusinessNeed.id, NeedHelpOffer.helper_user_id == viewer.id).correlate(BusinessNeed).scalar_subquery()
+    q = (
+        select(BusinessNeed, Business, PersonalProfile, User.photo_key, offers_count, my_offer_id, my_offer_status)
         .join(Business, Business.id == BusinessNeed.business_id)
         .join(PersonalProfile, PersonalProfile.user_id == BusinessNeed.user_id)
         .join(User, User.id == BusinessNeed.user_id)
-        .where(BusinessNeed.status == "OPEN")
-        .order_by(BusinessNeed.created_at.desc())
-        .limit(100)
     )
+    if mine:
+        q = q.where(BusinessNeed.user_id == viewer.id)           # my own needs, whatever their status (a resolved or cancelled need leaves the board)
+    else:
+        q = q.where(BusinessNeed.status == "OPEN")
+    rows = (await db.execute(q.order_by(BusinessNeed.created_at.desc()).limit(100))).all()
     return [
         BusinessNeedOut(
             id=n.id,
@@ -923,9 +895,22 @@ async def list_needs(
             city=profile.city or b.city,
             created_at=n.created_at,
             poster_photo_url=photo_url_for(n.user_id, photo_key),
+            offers_count=int(count or 0) if n.user_id == viewer.id else None,
+            my_offer_id=oid,
+            my_offer_status=ost,
+            resolved_offer_id=n.resolved_offer_id if n.user_id == viewer.id else None,
         )
-        for n, b, profile, photo_key in rows.all()
+        for n, b, profile, photo_key, count, oid, ost in rows
     ]
+
+
+@router.get("/networking/needs", response_model=list[BusinessNeedOut])
+async def list_needs(
+    mine: bool = Query(default=False),
+    user: User = Depends(require_active_networking_member),
+    db: AsyncSession = Depends(get_db),
+) -> list[BusinessNeedOut]:
+    return await _need_rows(db, user, mine)
 
 
 @router.post("/networking/needs", response_model=BusinessNeedOut, status_code=status.HTTP_201_CREATED)
@@ -935,14 +920,21 @@ async def create_need(
     __: None = Depends(require_customer_csrf),
     db: AsyncSession = Depends(get_db),
 ) -> BusinessNeedOut:
+    enforce(f"need-publish:{user.id}", 10, 3600, "You are posting needs too quickly. Please try again later.")
     business = await _primary_business(db, user.id)
     if business is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Complete your business profile first.")
     profile = (
         await db.execute(select(PersonalProfile).where(PersonalProfile.user_id == user.id))
     ).scalar_one_or_none()
-    need = BusinessNeed(user_id=user.id, business_id=business.id, title=payload.title, category=payload.category, description=payload.description)
-    db.add(need)
+    user_id, business_id = user.id, business.id            # plain values: a rejected publication may roll the session back
+    try:
+        need = await community.publish_need(db, user, business_id, payload.title, payload.category, payload.description)
+    except community.NeedRejected as rejected:
+        # the rejection is itself a recorded fact (it is how quality attempts are measured), committed on its own before the error is returned
+        community.record(db, "NEED", "REJECTED", actor=user_id, reason=rejected.code, details={"description_chars": len((payload.description or "").strip())})
+        await db.commit()
+        raise HTTPException(rejected.http_status, rejected.message)
     await db.commit()
     return BusinessNeedOut(
         id=need.id,
@@ -956,31 +948,40 @@ async def create_need(
         city=(profile.city if profile else None) or business.city,
         created_at=need.created_at,
         poster_photo_url=user.photo_url,
+        offers_count=0,
     )
 
 
 @router.post("/networking/needs/{need_id}/help", status_code=status.HTTP_204_NO_CONTENT)
 async def help_need(
     need_id: str,
+    payload: NeedOfferCreate | None = None,
     user: User = Depends(require_active_networking_member),
     __: None = Depends(require_customer_csrf),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
+    """"I can help": now a stored OFFER (who offered, when, and what the poster did with it), not only a notification. It records an offer, which is
+    not evidence that help was given, and it earns nothing. Repeating the call changes nothing and notifies nobody twice."""
+    enforce(f"help-offer:{user.id}", 30, 3600, "You are offering help too quickly. Please try again later.")
     need = await db.get(BusinessNeed, need_id)
     if need is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Need not found")
     if need.user_id == user.id:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "You cannot offer help on your own need.")
-    notify(
-        db,
-        need.user_id,
-        "need_help_offered",
-        f"{await _who(db, user.id)} can help with your need",
-        f"Your need: {need.title}",
-        "business_need",
-        need.id,
-        actor_user_id=user.id,
-    )
+    if need.status != "OPEN":
+        raise HTTPException(status.HTTP_409_CONFLICT, "This need is no longer open.")
+    offer, created = await community.create_offer(db, need, user, payload.message if payload else None)
+    if created:
+        notify(
+            db,
+            need.user_id,
+            "need_help_offered",
+            f"{await _who(db, user.id)} can help with your need",
+            f"Your need: {need.title}",
+            "business_need",
+            need.id,
+            actor_user_id=user.id,
+        )
     await db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -990,7 +991,14 @@ async def list_connections(
     user: User = Depends(require_active_networking_member),
     db: AsyncSession = Depends(get_db),
 ) -> list[Connection]:
-    rows = await db.execute(select(Connection).where(Connection.requester_user_id == user.id))
+    """Every connection row the member is part of, in either direction. The
+    caller works out each pair's state: ACCEPTED = connected; PENDING/DECLINED as
+    requester = "requested"; PENDING as target = an invitation waiting on them."""
+    rows = await db.execute(
+        select(Connection)
+        .where(or_(Connection.requester_user_id == user.id, Connection.target_user_id == user.id))
+        .order_by(Connection.created_at.desc())
+    )
     return rows.scalars().all()
 
 
@@ -1001,32 +1009,164 @@ async def create_connection(
     __: None = Depends(require_customer_csrf),
     db: AsyncSession = Depends(get_db),
 ) -> Connection:
+    enforce(f"connect:{user.id}", 30, 3600, "You are sending connection requests too quickly. Please try again later.")
     if payload.target_user_id == user.id:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "You cannot connect with yourself.")
     if not await is_active_member(db, payload.target_user_id):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Target is not an active Networking member.")
-    existing = await db.scalar(
-        select(func.count()).select_from(Connection).where(
-            Connection.requester_user_id == user.id, Connection.target_user_id == payload.target_user_id
+    # Both members are locked (always in the same order) BEFORE the pair is read, so two crossing requests, or a double click, are serialised; the
+    # partial unique index on the hashed pair is the backstop that holds on every database and worker. A request that loses a race sees the winner
+    # on its second pass (and then accepts it, or reports a duplicate).
+    me_id, target_id = user.id, payload.target_user_id          # plain values: a rolled-back session expires the ORM objects
+    pair_key = community.pair_hash(me_id, target_id)
+    for attempt in (1, 2):
+        await community.lock_users(db, [me_id, target_id])
+        pair = (await db.execute(
+            select(Connection).where(or_(
+                and_(Connection.requester_user_id == me_id, Connection.target_user_id == target_id),
+                and_(Connection.requester_user_id == target_id, Connection.target_user_id == me_id),
+            )).execution_options(populate_existing=True)
+        )).scalars().all()
+        mine = next((c for c in pair if c.requester_user_id == me_id), None)
+        theirs = next((c for c in pair if c.requester_user_id == target_id), None)
+        if (mine and mine.status == "ACCEPTED") or (theirs and theirs.status == "ACCEPTED"):
+            raise HTTPException(status.HTTP_409_CONFLICT, "You are already connected with this member.")
+        if mine:
+            raise HTTPException(status.HTTP_409_CONFLICT, "You already sent a connection request to this member.")
+        if theirs:
+            # They already asked me (or I had set their request aside): asking them back is
+            # the same as accepting, so the two become connected instead of crossing requests.
+            theirs_id, theirs_requester = theirs.id, theirs.requester_user_id
+            if not await community.move_connection(db, theirs_id, ("PENDING", "DECLINED"), "ACCEPTED"):
+                await db.rollback()              # someone else already answered it: look again, once
+                if attempt == 2:
+                    raise HTTPException(status.HTTP_409_CONFLICT, "You are already connected with this member.")
+                continue
+            await community.connection_event(db, "REQUESTED", me_id, target_id, actor=me_id, connection_id=theirs_id, extra={"crossing": True})
+            await community.connection_event(db, "ACCEPTED", me_id, target_id, actor=me_id, connection_id=theirs_id, extra={"via": "crossing_request"})
+            notify(
+                db,
+                theirs_requester,
+                "connection_accepted",
+                f"{await _who(db, me_id)} accepted your connection request",
+                "You are now connected.",
+                "connection",
+                theirs_id,
+                actor_user_id=me_id,
+            )
+            await db.commit()
+            return await db.scalar(select(Connection).where(Connection.id == theirs_id).execution_options(populate_existing=True))
+        conn = Connection(requester_user_id=me_id, target_user_id=target_id, note=payload.note, pair_key=pair_key)
+        db.add(conn)
+        try:
+            await db.flush()
+        except IntegrityError:
+            await db.rollback()          # a crossing request won the race: look again, once
+            if attempt == 2:
+                raise HTTPException(status.HTTP_409_CONFLICT, "A connection request between you and this member already exists.")
+            continue
+        await community.connection_event(db, "REQUESTED", me_id, target_id, actor=me_id, connection_id=conn.id)
+        notify(
+            db,
+            target_id,
+            "connection_request",
+            f"{await _who(db, me_id)} wants to connect",
+            payload.note or "No message was added.",
+            "connection",
+            conn.id,
+            actor_user_id=me_id,
         )
-    )
-    if existing:
-        raise HTTPException(status.HTTP_409_CONFLICT, "You already sent a connection request to this member.")
-    conn = Connection(requester_user_id=user.id, target_user_id=payload.target_user_id, note=payload.note)
-    db.add(conn)
-    await db.flush()
+        await db.commit()
+        return conn
+
+
+@router.patch("/networking/connections/{connection_id}", response_model=ConnectionOut)
+async def respond_to_connection(
+    connection_id: str,
+    payload: ConnectionRespond,
+    user: User = Depends(require_active_networking_member),
+    __: None = Depends(require_customer_csrf),
+    db: AsyncSession = Depends(get_db),
+) -> Connection:
+    """The member a request was sent to accepts or declines it. Only the target
+    may answer; anyone else gets a 404 (no hint the request exists)."""
+    conn = await db.get(Connection, connection_id)
+    if conn is None or conn.target_user_id != user.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Connection request not found.")
+    await community.lock_users(db, [conn.requester_user_id, conn.target_user_id])
+    conn = await db.scalar(select(Connection).where(Connection.id == connection_id).execution_options(populate_existing=True))      # re-read under the lock
+    if conn is None or conn.target_user_id != user.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Connection request not found.")      # withdrawn while this request waited
+    if conn.status == "ACCEPTED":
+        raise HTTPException(status.HTTP_409_CONFLICT, "You are already connected with this member.")
+    if payload.action == "decline":
+        if conn.status == "DECLINED":
+            return conn  # already set aside; repeating it changes nothing
+        if not await community.move_connection(db, conn.id, ("PENDING",), "DECLINED"):      # silent: the requester is not notified
+            raise HTTPException(status.HTTP_409_CONFLICT, "This request was just answered.")
+        await community.connection_event(db, "DECLINED", conn.requester_user_id, conn.target_user_id, actor=user.id, connection_id=conn.id)
+        await db.commit()
+        await db.refresh(conn)
+        return conn
+    if not await is_active_member(db, conn.requester_user_id):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "That member is no longer an active Networking member.")
+    if not await community.move_connection(db, conn.id, ("PENDING", "DECLINED"), "ACCEPTED"):
+        raise HTTPException(status.HTTP_409_CONFLICT, "You are already connected with this member.")
+    await community.connection_event(db, "ACCEPTED", conn.requester_user_id, conn.target_user_id, actor=user.id, connection_id=conn.id)
     notify(
         db,
-        payload.target_user_id,
-        "connection_request",
-        f"{await _who(db, user.id)} wants to connect",
-        payload.note or "No message was added.",
+        conn.requester_user_id,
+        "connection_accepted",
+        f"{await _who(db, user.id)} accepted your connection request",
+        "You are now connected.",
         "connection",
         conn.id,
         actor_user_id=user.id,
     )
     await db.commit()
+    await db.refresh(conn)
     return conn
+
+
+@router.delete("/networking/connections/{connection_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_connection(
+    connection_id: str,
+    user: User = Depends(require_active_networking_member),
+    __: None = Depends(require_customer_csrf),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Withdraw a request you sent, or remove an existing connection (either side
+    may). Silent either way. A pending request can only be taken back by the one
+    who sent it; the recipient uses decline. The current-state row goes, as before;
+    the HISTORY stays: a withdrawal or removal is recorded as an event, so a pair
+    that was connected is remembered and a later request is a reconnection."""
+    conn = await db.get(Connection, connection_id)
+    if conn is None or user.id not in {conn.requester_user_id, conn.target_user_id}:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Connection not found.")
+    await community.lock_users(db, [conn.requester_user_id, conn.target_user_id])
+    conn = await db.scalar(select(Connection).where(Connection.id == connection_id).execution_options(populate_existing=True))
+    if conn is None:
+        return Response(status_code=status.HTTP_204_NO_CONTENT)      # already removed by the other member: the end state is the one asked for
+    if conn.status != "ACCEPTED" and conn.requester_user_id != user.id:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only the sender can withdraw a request.")
+    requester_id, target_id_, conn_id, was = conn.requester_user_id, conn.target_user_id, conn.id, conn.status
+    if was == "ACCEPTED":
+        # A connection is mutual and an old mutual request can leave a row each way:
+        # remove the whole pair, or the two would still read as connected.
+        pair = or_(
+            and_(Connection.requester_user_id == requester_id, Connection.target_user_id == target_id_),
+            and_(Connection.requester_user_id == target_id_, Connection.target_user_id == requester_id),
+        )
+        removed = (await db.execute(delete(Connection).where(pair))).rowcount
+        if removed:        # only the request that actually removed it records it, so two simultaneous removals write one event
+            await community.connection_event(db, "REMOVED", requester_id, target_id_, actor=user.id, connection_id=conn_id,
+                                             extra={"removed_by": "requester" if user.id == requester_id else "target"})
+    else:
+        removed = (await db.execute(delete(Connection).where(Connection.id == conn_id))).rowcount
+        if removed:
+            await community.connection_event(db, "WITHDRAWN", requester_id, target_id_, actor=user.id, connection_id=conn_id, extra={"from_status": was})
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/networking/referral-requests", status_code=status.HTTP_204_NO_CONTENT)
@@ -1114,7 +1254,7 @@ async def list_notifications(
         if n.related_entity_type == "connection":
             c = get("connection", n.related_entity_id)
             if c and c.target_user_id == user.id:
-                details[n.id] = {"note": c.note}
+                details[n.id] = {"note": c.note, "connection_status": c.status}
                 actors.setdefault(n.id, c.requester_user_id)
         elif n.related_entity_type == "referral_request":
             r = get("referral_request", n.related_entity_id)
@@ -1127,6 +1267,8 @@ async def list_notifications(
                 details[n.id] = {
                     "business_need": r.business_need,
                     "note": r.note,
+                    "prospect_company": r.prospect_company,
+                    "urgency": r.urgency,
                     "status": r.status,
                     "you_are": "receiver" if r.receiver_user_id == user.id else "giver",
                 }

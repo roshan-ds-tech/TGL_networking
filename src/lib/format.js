@@ -1,5 +1,21 @@
 /* Small display helpers shared by the product-app screens. */
 
+/**
+ * Paise (integer) -> "₹1,50,000.50". Integer arithmetic only, so no floating-point rounding can reach a
+ * displayed amount; the paise part appears only when it is not zero.
+ */
+export function formatInrMinor(minor) {
+  const whole = Math.trunc(minor / 100);
+  const paise = Math.abs(minor % 100);
+  return `₹${whole.toLocaleString('en-IN')}${paise ? `.${String(paise).padStart(2, '0')}` : ''}`;
+}
+
+/** Paise (integer) -> the text of a rupee input: "150000.5" for 15000050. */
+export function rupeeInputText(minor) {
+  const paise = Math.abs(minor % 100);
+  return `${Math.trunc(minor / 100)}${paise ? `.${String(paise).padStart(2, '0').replace(/0$/, '')}` : ''}`;
+}
+
 const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;

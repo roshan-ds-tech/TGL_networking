@@ -3,6 +3,7 @@ import { CATEGORIES } from '../../data/categories';
 import { api, go } from '../../lib/customerApi';
 import { trustTier } from '../../lib/format';
 import { openConnectModal, showToast } from '../../components/AppShell';
+import { connectionsChanged, useConnections } from '../../lib/connections';
 import ImageSlot from '../../components/ImageSlot';
 import NetTabs from './NetTabs';
 
@@ -16,10 +17,9 @@ export default function Member({ id, status }) {
   const [member, setMember] = useState(null);
   const [loading, setLoading] = useState(true);
   const [denied, setDenied] = useState(false);
-  // User ids this member has already asked to connect with. (The route id is
-  // the member id, so it has to be compared against member.user_id, not id.)
-  const [connectedIds, setConnectedIds] = useState(new Set());
+  const net = useConnections();
   const [requesting, setRequesting] = useState(false);
+  const [responding, setResponding] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -31,8 +31,20 @@ export default function Member({ id, status }) {
         if (err.status === 403) setDenied(true);
       })
       .finally(() => setLoading(false));
-    api.listConnections().then((rows) => setConnectedIds(new Set(rows.map((c) => c.target_user_id)))).catch(() => {});
   }, [id]);
+
+  async function respond(rel, action) {
+    setResponding(true);
+    try {
+      await api.respondConnection(rel.id, action);
+      showToast(action === 'accept' ? `You're now connected with ${member.founder_name}.` : 'Request ignored.');
+    } catch (err) {
+      showToast(err.message || 'Could not update this request.');
+    } finally {
+      setResponding(false);
+      connectionsChanged();
+    }
+  }
 
   async function requestReferral() {
     if (!member) return;
@@ -71,7 +83,7 @@ export default function Member({ id, status }) {
   }
 
   const isMe = !!member && member.user_id === myId;
-  const connected = !!member && connectedIds.has(member.user_id);
+  const rel = member ? net.relation(member.user_id) : { kind: 'none' };
   const tier = trustTier(member.trust_score || 0);
   const interests = (member.interests || '').split(',').map((s) => s.trim()).filter(Boolean);
 
@@ -131,15 +143,25 @@ export default function Member({ id, status }) {
                     </>
                   ) : (
                     <>
-                  <button
-                    type="button"
-                    className="tglp-gold"
-                    disabled={connected}
-                    onClick={() => openConnectModal(member.business_name, member.user_id)}
-                    style={{ width: '100%', padding: 15, border: 'none', borderRadius: 999, background: 'linear-gradient(135deg,#EFCB77,#E0B558 45%,#C08D2E)', color: '#22103A', fontSize: 11.5, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', cursor: connected ? 'default' : 'pointer', whiteSpace: 'nowrap', marginBottom: 10 }}
-                  >
-                    {connected ? 'Requested' : 'Connect'}
-                  </button>
+                  {rel.kind === 'received' ? (
+                    <div style={{ marginBottom: 10 }}>
+                      <p style={{ margin: '0 0 10px', fontSize: 13, lineHeight: 1.55, color: 'rgba(246,238,223,0.78)' }}>{member.founder_name.split(' ')[0]} wants to connect with you.{rel.note ? ` “${rel.note}”` : ''}</p>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                        <button type="button" className="tglp-gold" disabled={responding} onClick={() => respond(rel, 'accept')} style={{ ...{ width: '100%', padding: 15, border: 'none', borderRadius: 999, background: 'linear-gradient(135deg,#EFCB77,#E0B558 45%,#C08D2E)', color: '#22103A', fontSize: 11.5, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', whiteSpace: 'nowrap' }, cursor: responding ? 'default' : 'pointer', padding: 14 }}>{responding ? '…' : 'Accept'}</button>
+                        <button type="button" className="tglp-ghost-dark" disabled={responding} onClick={() => respond(rel, 'decline')} style={{ padding: 14, border: '1px solid rgba(246,238,223,0.3)', borderRadius: 999, background: 'transparent', color: '#F6EEDF', fontSize: 11.5, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', cursor: responding ? 'default' : 'pointer', whiteSpace: 'nowrap' }}>Ignore</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="tglp-gold"
+                      disabled={rel.kind !== 'none'}
+                      onClick={() => openConnectModal(member.business_name, member.user_id)}
+                      style={{ width: '100%', padding: 15, border: 'none', borderRadius: 999, background: 'linear-gradient(135deg,#EFCB77,#E0B558 45%,#C08D2E)', color: '#22103A', fontSize: 11.5, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', whiteSpace: 'nowrap', cursor: rel.kind === 'none' ? 'pointer' : 'default', marginBottom: 10, opacity: rel.kind === 'none' ? 1 : 0.7 }}
+                    >
+                      {rel.kind === 'connected' ? '✓ Connected' : rel.kind === 'sent' ? 'Requested' : 'Connect'}
+                    </button>
+                  )}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                     <button
                       type="button"
@@ -188,7 +210,9 @@ export default function Member({ id, status }) {
                   <svg width="13" height="13" viewBox="0 0 24 24"><use href="#i-chart" /></svg>
                   Growth Points
                 </p>
-                <p style={{ ...METRIC_VALUE, color: '#8F6420' }}>{member.growth_points || 0}</p>
+                {/* Not active yet: always 0, never a stored balance. */}
+                <p style={{ ...METRIC_VALUE, color: '#8F6420' }}>0</p>
+                <p style={{ margin: '4px 0 0', fontSize: 11, color: 'rgba(43,23,64,0.6)' }}>Coming soon</p>
               </div>
               <div style={{ padding: 20, background: '#FFFCF5' }}>
                 <p style={METRIC_LABEL}>Referrals given</p>

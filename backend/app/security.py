@@ -30,7 +30,7 @@ from .config import settings
 from .database import get_db
 from .observability import timed
 from .services import SEASON_1_SLUG, EventSnapshot, add_calendar_months, season_1  # noqa: F401
-from .models import Admin, Event, Registration, TGLMembership, User, utcnow
+from .models import Admin, Event, Registration, Subscription, TGLMembership, User, utcnow
 
 SESSION_COOKIE = "tgl_session"
 CSRF_COOKIE = "tgl_csrf"
@@ -276,15 +276,27 @@ def _registration_exists(user: User, verified_only: bool = False):
 
 
 def _active_membership_exists(user_id_col):
-    return exists(
-        select(TGLMembership.id).where(
-            TGLMembership.user_id == user_id_col,
-            TGLMembership.membership_type == "NETWORKING",
-            TGLMembership.status == "ACTIVE",
-            TGLMembership.starts_at.is_not(None),
-            TGLMembership.expires_at.is_not(None),
-            TGLMembership.expires_at > utcnow(),
-        )
+    return or_(
+        exists(
+            select(TGLMembership.id).where(
+                TGLMembership.user_id == user_id_col,
+                TGLMembership.membership_type == "NETWORKING",
+                TGLMembership.status == "ACTIVE",
+                TGLMembership.starts_at.is_not(None),
+                TGLMembership.expires_at.is_not(None),
+                TGLMembership.expires_at > utcnow(),
+            )
+        ),
+        # A paid subscription (payment verified by an admin) is also a membership.
+        exists(
+            select(Subscription.id).where(
+                Subscription.user_id == user_id_col,
+                Subscription.status == "ACTIVE",
+                Subscription.starts_at.is_not(None),
+                Subscription.expires_at.is_not(None),
+                Subscription.expires_at > utcnow(),
+            )
+        ),
     )
 
 
@@ -331,7 +343,12 @@ async def active_member_clause(db: AsyncSession, user_id_col):
         TGLMembership.starts_at.is_not(None),
         TGLMembership.expires_at > utcnow(),
     )
-    clause = user_id_col.in_(membership_ids)
+    subscription_ids = select(Subscription.user_id).where(
+        Subscription.status == "ACTIVE",
+        Subscription.starts_at.is_not(None),
+        Subscription.expires_at > utcnow(),
+    )
+    clause = or_(user_id_col.in_(membership_ids), user_id_col.in_(subscription_ids))
     if await finale_window(db) is not None:
         registrant_ids = (
             select(User.id)

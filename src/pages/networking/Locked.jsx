@@ -6,7 +6,7 @@ const OPENS_AFTER = [
   { icon: 'i-users', title: 'Member directory', desc: 'Find founders and businesses from across Season 1.' },
   { icon: 'i-link', title: 'Referrals', desc: 'Give and receive introductions, tracked to outcome.' },
   { icon: 'i-target', title: 'Business Need Board', desc: 'Post what you need. Offer help where you can.' },
-  { icon: 'i-medal', title: 'Recognition', desc: 'Growth Points and achievements for real contribution.' },
+  { icon: 'i-medal', title: 'Recognition', desc: 'Achievements for real contribution. Growth Points are coming soon.' },
 ];
 
 const DONE = { bg: '#C08D2E', color: '#22103A' };
