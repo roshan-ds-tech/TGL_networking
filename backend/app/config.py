@@ -34,7 +34,8 @@ REQUIRED_APPROVALS = frozenset({"MANAGEMENT_MODEL", "ACCOUNTING_GST", "PRODUCTIO
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    # hide_input_in_errors: a refused setting must never print the other settings (passwords, keys, the database URL) into the logs
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore", hide_input_in_errors=True)
 
     environment: str = "development"
 
