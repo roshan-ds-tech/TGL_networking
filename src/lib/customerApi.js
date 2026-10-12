@@ -185,7 +185,7 @@ export const api = {
     return request(`/api/v1/subscriptions/${subscriptionId}/payment-proof`, { method: 'POST', body: fd });
   },
   // Renewal: the exact calculation, and the confirmation. The server recomputes everything; these numbers are only what the member saw.
-  renewalQuote: (planCode) => request(`/api/v1/renewal/quote?plan_code=${encodeURIComponent(planCode)}`),
+  renewalQuote: (planCode, points) => request(`/api/v1/renewal/quote?plan_code=${encodeURIComponent(planCode)}${points ? `&points=${Number(points)}` : ''}`),
   renewalSimulate: (body) => request('/api/v1/renewal/simulate', { method: 'POST', body: JSON.stringify(body) }),
   renewalConfirm: (body) => request('/api/v1/renewal/confirm', { method: 'POST', body: JSON.stringify(body) }),
   growthPointsOverview: () => request('/api/v1/growth-points/overview'),

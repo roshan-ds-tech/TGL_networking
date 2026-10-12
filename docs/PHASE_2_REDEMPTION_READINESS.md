@@ -47,3 +47,18 @@ Gate A not passed (no real-member data); no external approval recorded (manageme
 ## Community recording and redemption (added with Phase A)
 
 Phase A community recording (`PHASE_A_COMMUNITY_ACTIVITY_RECORDING.md`) and the candidate Community rewards (`GROWTH_POINTS_COMMUNITY_REWARDS_IMPLEMENTATION_SPEC.md`) change **nothing** here. No community activity earns a Growth Point, no ledger event type exists for it, no rule version beyond `growth-points-v3` exists, and no community figure feeds Gate A. Redemption stays disabled, `GROWTH_POINTS_REDEEMABLE_FROM` stays empty, and no epoch is recorded. Even if community rewards are approved later, points earned under any new rule version are redeemable only if their `event_at` is on or after the cutoff management approves in writing. The status above is unchanged: **READY FOR PHASE 3 = NO**.
+
+## Update 2026-10-12: chosen points, in-flight re-check, Emergency Stop & Reset Redemption
+
+Status: implemented and tested locally (SQLite and PostgreSQL 17). **Not deployed to any staging environment; redemption stays disabled; Gate A is unchanged and still blocks real redemption.**
+
+* **The member chooses how many points to use.** `GET /api/v1/renewal/quote?points=N` and `POST /api/v1/renewal/confirm {points: N}`. The server clamps N to `MIN(N, eligible old-cycle points, 15% cap)`; it can only lower the discount. 10 points = ₹1, so 500 points = ₹50. The quote also returns `max_points_usable`. The confirm still requires the figures the member saw (`expected_points`, `expected_discount_minor`) and refuses with `calculation_changed` if anything differs. Renewal panel: a number field (1 to the maximum), "Use the most", and "Remove discount" before confirming.
+* **In-flight protection (defect fixed).** `confirm()` checked the gates only before taking the member lock. It now re-checks every gate (flag, approvals, kill switch, Gate A, rollout, cutoff) under the member lock immediately before a redemption row is written. A stop committed after a request passed the first check refuses it, and the whole renewal (subscription, invoice, payment, redemption) is rolled back. A redemption that committed before the stop is left as it is, by design.
+* **Emergency Stop & Reset Redemption** (admin dashboard → Growth Points → Finance (real)).
+  * `POST /api/admin/growth-points/redemption/kill {reason ≥ 10 chars, confirm: "STOP REDEMPTION"}`. Any signed-in admin (session + admin CSRF), because stopping is the safe direction. The phrase is checked on the server.
+  * It appends one `growth_point_controls` row (append-only, database triggers) and an audit entry. It is read from the database on every redemption, so it applies to every instance at once and survives restarts.
+  * Pressing it again while stopped is idempotent: no second control row, but the attempt is audited.
+  * After committing, the endpoint reads the state back and returns 500 instead of success if it cannot confirm the stop.
+  * It deletes and reverses nothing: points, ledgers, redemptions, invoices, payments, subscriptions, the cutoff and the audit log are unchanged (tested by counts before and after).
+  * `POST …/redemption/resume {reason, confirm: "RESUME REDEMPTION"}` is a separate action, programme owners only. It opens nothing by itself; every other gate still applies.
+  * `GET …/redemption/state` now returns `last_stop` (when, who, why) and the stop/resume `history`.

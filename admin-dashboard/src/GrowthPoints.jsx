@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError, inr } from './api';
+import EmergencyStop from './EmergencyStop';
 import ReasonModal from './ReasonModal';
 
 // Growth Points, SHADOW MODE. Everything here is a simulation: points are recorded and analysed, never applied to an invoice or a payment.
@@ -175,7 +176,7 @@ export default function GrowthPoints({ onUnauthorized }) {
       {section === 'overview' && <Overview guard={guard} status={status} />}
       {section === 'observation' && <Observation guard={guard} />}
       {section === 'gates' && <Gates guard={guard} />}
-      {section === 'finance' && <Finance guard={guard} run={run} />}
+      {section === 'finance' && <Finance guard={guard} />}
       {section === 'economics' && <Economics guard={guard} />}
       {section === 'members' && <Members guard={guard} />}
       {section === 'ledger' && <Ledger guard={guard} />}
@@ -270,7 +271,7 @@ function Observation({ guard }) {
   );
 }
 
-function Finance({ guard, run }) {
+function Finance({ guard }) {
   const f = useLoad(() => api.gpFinance(), guard, []);
   const st = useLoad(() => api.gpRedemptionState(), guard, []);
   if (!f || !st) return <p className="cell__sub">Loading…</p>;
@@ -286,11 +287,8 @@ function Finance({ guard, run }) {
           <div><dt>Redeemable from</dt><dd>{st.redeemable_from || 'Not set'}</dd></div>
         </dl>
         {!st.redeemable_from && <p className="gp-note">Nothing is redeemable until management records an approved date. Points earned before that date never become redeemable.</p>}
-        <div className="gpx-actions" style={{ marginTop: 14, marginBottom: 0 }}>
-          <button type="button" className="btn btn--danger" onClick={() => run('Emergency stop', 'Stops NEW redemptions at once. Existing invoices, history and members’ points are untouched. Programme owner only.', api.gpKill, 'Stop redemptions')}>Emergency stop</button>
-          <button type="button" className="btn btn--ghost" onClick={() => run('Resume redemptions', 'Lifts the emergency stop (every other gate still applies). Programme owner only.', api.gpResume, 'Resume')}>Resume</button>
-        </div>
       </section>
+      <EmergencyStop guard={guard} />
       <Facts title="Realized (real discounts given)" hint="Money actually taken off invoices. Zero while redemption is off." data={f.realized} />
       <Facts title="Points" hint="Points that were redeemed, restored or expired through real redemption." data={f.points} />
       <Facts title="Outstanding potential liability (not incurred)" data={f.outstanding_potential_liability} />
