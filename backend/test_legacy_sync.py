@@ -149,6 +149,20 @@ def main() -> int:
         res = asyncio.run(legacy_sync.sync_once())
         check("changes in the legacy system sync (1 updated, 1 removed)", res["updated"] == 1 and res["removed"] == 1, str(res))
 
+        # An admin opening the registrations list must see a registration taken on the legacy site moments ago, without waiting for the timer (3600 s here).
+        before = filled(c)
+        ROWS.append(_row("brand-new@example.com", category="05"))
+        legacy_sync.last_result.clear()
+        asyncio.run(legacy_sync.refresh_if_stale())
+        check("on-demand refresh: a registration just taken on the legacy site appears at once", filled(c) == before + 1, f"{before} -> {filled(c)}")
+        logins = LOGINS["count"]
+        asyncio.run(legacy_sync.refresh_if_stale())
+        check("on-demand refresh is skipped while the copy is fresh (no extra legacy login)", LOGINS["count"] == logins, str(LOGINS))
+        del ROWS[-1]
+        legacy_sync.last_result.clear()
+        asyncio.run(legacy_sync.refresh_if_stale())
+        check("on-demand refresh also reconciles a registration deleted on the legacy site", filled(c) == before, f"{filled(c)} vs {before}")
+
         STATE["fail_list"] = True
         try:
             asyncio.run(legacy_sync.sync_once())

@@ -188,6 +188,30 @@ async def sync_once() -> dict:
     return result
 
 
+_refresh_lock = asyncio.Lock()
+
+
+async def refresh_if_stale(max_age: float = 15.0, timeout: float = 12.0) -> None:
+    """Called when an admin opens the registrations list: if the mirror is older than `max_age` seconds, sync NOW (bounded by `timeout`)
+    so a registration just taken on the legacy site shows up on the first load instead of up to LEGACY_SYNC_SECONDS later.
+    Never raises: on any failure the list is simply served from the existing copy. Concurrent callers share one sync."""
+    if not enabled() or _auth_failed:
+        return
+    if time.time() - last_result.get("at", 0) < max_age and last_result.get("ok"):
+        return
+    if _refresh_lock.locked():
+        return
+    async with _refresh_lock:
+        try:
+            await asyncio.wait_for(sync_once(), timeout=timeout)
+        except asyncio.CancelledError:
+            raise
+        except LegacyAuthError:
+            pass                                    # the background loop reports and stops on a refused login
+        except Exception as exc:
+            logger.warning("on-demand legacy sync failed: %s: %s", type(exc).__name__, str(exc)[:200])
+
+
 async def _run() -> None:
     global _auth_failed
     while True:

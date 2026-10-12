@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response,
 from sqlalchemy import Integer, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .. import audit
+from .. import audit, legacy_sync
 from ..config import settings
 from ..ratelimit import client_ip
 from ..database import get_db
@@ -85,6 +85,7 @@ async def list_registrations(
     _: Admin = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ) -> RegistrationPage:
+    await legacy_sync.refresh_if_stale()          # pick up registrations just taken on the legacy site
     filters = []
     if search:
         # Parameterised LIKE - values are bound, never string-concatenated.
