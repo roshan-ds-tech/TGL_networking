@@ -198,7 +198,7 @@ export default function NetworkingHome({ status }) {
               </Panel>
             )}
             <Panel title="People to meet" sub="Founders in the Season 1 network" link={{ to: '/app/networking/members', label: 'All members' }}>
-              {members === null ? <SkeletonRows /> : toMeet.length === 0 ? (
+              {members === null || !net.loaded ? <SkeletonRows /> : toMeet.length === 0 ? (
                 <Empty icon="i-users" title={members.length === 0 ? 'No other members yet' : "You've met everyone for now"} body={members.length === 0 ? 'Check back as more Season 1 founders activate their membership.' : 'New members will show up here as they join.'} />
               ) : (
                 <ul className="nh-list">
