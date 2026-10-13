@@ -88,7 +88,7 @@ function Table({ title, hint, rows, onRow, bare }) {
   const cols = Object.keys(rows[0]).filter((k) => typeof rows[0][k] !== 'object' || rows[0][k] === null);
   const num = (c) => rows.every((r) => r[c] === null || r[c] === undefined || typeof r[c] === 'number') && !/_id$|^id$/.test(c);
   const wrap = (
-    <div className="tablewrap gpx-tablewrap">
+    <div className="tablewrap gpx-tablewrap" tabIndex={0} role="region" aria-label="Table (scrolls sideways on small screens)">
       <table className="table gpx-table">
         <thead><tr>{cols.map((c) => <th key={c} className={num(c) ? 'gpx-num' : undefined}>{nice(c)}</th>)}</tr></thead>
         <tbody>
@@ -139,7 +139,7 @@ export default function GrowthPoints({ onUnauthorized }) {
             <summary>How points are earned</summary>
             <table className="gpx-mini">
               <tbody>
-                <tr><td>Referral accepted</td><td>30 for the referrer (45 with a direct introduction), 15 for the recipient</td></tr>
+                <tr><td>Referral accepted</td><td>30 for the referrer (45 with a direct introduction or an arranged meeting), 15 for the recipient</td></tr>
                 <tr><td>Prospect contacted</td><td>15 for the recipient (within 72 hours)</td></tr>
                 <tr><td>Meeting completed</td><td>45 for the referrer, 60 for the recipient (both must confirm)</td></tr>
                 <tr><td>Business closed</td><td>210 to 1,890 for the referrer (by deal size), 30% of the pool to the recipient</td></tr>
@@ -419,7 +419,7 @@ function Flags({ guard, run }) {
       <div className="toolbar"><select className="input" value={status} onChange={(e) => { setPage(1); setStatus(e.target.value); }} aria-label="Status"><option value="OPEN">Open</option><option value="REVIEWED">Reviewed</option><option value="DISMISSED">Dismissed</option><option value="">Any</option></select></div>
       {!res ? <p className="cell__sub">Loading…</p> : (
         <>
-          <div className="tablewrap">
+          <div className="tablewrap" tabIndex={0} role="region" aria-label="Table (scrolls sideways on small screens)">
             <table className="table">
               <thead><tr><th>Raised</th><th>Kind</th><th>Severity</th><th>Member</th><th>Detail</th><th>Status</th><th /></tr></thead>
               <tbody>

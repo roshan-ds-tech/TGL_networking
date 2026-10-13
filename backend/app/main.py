@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import socket
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -204,8 +205,35 @@ async def integrity_error_handler(request: Request, exc: IntegrityError):
     return JSONResponse(status_code=409, content={"detail": "This was already submitted. Please refresh and try again."})
 
 
+def _dependency_unreachable(exc: BaseException) -> bool:
+    """The database (or another dependency) could not be reached: refused, reset, timed out, DNS failure, a dropped
+    connection. That is a temporary outage, not a bug, so it is answered with 503 + Retry-After, which the frontend
+    already treats as "starting up, try again" instead of a broken page. Walks causes and exception groups."""
+    seen: set[int] = set()
+    stack: list[BaseException] = [exc]
+    while stack:
+        e = stack.pop()
+        if e is None or id(e) in seen:
+            continue
+        seen.add(id(e))
+        if isinstance(e, (ConnectionError, TimeoutError, socket.gaierror)):
+            return True
+        if isinstance(e, DBAPIError) and e.connection_invalidated:
+            return True
+        stack.extend([e.__cause__, e.__context__, getattr(e, "orig", None), *getattr(e, "exceptions", ())])
+    return False
+
+
+def _unavailable(request: Request) -> JSONResponse:
+    logger.error("Dependency unreachable on %s %s", request.method, request.url.path, exc_info=True)
+    return JSONResponse(status_code=503, content={"detail": "The service is temporarily unavailable. Please try again shortly."},
+                        headers={"Retry-After": "5", "Cache-Control": "no-store"})
+
+
 @app.exception_handler(DBAPIError)
 async def database_error_handler(request: Request, exc: DBAPIError):
+    if _dependency_unreachable(exc):
+        return _unavailable(request)
     # SQLSTATE class 22 = "data exception": the client sent a value the database cannot store (PostgreSQL
     # rejects a NUL character in text, an out-of-range number, ...). SQLite stores such values, so only
     # Postgres shows it; it is the client's fault, not a server fault.
@@ -220,6 +248,8 @@ async def database_error_handler(request: Request, exc: DBAPIError):
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
     # Log the detail server-side; never leak stack traces to the client.
+    if _dependency_unreachable(exc):
+        return _unavailable(request)
     logger.exception("Unhandled error on %s %s", request.method, request.url.path)
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 

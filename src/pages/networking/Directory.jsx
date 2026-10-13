@@ -179,7 +179,7 @@ export default function Directory({ status }) {
               <p className="nd-total"><strong>{loading && !items.length ? '–' : visible.length}</strong> {visible.length === 1 ? 'member' : 'members'}</p>
               <label className="nd-sort">
                 <span>Sort</span>
-                <select value={sort} onChange={(e) => setSort(e.target.value)}>
+                <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort members">
                   {SORTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                 </select>
               </label>

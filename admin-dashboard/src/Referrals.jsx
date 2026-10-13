@@ -162,7 +162,7 @@ export default function Referrals({ onUnauthorized }) {
         <input className="input" type="date" value={f.date_to} onChange={set('date_to')} aria-label="Created to" />
       </div>
       {error && <p className="alert" role="alert">{error}</p>}
-      <div className="tablewrap">
+      <div className="tablewrap" tabIndex={0} role="region" aria-label="Table (scrolls sideways on small screens)">
         <table className="table">
           <thead><tr><th>Created</th><th>Referrer</th><th>Recipient</th><th>Prospect</th><th>Status</th><th>Meeting</th><th>Closed business</th><th>Actual value</th><th /></tr></thead>
           <tbody>

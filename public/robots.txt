@@ -1,10 +1,11 @@
 # The Growth League (TGL) — Season 1
 # https://tgl.skykeen.in
 #
-# This is a single-page public marketing site. Everything served from this
-# origin is public and intended to be indexed, so nothing here is disallowed.
-# The admin dashboard and registration API are on a separate origin and are
-# not reachable from this one.
+# The public marketing page is meant to be indexed. The member app (/app),
+# the admin dashboard (/admin) and the API (/api) are also served from this
+# origin; they require sign-in and every response carries
+# "X-Robots-Tag: noindex, nofollow". They are deliberately NOT disallowed
+# here: a crawler that is blocked from a URL never sees its noindex header.
 
 User-agent: *
 Allow: /

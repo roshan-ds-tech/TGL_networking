@@ -48,7 +48,7 @@ export default function Subscriptions({ onUnauthorized }) {
         <select className="input" value={f.payment_status} onChange={set('payment_status')} aria-label="Payment status"><option value="">Any payment status</option>{['PENDING', 'SUBMITTED', 'VERIFIED', 'FAILED', 'REFUNDED'].map((s) => <option key={s} value={s}>{label(s)}</option>)}</select>
       </div>
       {error && <p className="alert" role="alert">{error}</p>}
-      <div className="tablewrap">
+      <div className="tablewrap" tabIndex={0} role="region" aria-label="Table (scrolls sideways on small screens)">
         <table className="table">
           <thead><tr><th>Member</th><th>Plan</th><th>Invoice</th><th>Amount</th><th>Payment</th><th>Subscription</th><th>Submitted</th><th /></tr></thead>
           <tbody>

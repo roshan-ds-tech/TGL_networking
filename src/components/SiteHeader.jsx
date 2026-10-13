@@ -95,8 +95,8 @@ export default function SiteHeader({ path, authUser, authChecked, unread = 0, on
     <header ref={headerRef} style={{ position: 'sticky', top: '0', zIndex: '60', background: 'linear-gradient(180deg, rgba(252,246,234,0.95), rgba(246,238,223,0.88))', backdropFilter: 'blur(18px) saturate(1.35)', WebkitBackdropFilter: 'blur(18px) saturate(1.35)', borderBottom: '1px solid rgba(192,141,46,0.22)', transition: 'box-shadow .3s ease, background .3s ease', animation: 'tglNavIn .32s ease' }}>
       <div style={{ position: 'absolute', left: '0', right: '0', top: '0', height: '1px', pointerEvents: 'none', background: 'linear-gradient(90deg, rgba(192,141,46,0), rgba(224,181,88,0.65) 50%, rgba(192,141,46,0))' }}></div>
       <div style={{ position: 'relative', maxWidth: '1240px', margin: '0 auto', padding: '13px 28px', display: 'flex', alignItems: 'center', gap: '24px' }}>
-        <a href="/" onClick={goHome} aria-label="The Growth League — home" style={{ display: 'flex', alignItems: 'center', gap: '14px', flexShrink: '0' }}>
-          <img src={logo} alt="The Growth League logo" style={{ height: '44px', width: 'auto', display: 'block' }} />
+        <a href="/" onClick={goHome} style={{ display: 'flex', alignItems: 'center', gap: '14px', flexShrink: '0' }}>
+          <img src={logo} alt="The Growth League — home" style={{ height: '44px', width: 'auto', display: 'block' }} />
           <span data-nav-desktop="" data-nav-wordmark="" style={{ width: '1px', height: '30px', background: 'linear-gradient(180deg, rgba(53,26,78,0), rgba(53,26,78,0.22), rgba(53,26,78,0))' }}></span>
           <span data-nav-desktop="" data-nav-wordmark="" style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
             <span style={{ fontFamily: 'Archivo, Helvetica, sans-serif', fontSize: '12.5px', fontWeight: '800', letterSpacing: '.16em', textTransform: 'uppercase', color: '#2B1740', lineHeight: '1' }}>
