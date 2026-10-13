@@ -148,7 +148,7 @@ export default function NetworkingHome({ status }) {
         </div>
 
         <div className="nh-stats">
-          <button type="button" className="nh-stat nh-stat--link" onClick={() => go('/app/growth-points')} aria-label="Open your Growth Points">
+          <button type="button" className="nh-stat nh-stat--link" onClick={() => go('/app/growth-points')}>
             <span className="nh-stat-label"><Icon id="i-chart" size={14} /> Growth Points</span>
             {/* The number comes from the server's overview (the points ledger), only when Growth Points are visible to this member. */}
             <span className="nh-stat-value nh-stat-value--gold">{gp?.visible ? gp.balance.total.toLocaleString('en-IN') : '0'}</span>
@@ -158,7 +158,7 @@ export default function NetworkingHome({ status }) {
           <div className="nh-stat">
             <span className="nh-stat-label"><Icon id="i-shield" size={14} /> Trust</span>
             <span className="nh-stat-value nh-stat-value--text">{tier.label}</span>
-            <span className="nh-meter" aria-label={`Trust level ${tier.filled} of 5`}>
+            <span className="nh-meter" role="img" aria-label={`Trust level ${tier.filled} of 5`}>
               {[1, 2, 3, 4, 5].map((n) => <span key={n} className={n <= tier.filled ? 'on' : ''} />)}
             </span>
           </div>

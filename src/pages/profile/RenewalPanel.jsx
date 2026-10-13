@@ -18,7 +18,7 @@ const pts = (n) => Number(n).toLocaleString('en-IN');
 function Row({ name, value, strong, note }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, padding: '7px 0', borderBottom: '1px solid rgba(53,26,78,0.07)' }}>
-      <span style={{ fontSize: 13.5, color: 'rgba(43,23,64,0.75)' }}>{name}{note && <span style={{ display: 'block', fontSize: 11.5, color: 'rgba(43,23,64,0.55)' }}>{note}</span>}</span>
+      <span style={{ fontSize: 13.5, color: 'rgba(43,23,64,0.75)' }}>{name}{note && <span style={{ display: 'block', fontSize: 11.5, color: 'rgba(43,23,64,0.68)' }}>{note}</span>}</span>
       <span style={{ fontSize: strong ? 17 : 14, fontWeight: strong ? 800 : 600, color: '#2B1740', textAlign: 'right' }}>{value}</span>
     </div>
   );
@@ -142,7 +142,7 @@ export default function RenewalPanel() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, padding: '7px 0', borderBottom: '1px solid rgba(53,26,78,0.07)', flexWrap: 'wrap' }}>
             <label htmlFor="rp-points" style={{ fontSize: 13.5, color: 'rgba(43,23,64,0.75)' }}>
               Growth Points you will use
-              <span style={{ display: 'block', fontSize: 11.5, color: 'rgba(43,23,64,0.55)' }}>Choose 1 to {pts(maxUsable)}. The discount below updates when you leave the box or press Enter.</span>
+              <span style={{ display: 'block', fontSize: 11.5, color: 'rgba(43,23,64,0.68)' }}>Choose 1 to {pts(maxUsable)}. The discount below updates when you leave the box or press Enter.</span>
             </label>
             <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <input id="rp-points" type="number" inputMode="numeric" min={1} max={maxUsable} step={1} value={draft} disabled={busy}
@@ -182,7 +182,7 @@ export default function RenewalPanel() {
           <button type="button" disabled={busy} onClick={renewFullPrice} style={{ border: 'none', background: 'none', textDecoration: 'underline', cursor: 'pointer', color: '#35194E', fontSize: 13 }}>Renew at the full price without using Growth Points</button>
         </p>
       )}
-      <p style={{ margin: '12px 0 0', fontSize: 12, lineHeight: 1.5, color: 'rgba(43,23,64,0.6)' }}>{q.terms}</p>
+      <p style={{ margin: '12px 0 0', fontSize: 12, lineHeight: 1.5, color: 'rgba(43,23,64,0.68)' }}>{q.terms}</p>
     </section>
   );
 }

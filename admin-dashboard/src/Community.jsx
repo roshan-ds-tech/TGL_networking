@@ -98,7 +98,7 @@ export default function Community({ onUnauthorized }) {
         <p className="cell__sub gp-hint">Remove a need that is not genuine, or restore one. Your name, the reason and the time are recorded in the need, the activity history and the audit log.</p>
         <div className="gpx-actions"><label className="cell__sub">Status <select className="input" value={status} onChange={(e) => { setPage(1); setStatus(e.target.value); }}>{NEED_STATUS.map((s) => <option key={s} value={s}>{s || 'Any'}</option>)}</select></label></div>
         {!needs ? <p className="cell__sub">Loading…</p> : (
-          <div className="tablewrap gpx-tablewrap">
+          <div className="tablewrap gpx-tablewrap" tabIndex={0} role="region" aria-label="Table (scrolls sideways on small screens)">
             <table className="table gpx-table">
               <thead><tr><th>Posted</th><th>Poster</th><th>Need</th><th>Status</th><th className="gpx-num">Offers</th><th>Tracked</th><th /></tr></thead>
               <tbody>

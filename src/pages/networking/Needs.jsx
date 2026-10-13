@@ -318,7 +318,7 @@ export default function Needs({ status }) {
               <p><strong>{loading ? '–' : visible.length}</strong> {mineOnly ? '' : 'open '}{visible.length === 1 ? 'need' : 'needs'}</p>
               <label>
                 <span>Sort</span>
-                <select value={sort} onChange={(e) => setSort(e.target.value)}>
+                <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort needs">
                   <option value="new">Newest first</option>
                   <option value="old">Oldest first</option>
                 </select>

@@ -48,7 +48,7 @@ async def preview(user: User = Depends(require_active_networking_member), db: As
 
 
 EARN_GUIDE = [
-    {"key": "REFERRAL_ACCEPTED", "title": "A referral is accepted", "points": "30 for you (45 with a direct introduction), 15 for the member who accepts", "icon": "send",
+    {"key": "REFERRAL_ACCEPTED", "title": "A referral is accepted", "points": "30 for you (45 if you introduced them by email or call, or arranged a meeting), 15 for the member who accepts", "icon": "send",
      "detail": "You earn when the other member accepts the referral you gave. Creating a referral earns nothing on its own: it has to be accepted."},
     {"key": "PROSPECT_CONTACTED", "title": "A prospect is contacted", "points": "15 for the member who contacts them", "icon": "phone",
      "detail": "The member you referred to contacts the prospect within 72 hours of accepting."},

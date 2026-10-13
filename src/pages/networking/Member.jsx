@@ -212,7 +212,7 @@ export default function Member({ id, status }) {
                 </p>
                 {/* Not active yet: always 0, never a stored balance. */}
                 <p style={{ ...METRIC_VALUE, color: '#8F6420' }}>0</p>
-                <p style={{ margin: '4px 0 0', fontSize: 11, color: 'rgba(43,23,64,0.6)' }}>Coming soon</p>
+                <p style={{ margin: '4px 0 0', fontSize: 11, color: 'rgba(43,23,64,0.68)' }}>Coming soon</p>
               </div>
               <div style={{ padding: 20, background: '#FFFCF5' }}>
                 <p style={METRIC_LABEL}>Referrals given</p>

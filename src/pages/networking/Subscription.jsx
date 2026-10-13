@@ -192,7 +192,7 @@ export function MyInvoice({ sub, onChange }) {
       <dl style={{ margin: '0 0 22px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
         {[['Amount due', <Money key="a" minor={inv.amount_due_minor} />], ['Payment reference', pay.reference], ['Status', submitted ? 'Payment proof under review' : pay.status === 'FAILED' ? 'Proof not accepted' : 'Awaiting your payment']].map(([k, v]) => (
           <div key={k} style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(53,26,78,0.05)' }}>
-            <dt style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.55)' }}>{k}</dt>
+            <dt style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.68)' }}>{k}</dt>
             <dd style={{ margin: '4px 0 0', fontSize: 15, fontWeight: 700, color: '#2B1740', overflowWrap: 'anywhere' }}>{v}</dd>
           </div>
         ))}
@@ -214,7 +214,7 @@ export function MyInvoice({ sub, onChange }) {
         <button type="button" className="tglp-gold" disabled={!file || busy} onClick={() => run(() => api.submitPaymentProof(sub.id, file), 'Payment proof submitted for review.')} style={{ padding: '12px 22px', border: 'none', borderRadius: 999, background: 'linear-gradient(135deg,#EFCB77,#E0B558 45%,#C08D2E)', color: '#22103A', fontSize: 12, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', cursor: !file || busy ? 'default' : 'pointer', opacity: !file || busy ? 0.6 : 1 }}>
           {busy ? 'Uploading…' : submitted ? 'Replace proof' : 'Submit payment proof'}
         </button>
-        <button type="button" disabled={busy} onClick={() => run(() => api.cancelSubscription(sub.id), 'Subscription cancelled.')} style={{ border: 'none', background: 'none', color: 'rgba(43,23,64,0.6)', textDecoration: 'underline', cursor: 'pointer', font: 'inherit', fontSize: 13 }}>Cancel this subscription</button>
+        <button type="button" disabled={busy} onClick={() => run(() => api.cancelSubscription(sub.id), 'Subscription cancelled.')} style={{ border: 'none', background: 'none', color: 'rgba(43,23,64,0.68)', textDecoration: 'underline', cursor: 'pointer', font: 'inherit', fontSize: 13 }}>Cancel this subscription</button>
       </div>
     </section>
   );

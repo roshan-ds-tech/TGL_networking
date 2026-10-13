@@ -439,7 +439,7 @@ export default function App() {
           </p>
         )}
 
-        <div className="tablewrap">
+        <div className="tablewrap" tabIndex={0} role="region" aria-label="Table (scrolls sideways on small screens)">
           <table className="table">
             <thead>
               <tr>
