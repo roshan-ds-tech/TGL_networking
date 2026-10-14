@@ -12,6 +12,7 @@ function Icon({ id, size = 13 }) {
      sent      -> Requested (waiting on them)
      received  -> Accept / Ignore (they asked you)
      connected -> Connected
+     loading   -> a disabled placeholder until the connection list has loaded
    `prefix` picks the page's button styles (nh / nd / rf-style classes). */
 export default function ConnectionButton({ relation, userId, name, businessName, prefix = 'nd', extra = '' }) {
   const [busy, setBusy] = useState(false);
@@ -30,6 +31,9 @@ export default function ConnectionButton({ relation, userId, name, businessName,
     }
   }
 
+  if (relation.kind === 'loading') {
+    return <button type="button" className={base} disabled aria-busy="true" aria-label={`Checking connection with ${name}`}>…</button>;
+  }
   if (relation.kind === 'connected') {
     return <span className={`${base} is-done`} aria-label={`Connected with ${name}`}><Icon id="i-check" /> Connected</span>;
   }

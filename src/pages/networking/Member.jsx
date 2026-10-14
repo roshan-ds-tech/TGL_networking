@@ -159,7 +159,7 @@ export default function Member({ id, status }) {
                       onClick={() => openConnectModal(member.business_name, member.user_id)}
                       style={{ width: '100%', padding: 15, border: 'none', borderRadius: 999, background: 'linear-gradient(135deg,#EFCB77,#E0B558 45%,#C08D2E)', color: '#22103A', fontSize: 11.5, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', whiteSpace: 'nowrap', cursor: rel.kind === 'none' ? 'pointer' : 'default', marginBottom: 10, opacity: rel.kind === 'none' ? 1 : 0.7 }}
                     >
-                      {rel.kind === 'connected' ? '✓ Connected' : rel.kind === 'sent' ? 'Requested' : 'Connect'}
+                      {rel.kind === 'loading' ? '…' : rel.kind === 'connected' ? '✓ Connected' : rel.kind === 'sent' ? 'Requested' : 'Connect'}
                     </button>
                   )}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>

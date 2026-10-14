@@ -57,7 +57,8 @@ export function useConnections() {
   return {
     loaded: rows !== null,
     reload: load,
-    relation: (otherId) => relationWith(all, myId, otherId),
+    // Until the rows arrive nothing is known: say so, never claim "not connected".
+    relation: (otherId) => (rows === null ? { kind: 'loading' } : relationWith(all, myId, otherId)),
     connected,
     invitations: all.filter((c) => c.target_user_id === myId && c.status === 'PENDING'),
     sent: all.filter((c) => c.requester_user_id === myId && c.status !== 'ACCEPTED'),
