@@ -77,10 +77,23 @@ def body() -> int:
     check("exactly one cycle per member (the complimentary term is not duplicated)", scalar("select count(*) from growth_point_cycles where member_id = :m", m=a_id) == 1)
     check("nothing financial changed: no invoice, payment or discount was created", scalar("select count(*) from invoices") == 0 and scalar("select count(*) from payments") == 0)
 
+    # ---------------------------------------------------------------- the member profile shows the same balance
+    directory = {m["user_id"]: m["member_id"] for m in a.get("/api/v1/networking/members").json()}
+    pa_prof = b.get(f"/api/v1/networking/members/{directory[a_id]}").json()
+    pb_prof = a.get(f"/api/v1/networking/members/{directory[b_id]}").json()
+    own_prof = a.get(f"/api/v1/networking/members/{directory[a_id]}").json()
+    check("PROFILE: another member sees the referrer's real ledger balance (30), the same figure as the referrer's own Growth Points page, labelled a preview",
+          pa_prof.get("growth_points") == 30 == ov["balance"]["total"] and pa_prof.get("growth_points_visible") is True and pa_prof.get("growth_points_preview") is True, str({k: pa_prof.get(k) for k in ("growth_points", "growth_points_visible", "growth_points_preview")}))
+    check("PROFILE: the recipient's profile shows their own 15, and a member's own profile shows the same 30", pb_prof.get("growth_points") == 15 and own_prof.get("growth_points") == 30, f"{pb_prof.get('growth_points')}, {own_prof.get('growth_points')}")
+    check("PROFILE: only the total is exposed, never the activity, cycle or rule trace", not any(k in pa_prof for k in ("activity", "cycle", "balance", "earned_by_activity", "rule_version")))
+    check("PROFILE: the legacy growth_points column is still untouched (the ledger is the only source)", scalar("select coalesce(sum(growth_points), 0) from networking_profiles") == 0)
+
     # ---------------------------------------------------------------- visibility
     app_settings.growth_points_member_preview = False
     off = a.get("/api/v1/growth-points/overview").json()
     check("PREVIEW OFF: the page explains how it works but shows none of the member's numbers", off["visible"] is False and "balance" not in off and "activity" not in off and len(off["ways_to_earn"]) >= 5 and off["message"])
+    hidden = b.get(f"/api/v1/networking/members/{directory[a_id]}").json()
+    check("PREVIEW OFF: the profile hides the figure too (visible false, 0), under the same rule as the member's own page", hidden.get("growth_points_visible") is False and hidden.get("growth_points") == 0, str(hidden.get("growth_points")))
     app_settings.growth_points_member_preview = True
 
     # ---------------------------------------------------------------- admin: demo members

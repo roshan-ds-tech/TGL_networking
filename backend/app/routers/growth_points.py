@@ -92,8 +92,8 @@ async def overview(user: User = Depends(require_active_networking_member), db: A
         return out
     now = utcnow()
     lots = await ledger.lots(db, member_id=user.id, now=now)
-    pending = sum(l.remaining for l in lots if l.state == "PENDING")
-    available = sum(l.remaining for l in lots if l.state == "AVAILABLE")
+    held = await ledger.member_balance(db, user.id, now)
+    pending, available = held["pending"], held["available"]
     expiring = sum(l.remaining for l in lots if l.state in ("PENDING", "AVAILABLE") and l.row.expires_at is not None and rules.aware(l.row.expires_at) <= now + timedelta(days=30))
     cycle = await cycles.resolve_cycle(db, user.id, now, persist=False)
     earned_cycle = 0

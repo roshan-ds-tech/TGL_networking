@@ -8,9 +8,16 @@ import ImageSlot from '../../components/ImageSlot';
 import NetTabs from './NetTabs';
 
 const CATEGORY_MAP = new Map(CATEGORIES.map((c) => [c.code, c.name]));
-const CAPTION = { margin: '0 0 12px', fontSize: 10.5, fontWeight: 700, letterSpacing: '.26em', textTransform: 'uppercase', color: '#8F6420' };
-const METRIC_LABEL = { margin: '0 0 10px', fontSize: 10, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: 'rgba(43,23,64,0.65)' };
-const METRIC_VALUE = { margin: 0, fontSize: 24, fontWeight: 800, color: '#2B1740' };
+
+/* An empty profile field: a quiet line for visitors, a nudge to fill it for the member themselves. */
+function Missing({ isMe, text, cta }) {
+  return (
+    <p className="mp-missing">
+      {isMe ? 'You haven\u2019t added this yet.' : text}
+      {isMe && <button type="button" className="mp-missing-cta" onClick={() => go('/app/profile')}>{cta} →</button>}
+    </p>
+  );
+}
 
 export default function Member({ id, status }) {
   const myId = status?.user?.id;
@@ -191,105 +198,103 @@ export default function Member({ id, status }) {
             </div>
           </aside>
 
-          <div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 1, background: 'rgba(53,26,78,0.1)', border: '1px solid rgba(53,26,78,0.1)', borderRadius: 20, overflow: 'hidden', marginBottom: 14 }}>
-              <div style={{ padding: 20, background: '#FFFCF5' }}>
-                <p style={{ margin: '0 0 10px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: '#6B3E96' }}>
-                  <svg width="13" height="13" viewBox="0 0 24 24"><use href="#i-shield" /></svg>
-                  Trust Score
-                </p>
-                <p style={{ margin: '0 0 10px', fontSize: 18, fontWeight: 800, color: '#2B1740' }}>{tier.label}</p>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 3 }}>
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <span key={n} style={{ height: 3, background: n <= tier.filled ? '#6B3E96' : 'rgba(107,62,150,0.15)' }} />
-                  ))}
-                </div>
-              </div>
-              <div style={{ padding: 20, background: '#FFFCF5' }}>
-                <p style={{ margin: '0 0 10px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '.18em', textTransform: 'uppercase', color: '#A8762F' }}>
-                  <svg width="13" height="13" viewBox="0 0 24 24"><use href="#i-chart" /></svg>
-                  Growth Points
-                </p>
-                {/* Not active yet: always 0, never a stored balance. */}
-                <p style={{ ...METRIC_VALUE, color: '#8F6420' }}>0</p>
-                <p style={{ margin: '4px 0 0', fontSize: 11, color: 'rgba(43,23,64,0.68)' }}>Coming soon</p>
-              </div>
-              <div style={{ padding: 20, background: '#FFFCF5' }}>
-                <p style={METRIC_LABEL}>Referrals given</p>
-                <p style={METRIC_VALUE}>{member.referrals_given || 0}</p>
-              </div>
-              <div style={{ padding: 20, background: '#FFFCF5' }}>
-                <p style={METRIC_LABEL}>Referrals received</p>
-                <p style={METRIC_VALUE}>{member.referrals_received || 0}</p>
-              </div>
-            </div>
-            <p style={{ margin: '0 0 44px', fontFamily: "'IBM Plex Mono', monospace", fontSize: 10.5, color: 'rgba(43,23,64,0.65)' }}>
-              Metrics populate from live activity. Trust Score formula is defined by TGL.
-            </p>
-
-            <div data-grid-2="" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 40, marginBottom: 40 }}>
-              <div>
-                <p style={CAPTION}>Founder story</p>
-                <p style={{ margin: 0, fontSize: 15.5, lineHeight: 1.7, color: 'rgba(43,23,64,0.75)' }}>
-                  {member.founder_story || 'Not shared yet.'}
-                </p>
-              </div>
-              <div>
-                <p style={CAPTION}>Business story</p>
-                <p style={{ margin: 0, fontSize: 15.5, lineHeight: 1.7, color: 'rgba(43,23,64,0.75)' }}>
-                  {member.headline || 'Not shared yet.'}
-                </p>
-              </div>
-            </div>
-
-            <div style={{ padding: '30px 0', borderTop: '1px solid rgba(53,26,78,0.12)' }}>
-              <p style={CAPTION}>What we do</p>
-              <p style={{ margin: 0, fontSize: 17, lineHeight: 1.65, color: '#2B1740' }}>
-                {member.business_description || 'No business description provided.'}
-              </p>
-            </div>
-
-            <div data-grid-2="" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, padding: '30px 0', borderTop: '1px solid rgba(53,26,78,0.12)' }}>
-              <div style={{ padding: 24, borderRadius: 18, background: 'rgba(107,62,150,0.07)' }}>
-                <p style={{ margin: '0 0 10px', display: 'flex', alignItems: 'center', gap: 8, fontSize: 10.5, fontWeight: 700, letterSpacing: '.22em', textTransform: 'uppercase', color: '#6B3E96' }}>
-                  <svg width="15" height="15" viewBox="0 0 24 24"><use href="#i-search" /></svg>
-                  Looking for
-                </p>
-                <p style={{ margin: 0, fontSize: 15, lineHeight: 1.6, color: '#2B1740' }}>
-                  {member.seeking_mentor ? 'Mentoring and guidance from experienced founders.' : 'Nothing listed right now.'}
-                </p>
-              </div>
-              <div style={{ padding: 24, borderRadius: 18, background: 'rgba(192,141,46,0.1)' }}>
-                <p style={{ margin: '0 0 10px', display: 'flex', alignItems: 'center', gap: 8, fontSize: 10.5, fontWeight: 700, letterSpacing: '.22em', textTransform: 'uppercase', color: '#8A5A18' }}>
-                  <svg width="15" height="15" viewBox="0 0 24 24"><use href="#i-link" /></svg>
-                  Can help with
-                </p>
-                <p style={{ margin: 0, fontSize: 15, lineHeight: 1.6, color: '#2B1740' }}>
-                  {member.open_to_mentoring ? 'Mentoring other Season 1 founders.' : 'Nothing listed right now.'}
-                </p>
-              </div>
-            </div>
-
-            <div style={{ padding: '30px 0', borderTop: '1px solid rgba(53,26,78,0.12)' }}>
-              <p style={{ ...CAPTION, marginBottom: 14 }}>Interests</p>
-              {interests.length === 0 ? (
-                <p style={{ margin: 0, fontSize: 14, color: 'rgba(43,23,64,0.65)' }}>None listed yet.</p>
+          <div className="mp">
+            <header className="mp-intro">
+              <p className="mp-eyebrow">About the business</p>
+              <h2 className="mp-headline">{member.headline || `Building ${member.business_name}`}</h2>
+              {member.business_description ? (
+                <p className="mp-lead">{member.business_description}</p>
               ) : (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                  {interests.map((t) => (
-                    <span key={t} style={{ padding: '8px 14px', border: '1px solid rgba(53,26,78,0.14)', borderRadius: 999, fontSize: 13, fontWeight: 600, color: '#35194E', background: '#FFFCF5' }}>{t}</span>
-                  ))}
+                <Missing isMe={isMe} text="No business description yet." cta="Describe your business" />
+              )}
+              {(member.open_to_mentoring || member.seeking_mentor) && (
+                <div className="mp-flags">
+                  {member.open_to_mentoring && <span className="mp-flag mp-flag--gold"><svg width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-bulb" /></svg>Open to mentoring</span>}
+                  {member.seeking_mentor && <span className="mp-flag"><svg width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-compass" /></svg>Seeking a mentor</span>}
                 </div>
               )}
-            </div>
+            </header>
 
-            <div style={{ padding: '30px 0 0', borderTop: '1px solid rgba(53,26,78,0.12)' }}>
-              <p style={{ ...CAPTION, marginBottom: 14 }}>Achievements</p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '20px 22px', border: '1px dashed rgba(53,26,78,0.2)', borderRadius: 16 }}>
-                <svg width="22" height="22" viewBox="0 0 24 24" style={{ color: 'rgba(43,23,64,0.65)' }}><use href="#i-trophy" /></svg>
-                <p style={{ margin: 0, fontSize: 14, color: 'rgba(43,23,64,0.65)' }}>No achievements yet. They appear here as they&apos;re earned.</p>
+            <section className="mp-stats" aria-label="Network standing">
+              <div className="mp-stat">
+                <p className="mp-stat-label"><span className="mp-stat-ico mp-stat-ico--violet"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-shield" /></svg></span>Trust standing</p>
+                <p className="mp-stat-value mp-stat-value--text">{tier.label}</p>
+                <div className="mp-meter" role="img" aria-label={`Trust level ${tier.filled} of 5`}>
+                  {[1, 2, 3, 4, 5].map((n) => <span key={n} className={n <= tier.filled ? 'is-on' : ''} />)}
+                </div>
               </div>
-            </div>
+              <div className="mp-stat">
+                <p className="mp-stat-label"><span className="mp-stat-ico"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-send" /></svg></span>Referrals given</p>
+                <p className="mp-stat-value">{member.referrals_given || 0}</p>
+                <p className="mp-stat-sub">Introductions made</p>
+              </div>
+              <div className="mp-stat">
+                <p className="mp-stat-label"><span className="mp-stat-ico"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-users" /></svg></span>Referrals received</p>
+                <p className="mp-stat-value">{member.referrals_received || 0}</p>
+                <p className="mp-stat-sub">Introductions received</p>
+              </div>
+              <div className="mp-stat">
+                <p className="mp-stat-label"><span className="mp-stat-ico mp-stat-ico--gold"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-chart" /></svg></span>Growth Points</p>
+                {/* The member's ledger balance, shown under the same rule as the viewer's own Growth Points page. */}
+                {member.growth_points_visible ? (
+                  <>
+                    <p className="mp-stat-value mp-stat-value--gold">{(member.growth_points || 0).toLocaleString('en-IN')}</p>
+                    <p className="mp-stat-sub">{member.growth_points_preview ? 'Preview · not redeemable yet' : 'Points held'}</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="mp-stat-value mp-stat-value--soon">Soon</p>
+                    <p className="mp-stat-sub">Not active yet</p>
+                  </>
+                )}
+              </div>
+            </section>
+            <p className="mp-footnote">Updated from live network activity. Trust standing is defined by TGL.</p>
+
+            <section className="mp-card">
+              <h3 className="mp-card-title">Founder story</h3>
+              {member.founder_story ? (
+                <blockquote className="mp-quote">{member.founder_story}</blockquote>
+              ) : (
+                <Missing isMe={isMe} text={`${member.founder_name.split(' ')[0]} hasn't shared their story yet.`} cta="Add your founder story" />
+              )}
+            </section>
+
+            <section className="mp-card">
+              <h3 className="mp-card-title">Ways to work together</h3>
+              <div className="mp-tiles">
+                <div className="mp-tile mp-tile--violet">
+                  <p className="mp-tile-label"><svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-search" /></svg>Looking for</p>
+                  <p className={member.seeking_mentor ? 'mp-tile-text' : 'mp-tile-text is-empty'}>
+                    {member.seeking_mentor ? 'Mentoring and guidance from experienced founders.' : 'Nothing listed right now.'}
+                  </p>
+                </div>
+                <div className="mp-tile mp-tile--gold">
+                  <p className="mp-tile-label"><svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-link" /></svg>Can help with</p>
+                  <p className={member.open_to_mentoring ? 'mp-tile-text' : 'mp-tile-text is-empty'}>
+                    {member.open_to_mentoring ? 'Mentoring other Season 1 founders.' : 'Nothing listed right now.'}
+                  </p>
+                </div>
+              </div>
+              <div className="mp-interests">
+                <p className="mp-sub-title">Interests</p>
+                {interests.length === 0 ? (
+                  <p className="mp-muted">None listed yet.</p>
+                ) : (
+                  <ul className="mp-chips">
+                    {interests.map((t) => <li key={t}>{t}</li>)}
+                  </ul>
+                )}
+              </div>
+            </section>
+
+            <section className="mp-card mp-card--row">
+              <span className="mp-trophy"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-trophy" /></svg></span>
+              <div>
+                <h3 className="mp-card-title mp-card-title--tight">Achievements</h3>
+                <p className="mp-muted">No achievements yet. They appear here as they&apos;re earned.</p>
+              </div>
+            </section>
           </div>
         </div>
       </main>

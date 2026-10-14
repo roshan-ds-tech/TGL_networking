@@ -510,7 +510,7 @@ def main() -> int:
     check("active member can view a member profile", r.status_code == 200, r.text[:200])
     detail = r.json() if r.status_code == 200 else {}
     check("member profile shows zero Trust Score (no invented metrics)", detail.get("trust_score") == 0, str(detail.get("trust_score")))
-    check("member profile shows zero Growth Points", detail.get("growth_points") == 0, str(detail.get("growth_points")))
+    check("member profile shows zero Growth Points for a member with no ledger activity, with an explicit visibility flag", detail.get("growth_points") == 0 and isinstance(detail.get("growth_points_visible"), bool), str(detail.get("growth_points")))
     check("member profile hides private contact data", "email" not in r.text and "phone" not in r.text)
 
     r = u1.get("/api/v1/networking/members/not-a-real-id")

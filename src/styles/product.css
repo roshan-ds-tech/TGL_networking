@@ -1954,3 +1954,69 @@ a.nh-person:hover .nh-name { color: #6B3E96; }
 .nb-offers-foot label { display: grid; gap: 4px; font-size: 12px; color: rgba(43,23,64,0.65); }
 .nb-offers-foot select { padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(43,23,64,0.18); background: #fff; font: inherit; }
 @media (max-width: 640px) { .nb-offer { flex-direction: column; } .nb-offer-side { align-items: flex-start; } }
+
+/* Member profile: the right-hand column (the photo card on the left is styled inline and unchanged) */
+.mp { min-width: 0; display: grid; gap: 22px; }
+.mp-intro { padding: 6px 0 4px; }
+.mp-eyebrow { margin: 0 0 12px; font-size: 10.5px; font-weight: 700; letter-spacing: .26em; text-transform: uppercase; color: #8F6420; }
+.mp-headline { margin: 0; font-size: clamp(28px, 3.2vw, 40px); line-height: 1.12; font-weight: 800; letter-spacing: -0.025em; color: #2B1740; text-wrap: balance; overflow-wrap: anywhere; }
+.mp-lead { margin: 14px 0 0; max-width: 62ch; font-size: 17px; line-height: 1.65; color: rgba(43,23,64,0.78); overflow-wrap: anywhere; }
+.mp-flags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.mp-flag { display: inline-flex; align-items: center; gap: 7px; padding: 7px 13px; border-radius: 999px; font-size: 12.5px; font-weight: 600; background: rgba(107,62,150,0.08); color: #4A2670; border: 1px solid rgba(107,62,150,0.16); }
+.mp-flag--gold { background: rgba(224,181,88,0.14); color: #7A5214; border-color: rgba(192,141,46,0.3); }
+
+.mp-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 8px; border-radius: 22px; background: #FFFDF8; border: 1px solid rgba(192,141,46,0.2); box-shadow: 0 1px 0 rgba(255,255,255,0.8) inset, 0 18px 40px -24px rgba(43,23,64,0.25); overflow: hidden; }
+.mp-stat { padding: 22px 22px 20px; min-width: 0; }
+.mp-stat + .mp-stat { border-left: 1px solid rgba(53,26,78,0.08); }
+.mp-stat-label { display: flex; align-items: center; gap: 9px; margin: 0 0 14px; font-size: 10px; font-weight: 700; letter-spacing: .14em; line-height: 1.35; text-transform: uppercase; color: rgba(43,23,64,0.62); }
+.mp-stat-ico { display: inline-grid; place-items: center; flex: none; width: 26px; height: 26px; border-radius: 9px; background: rgba(43,23,64,0.06); color: #4A2670; }
+.mp-stat-ico--violet { background: rgba(107,62,150,0.12); color: #6B3E96; }
+.mp-stat-ico--gold { background: rgba(224,181,88,0.2); color: #8F6420; }
+.mp-stat-value { margin: 0; font-size: 32px; line-height: 1; font-weight: 800; letter-spacing: -0.02em; color: #2B1740; font-variant-numeric: tabular-nums; }
+.mp-stat-value--text { font-size: 19px; line-height: 1.2; }
+.mp-stat-value--soon { font-size: 19px; line-height: 1.2; color: #8F6420; }
+.mp-stat-value--gold { color: #8F6420; }
+.mp-stat-sub { margin: 8px 0 0; font-size: 12px; color: rgba(43,23,64,0.6); }
+.mp-meter { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin-top: 12px; }
+.mp-meter span { height: 4px; border-radius: 99px; background: rgba(107,62,150,0.14); }
+.mp-meter span.is-on { background: linear-gradient(90deg, #6B3E96, #8C5BBE); }
+.mp-footnote { margin: -12px 0 0 4px; font-size: 11.5px; color: rgba(43,23,64,0.55); }
+
+.mp-card { padding: 26px 28px; border-radius: 22px; background: #FFFDF8; border: 1px solid rgba(53,26,78,0.09); }
+.mp-card-title { margin: 0 0 16px; font-size: 10.5px; font-weight: 700; letter-spacing: .24em; text-transform: uppercase; color: #8F6420; }
+.mp-card-title--tight { margin-bottom: 6px; }
+.mp-card--row { display: flex; align-items: center; gap: 18px; padding: 20px 24px; }
+.mp-quote { position: relative; margin: 0; padding-left: 22px; border-left: 3px solid #E0B558; font-size: 16px; line-height: 1.75; color: rgba(43,23,64,0.82); white-space: pre-line; overflow-wrap: anywhere; }
+.mp-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.mp-tile { padding: 20px 22px; border-radius: 16px; }
+.mp-tile--violet { background: rgba(107,62,150,0.06); border: 1px solid rgba(107,62,150,0.1); }
+.mp-tile--gold { background: rgba(224,181,88,0.1); border: 1px solid rgba(192,141,46,0.16); }
+.mp-tile-label { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 10.5px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: #6B3E96; }
+.mp-tile--gold .mp-tile-label { color: #8A5A18; }
+.mp-tile-text { margin: 0; font-size: 15px; line-height: 1.6; color: #2B1740; }
+.mp-tile-text.is-empty { color: rgba(43,23,64,0.55); }
+.mp-interests { margin-top: 22px; padding-top: 18px; border-top: 1px solid rgba(53,26,78,0.08); }
+.mp-sub-title { margin: 0 0 10px; font-size: 12px; font-weight: 700; color: rgba(43,23,64,0.75); }
+.mp-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.mp-chips li { padding: 7px 14px; border-radius: 999px; border: 1px solid rgba(53,26,78,0.14); background: #fff; font-size: 13px; font-weight: 600; color: #35194E; }
+.mp-muted { margin: 0; font-size: 14px; color: rgba(43,23,64,0.6); }
+.mp-trophy { display: inline-grid; place-items: center; flex: none; width: 44px; height: 44px; border-radius: 14px; background: rgba(224,181,88,0.16); color: #8F6420; }
+.mp-missing { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 14px 0 0; font-size: 14.5px; color: rgba(43,23,64,0.58); }
+.mp-card .mp-missing { margin-top: 0; }
+.mp-missing-cta { padding: 0; border: 0; background: none; font: inherit; font-size: 13.5px; font-weight: 700; color: #6B3E96; cursor: pointer; }
+.mp-missing-cta:hover { text-decoration: underline; }
+.mp-missing-cta:focus-visible { outline: 3px solid #6B3E96; outline-offset: 3px; border-radius: 4px; }
+
+@media (max-width: 1100px) {
+  .mp-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mp-stat:nth-child(3) { border-left: 0; }
+  .mp-stat:nth-child(n+3) { border-top: 1px solid rgba(53,26,78,0.08); }
+}
+@media (max-width: 640px) {
+  .mp-tiles { grid-template-columns: 1fr; }
+  .mp-card { padding: 22px 20px; }
+  .mp-stat { padding: 18px 16px; }
+  .mp-stat-value { font-size: 26px; }
+  .mp-stat-value--text, .mp-stat-value--soon { font-size: 17px; }
+  .mp-lead { font-size: 16px; }
+}

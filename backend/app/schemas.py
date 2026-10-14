@@ -499,7 +499,9 @@ class MemberDetail(MemberListItem):
     interests: str | None
     seeking_mentor: bool
     trust_score: int
-    growth_points: int
+    growth_points: int                       # pending + available ledger points; 0 when Growth Points are not visible to the viewer
+    growth_points_visible: bool = False       # same rule as the viewer's own Growth Points page
+    growth_points_preview: bool = True        # True while redemption is not active: the figure is a preview, not spendable
     referrals_given: int
     referrals_received: int
 

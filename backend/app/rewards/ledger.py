@@ -81,6 +81,15 @@ async def lots(db: AsyncSession, *, member_id: str | None = None, reference_type
     return out
 
 
+async def member_balance(db: AsyncSession, member_id: str, now: datetime | None = None) -> dict[str, int]:
+    """A member's points that still count: pending + available lots (expired, voided, reversed and redeemed points excluded). The single
+    definition used by the member's own Growth Points page and by their profile."""
+    found = await lots(db, member_id=member_id, now=now)
+    pending = sum(l.remaining for l in found if l.state == "PENDING")
+    available = sum(l.remaining for l in found if l.state == "AVAILABLE")
+    return {"total": pending + available, "pending": pending, "available": available}
+
+
 async def balance_row(db: AsyncSession, member_id: str) -> GrowthPointBalance:
     row = await db.get(GrowthPointBalance, member_id)
     if row is None:

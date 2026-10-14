@@ -827,7 +827,7 @@ async def member_search(
 @router.get("/networking/members/{member_id}", response_model=MemberDetail)
 async def member_detail(
     member_id: str,
-    _: User = Depends(require_active_networking_member),
+    viewer: User = Depends(require_active_networking_member),
     db: AsyncSession = Depends(get_db),
 ) -> MemberDetail:
     row = (
@@ -842,6 +842,13 @@ async def member_detail(
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Member not found")
     p, b, profile, photo_key = row
+    # Growth Points: the member's real balance from the ledger (the legacy networking_profiles.growth_points column is never written), shown
+    # under exactly the rule that shows the viewer their OWN points: the member preview, or real redemption open for the viewer. A total only.
+    from ..redemption import service as redemption_service
+    from ..rewards import firewall, ledger as gp_ledger
+    gp_open = (await redemption_service.allowed(db, viewer))[0]            # no query at all while redemption is switched off
+    gp_visible = firewall.member_preview_enabled() or gp_open
+    gp_total = (await gp_ledger.member_balance(db, p.user_id))["total"] if gp_visible else 0
     given = await db.scalar(select(func.count()).select_from(BusinessReferral).where(BusinessReferral.giver_user_id == p.user_id)) or 0
     received = await db.scalar(select(func.count()).select_from(BusinessReferral).where(BusinessReferral.receiver_user_id == p.user_id)) or 0
     return MemberDetail(
@@ -859,7 +866,9 @@ async def member_detail(
         interests=p.interests,
         seeking_mentor=p.seeking_mentor,
         trust_score=p.trust_score,
-        growth_points=p.growth_points,
+        growth_points=gp_total,
+        growth_points_visible=gp_visible,
+        growth_points_preview=not gp_open,
         referrals_given=given,
         referrals_received=received,
         photo_url=photo_url_for(p.user_id, photo_key),
